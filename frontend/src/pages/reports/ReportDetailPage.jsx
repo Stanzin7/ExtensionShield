@@ -1,0 +1,478 @@
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import { Card, CardContent } from "../../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Download, X } from "lucide-react";
+import FileViewerModal from "../../components/FileViewerModal";
+import realScanService from "../../services/realScanService";
+import databaseService from "../../services/databaseService";
+import "./ReportDetailPage.scss";
+
+// Permission to capability mapping with icons
+const CAPABILITY_MAP = {
+  tabCapture: { icon: "🎥", label: "Screen Capture", desc: "Can record your screen or tabs", risk: "medium" },
+  tabs: { icon: "📑", label: "Tab Access", desc: "Can see your open tabs", risk: "low" },
+  storage: { icon: "💾", label: "Data Storage", desc: "Stores data on your device", risk: "low" },
+  cookies: { icon: "🍪", label: "Cookie Access", desc: "Can read website cookies", risk: "medium" },
+  history: { icon: "📜", label: "Browsing History", desc: "Can see your browsing history", risk: "high" },
+  bookmarks: { icon: "🔖", label: "Bookmarks", desc: "Can access your bookmarks", risk: "low" },
+  downloads: { icon: "📥", label: "Downloads", desc: "Can manage downloads", risk: "medium" },
+  geolocation: { icon: "📍", label: "Location", desc: "Can access your location", risk: "high" },
+  notifications: { icon: "🔔", label: "Notifications", desc: "Can send notifications", risk: "low" },
+  webRequest: { icon: "🌐", label: "Network Access", desc: "Can monitor network traffic", risk: "high" },
+  activeTab: { icon: "👁️", label: "Active Tab", desc: "Can see current tab content", risk: "medium" },
+  clipboardRead: { icon: "📋", label: "Clipboard Read", desc: "Can read your clipboard", risk: "high" },
+  clipboardWrite: { icon: "✏️", label: "Clipboard Write", desc: "Can write to clipboard", risk: "low" },
+  management: { icon: "⚙️", label: "Extension Management", desc: "Can manage other extensions", risk: "high" },
+  "<all_urls>": { icon: "🌍", label: "All Websites", desc: "Access to all websites", risk: "high" },
+  identity: { icon: "👤", label: "Identity", desc: "Can access your identity", risk: "high" },
+  alarms: { icon: "⏰", label: "Scheduled Tasks", desc: "Can run scheduled tasks", risk: "low" },
+  contextMenus: { icon: "📝", label: "Context Menu", desc: "Adds right-click options", risk: "low" },
+  scripting: { icon: "💻", label: "Script Injection", desc: "Can inject scripts into pages", risk: "high" },
+};
+
+const ReportDetailPage = () => {
+  const { reportId } = useParams();
+  const navigate = useNavigate();
+
+  const [scanResults, setScanResults] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showInfoPopup, setShowInfoPopup] = useState(null);
+  const [fileViewerModal, setFileViewerModal] = useState({ isOpen: false, file: null });
+
+  useEffect(() => {
+    loadReportData(reportId);
+  }, [reportId]);
+
+  const loadReportData = async (extId) => {
+    try {
+      setIsLoading(true);
+      let results = await databaseService.getScanResult(extId);
+      if (!results) {
+        results = await realScanService.getRealScanResults(extId);
+      }
+      if (results && !results.files) {
+        results = realScanService.formatRealResults(results);
+      }
+      setScanResults(results);
+      setError(null);
+    } catch (err) {
+      setError("Failed to load report data");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleViewFile = (file) => {
+    setFileViewerModal({ isOpen: true, file });
+  };
+
+  const getFileContent = async (extensionId, filePath) => {
+    return await realScanService.getFileContent(extensionId, filePath);
+  };
+
+  const handleExportPDF = () => {
+    if (reportId) {
+      const baseURL = import.meta.env.VITE_API_URL || "";
+      window.open(`${baseURL}/api/scan/report/${reportId}`, '_blank');
+    }
+  };
+
+  // Get trust level info
+  const getTrustLevel = (score) => {
+    if (score >= 80) return { label: "Trusted", color: "green", icon: "✓" };
+    if (score >= 60) return { label: "Moderate", color: "yellow", icon: "!" };
+    if (score >= 40) return { label: "Caution", color: "orange", icon: "⚡" };
+    return { label: "Warning", color: "red", icon: "⚠" };
+  };
+
+  // Parse capabilities from permissions
+  const getCapabilities = (permissions) => {
+    if (!permissions) return [];
+    return permissions.map(p => {
+      const permName = p.name || p;
+      const mapped = CAPABILITY_MAP[permName];
+      if (mapped) {
+        return { ...mapped, name: permName, originalRisk: p.risk };
+      }
+      return {
+        icon: "🔧",
+        label: permName,
+        desc: p.description || "Extension capability",
+        risk: p.risk?.toLowerCase() || "low",
+        name: permName
+      };
+    });
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="report-detail-page">
+        <div className="report-bg-effects">
+          <div className="report-bg-gradient report-gradient-1" />
+          <div className="report-bg-gradient report-gradient-2" />
+        </div>
+        <div className="report-content">
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Analyzing extension...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (!scanResults && error) {
+    return (
+      <div className="report-detail-page">
+        <div className="report-bg-effects">
+          <div className="report-bg-gradient report-gradient-1" />
+          <div className="report-bg-gradient report-gradient-2" />
+        </div>
+        <div className="report-content">
+          <div className="error-container">
+            <div className="error-icon">⚠️</div>
+            <h2>Report Not Found</h2>
+            <p>{error}</p>
+            <Button onClick={() => navigate("/reports")}>Back to Reports</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const trustLevel = getTrustLevel(scanResults?.securityScore || 0);
+  const capabilities = getCapabilities(scanResults?.permissions);
+  const highRiskCaps = capabilities.filter(c => c.risk === "high");
+
+  // Determine overall behavior assessment
+  const hasNetworkAccess = capabilities.some(c => ["webRequest", "<all_urls>", "Network Access"].includes(c.name));
+  const hasDataAccess = capabilities.some(c => ["history", "cookies", "clipboardRead", "identity"].includes(c.name));
+  const hasScreenCapture = capabilities.some(c => ["tabCapture", "Screen Capture"].includes(c.name) || c.label === "Screen Capture");
+
+  // Info items for the popup
+  const infoItems = [
+    { icon: "🧩", label: "Extension Name", value: scanResults?.name || "Unknown" },
+    { icon: "👤", label: "Developer", value: scanResults?.developer || "Unknown" },
+    { icon: "📦", label: "Version", value: scanResults?.version || "Unknown" },
+    { icon: "📅", label: "Last Updated", value: scanResults?.lastUpdated || "Unknown" },
+  ];
+
+  return (
+    <div className="report-detail-page">
+      {/* Background Effects */}
+      <div className="report-bg-effects">
+        <div className="report-bg-gradient report-gradient-1" />
+        <div className="report-bg-gradient report-gradient-2" />
+      </div>
+
+      {/* Content */}
+      <div className="report-content">
+        {/* Navigation */}
+        <div className="report-nav">
+          <Link to="/reports" className="back-link">← Back to Reports</Link>
+          <div className="nav-actions">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/scanner/results/${reportId}`)}>
+              Full Analysis
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              📥 PDF
+            </Button>
+          </div>
+        </div>
+
+        {/* Unified Hero Section - Centered */}
+        <section className="report-hero">
+          {/* Extension Identity */}
+          <div className="hero-identity">
+            <h1 className="hero-title">{scanResults?.name || "Extension Report"}</h1>
+            <div className="hero-meta">
+              <code className="extension-id">{reportId}</code>
+              {scanResults?.version && <span className="version-badge">v{scanResults.version}</span>}
+              <button 
+                className="info-trigger-inline"
+                onClick={() => setShowInfoPopup(!showInfoPopup)}
+                title="View extension details"
+              >
+                ℹ️
+              </button>
+            </div>
+          </div>
+
+          {/* Trust Score Card */}
+          <div className={`trust-card trust-${trustLevel.color}`}>
+            <div className={`trust-circle trust-${trustLevel.color}`}>
+              <span className="trust-number">{scanResults?.securityScore || 0}</span>
+              <span className="trust-max">/100</span>
+            </div>
+            
+            <div className="trust-details">
+              <span className={`trust-badge trust-${trustLevel.color}`}>
+                {trustLevel.icon} {trustLevel.label}
+              </span>
+              
+              <div className={`verdict-banner verdict-${trustLevel.color}`}>
+                <span className="verdict-icon">
+                  {scanResults?.securityScore >= 80 ? "✅" : scanResults?.securityScore >= 60 ? "⚠️" : "🚨"}
+                </span>
+                <span className="verdict-text">
+                  {scanResults?.securityScore >= 80 
+                    ? "Safe to use" 
+                    : scanResults?.securityScore >= 60 
+                      ? "Review recommended"
+                      : "Proceed with caution"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Scan Meta */}
+          <div className="scan-meta">
+            <span className="scan-timestamp">
+              🕐 {scanResults?.timestamp 
+                ? new Date(scanResults.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                : 'Recently'}
+            </span>
+            <span className="meta-dot">•</span>
+            <span className="scan-files">
+              📁 {scanResults?.files?.length || 0} files analyzed
+            </span>
+          </div>
+        </section>
+
+        {/* Info Popup */}
+        {showInfoPopup && (
+          <div className="info-popup-overlay" onClick={() => setShowInfoPopup(false)}>
+            <div className="info-popup" onClick={(e) => e.stopPropagation()}>
+              <div className="info-popup-header">
+                <h3>Extension Details</h3>
+                <button className="close-popup" onClick={() => setShowInfoPopup(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="info-popup-content">
+                {infoItems.map((item, idx) => (
+                  <div key={idx} className="info-popup-item">
+                    <span className="info-popup-icon">{item.icon}</span>
+                    <div className="info-popup-text">
+                      <span className="info-popup-label">{item.label}</span>
+                      <span className="info-popup-value">{item.value}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs for Details - Right after Trust Score */}
+        <Tabs defaultValue="summary" className="results-tabs">
+          <TabsList className="tabs-list">
+            <TabsTrigger value="summary" className="tab-with-icon">
+              <span className="tab-icon">📋</span>
+              <span className="tab-label">Summary</span>
+            </TabsTrigger>
+            <TabsTrigger value="permissions" className="tab-with-icon">
+              <span className="tab-icon">👁️</span>
+              <span className="tab-label">Permissions</span>
+            </TabsTrigger>
+            <TabsTrigger value="security" className="tab-with-icon">
+              <span className="tab-icon">🛡️</span>
+              <span className="tab-label">Security</span>
+            </TabsTrigger>
+            <TabsTrigger value="actions" className="tab-with-icon">
+              <span className="tab-icon">✅</span>
+              <span className="tab-label">Actions</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Summary Tab */}
+          <TabsContent value="summary" className="tab-content">
+            <Card className="content-card">
+              <CardContent className="summary-content">
+                <div className="summary-icon">💡</div>
+                <div className="summary-text">
+                  <h3>Analysis Summary</h3>
+                  <p>{scanResults?.executiveSummary || "This extension has been analyzed for security concerns."}</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Quick Risk Indicators in Summary */}
+            {(highRiskCaps.length > 0 || scanResults?.totalFindings > 0) && (
+              <div className="risk-alerts">
+                {highRiskCaps.length > 0 && (
+                  <div className="risk-alert warning">
+                    <span className="alert-icon">⚠️</span>
+                    <span>{highRiskCaps.length} sensitive permission{highRiskCaps.length > 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                {scanResults?.totalFindings > 0 && (
+                  <div className="risk-alert danger">
+                    <span className="alert-icon">🚨</span>
+                    <span>{scanResults.totalFindings} issue{scanResults.totalFindings > 1 ? 's' : ''} found</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Permissions Tab - What This Extension Can Do */}
+          <TabsContent value="permissions" className="tab-content">
+            <div className="permissions-overview">
+              {/* Behavior Cards */}
+              <div className="behavior-cards">
+                <div className={`behavior-card ${hasNetworkAccess ? "active" : "inactive"}`}>
+                  <span className="behavior-icon">🌐</span>
+                  <span className="behavior-label">Network</span>
+                  <span className={`behavior-status ${hasNetworkAccess ? "yes" : "no"}`}>
+                    {hasNetworkAccess ? "Yes" : "No"}
+                  </span>
+                </div>
+                <div className={`behavior-card ${hasDataAccess ? "active" : "inactive"}`}>
+                  <span className="behavior-icon">📊</span>
+                  <span className="behavior-label">Data</span>
+                  <span className={`behavior-status ${hasDataAccess ? "yes" : "no"}`}>
+                    {hasDataAccess ? "Yes" : "No"}
+                  </span>
+                </div>
+                <div className={`behavior-card ${hasScreenCapture ? "active" : "inactive"}`}>
+                  <span className="behavior-icon">🎥</span>
+                  <span className="behavior-label">Screen</span>
+                  <span className={`behavior-status ${hasScreenCapture ? "yes" : "no"}`}>
+                    {hasScreenCapture ? "Yes" : "No"}
+                  </span>
+                </div>
+                <div className={`behavior-card ${highRiskCaps.length > 0 ? "active warning" : "inactive"}`}>
+                  <span className="behavior-icon">⚠️</span>
+                  <span className="behavior-label">Sensitive</span>
+                  <span className={`behavior-status ${highRiskCaps.length > 0 ? "yes" : "no"}`}>
+                    {highRiskCaps.length || "None"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Capabilities List */}
+              {capabilities.length > 0 && (
+                <div className="capability-section">
+                  <h4 className="capability-section-title">All Permissions</h4>
+                  <div className="capability-list">
+                    {capabilities.map((cap, idx) => (
+                      <div key={idx} className={`capability-chip risk-${cap.risk}`}>
+                        <span className="chip-icon">{cap.icon}</span>
+                        <span className="chip-label">{cap.label}</span>
+                        <span className="chip-risk">{cap.risk === "high" ? "🔴" : cap.risk === "medium" ? "🟡" : "🟢"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {capabilities.length === 0 && (
+                <div className="no-capabilities">
+                  <span>✨</span>
+                  <p>Minimal permissions required</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="security" className="tab-content">
+            <div className="security-checks">
+              <div className={`check-item ${(scanResults?.virustotalAnalysis?.total_malicious || 0) === 0 ? "pass" : "fail"}`}>
+                <span className="check-icon">{(scanResults?.virustotalAnalysis?.total_malicious || 0) === 0 ? "✅" : "❌"}</span>
+                <div className="check-info">
+                  <span className="check-name">Malware Free</span>
+                  <span className="check-desc">No known malware detected</span>
+                </div>
+              </div>
+              <div className={`check-item ${(scanResults?.entropyAnalysis?.obfuscated_files || 0) === 0 ? "pass" : "warn"}`}>
+                <span className="check-icon">{(scanResults?.entropyAnalysis?.obfuscated_files || 0) === 0 ? "✅" : "⚠️"}</span>
+                <div className="check-info">
+                  <span className="check-name">Code Transparency</span>
+                  <span className="check-desc">{(scanResults?.entropyAnalysis?.obfuscated_files || 0) === 0 ? "Code is readable" : "Some code may be hidden"}</span>
+                </div>
+              </div>
+              <div className={`check-item ${highRiskCaps.length === 0 ? "pass" : highRiskCaps.length <= 2 ? "warn" : "fail"}`}>
+                <span className="check-icon">{highRiskCaps.length === 0 ? "✅" : highRiskCaps.length <= 2 ? "⚠️" : "❌"}</span>
+                <div className="check-info">
+                  <span className="check-name">Permission Scope</span>
+                  <span className="check-desc">{highRiskCaps.length === 0 ? "Minimal permissions" : `${highRiskCaps.length} sensitive permission(s)`}</span>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Actions Tab */}
+          <TabsContent value="actions" className="tab-content">
+            <div className="actions-content">
+              {scanResults?.securityScore >= 80 ? (
+                <div className="action-card success">
+                  <span className="action-icon">✅</span>
+                  <div className="action-text">
+                    <h4>Safe to Use</h4>
+                    <p>This extension appears safe. No immediate action required.</p>
+                  </div>
+                </div>
+              ) : scanResults?.securityScore >= 50 ? (
+                <div className="action-card warning">
+                  <span className="action-icon">⚡</span>
+                  <div className="action-text">
+                    <h4>Review Recommended</h4>
+                    <p>Consider reviewing the capabilities before installing.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="action-card danger">
+                  <span className="action-icon">⚠️</span>
+                  <div className="action-text">
+                    <h4>Proceed with Caution</h4>
+                    <p>This extension has concerning characteristics.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="action-list">
+                <div className="action-item">
+                  <span>🔒</span>
+                  <span>Review permissions before installing</span>
+                </div>
+                <div className="action-item">
+                  <span>👤</span>
+                  <span>Verify the developer is trustworthy</span>
+                </div>
+                <div className="action-item">
+                  <span>⭐</span>
+                  <span>Check user reviews in Chrome Web Store</span>
+                </div>
+              </div>
+
+              {/* Export */}
+              <Button onClick={handleExportPDF} className="export-btn">
+                <Download size={16} />
+                Download Full Report
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <FileViewerModal
+          isOpen={fileViewerModal.isOpen}
+          onClose={() => setFileViewerModal({ isOpen: false, file: null })}
+          file={fileViewerModal.file}
+          extensionId={reportId}
+          onGetFileContent={getFileContent}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default ReportDetailPage;

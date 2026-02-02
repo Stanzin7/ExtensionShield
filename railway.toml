@@ -1,0 +1,40 @@
+# Railway Configuration for ExtensionShield
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+# Use the existing Dockerfile for building
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Number of replicas (Railway handles scaling)
+numReplicas = 1
+
+# Health check configuration
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+
+# Start command timeout - give more time for Python/UV to initialize
+startCommand = ""
+
+# Restart policy
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Resource limits (optional - adjust based on your plan)
+# memory = "1GB"
+# cpu = 1
+
+[env]
+# Default environment variables
+# Secrets should be set in Railway dashboard, not here
+# Note: Do NOT set PORT here - Railway will inject it automatically
+PYTHONDONTWRITEBYTECODE = "1"
+PYTHONUNBUFFERED = "1"
+LLM_PROVIDER = "openai"
+
+[static]
+# Not used since we serve static files via FastAPI
+disabled = true
+
+
