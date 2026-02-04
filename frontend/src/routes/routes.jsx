@@ -1,0 +1,300 @@
+import React from "react";
+import { Navigate } from "react-router-dom";
+
+// Lazy load pages for better code splitting
+const HomePage = React.lazy(() => import("../pages/HomePage"));
+const ScannerPage = React.lazy(() => import("../pages/scanner/ScannerPage"));
+const ScanProgressPage = React.lazy(() => import("../pages/scanner/ScanProgressPage"));
+const ScanResultsPageV2 = React.lazy(() => import("../pages/scanner/ScanResultsPageV2"));
+const ScanHistoryPage = React.lazy(() => import("../pages/ScanHistoryPage"));
+const EnterprisePage = React.lazy(() => import("../pages/EnterprisePage"));
+const SettingsPage = React.lazy(() => import("../pages/SettingsPage"));
+
+// Research Pages
+const ResearchPage = React.lazy(() => import("../pages/research/ResearchPage"));
+const MethodologyPage = React.lazy(() => import("../pages/research/MethodologyPage"));
+const CaseStudiesPage = React.lazy(() => import("../pages/research/CaseStudiesPage"));
+const HoneyCaseStudyPage = React.lazy(() => import("../pages/research/HoneyCaseStudyPage"));
+
+// GSoC / Open Source Pages
+const GSoCIdeasPage = React.lazy(() => import("../pages/gsoc/GSoCIdeasPage"));
+const ContributePage = React.lazy(() => import("../pages/gsoc/ContributePage"));
+const CommunityPage = React.lazy(() => import("../pages/gsoc/CommunityPage"));
+const BlogPage = React.lazy(() => import("../pages/gsoc/BlogPage"));
+const OpenSourcePage = React.lazy(() => import("../pages/open-source/OpenSourcePage"));
+
+// Extension Pages
+const ExtensionPage = React.lazy(() => import("../pages/extension/ExtensionPage"));
+const ExtensionVersionPage = React.lazy(() => import("../pages/extension/ExtensionVersionPage"));
+
+// Reports (Enterprise)
+const ReportsPage = React.lazy(() => import("../pages/reports/ReportsPage"));
+const ReportDetailPage = React.lazy(() => import("../pages/reports/ReportDetailPage"));
+
+/**
+ * Route Configuration
+ * 
+ * Each route object can have:
+ * - path: string (required)
+ * - element: React component (required)
+ * - seo: { title, description, canonical } (optional, for sitemap generation)
+ * - priority: number 0-1 (optional, for sitemap)
+ * - changefreq: string (optional, for sitemap)
+ */
+export const routes = [
+  // ============ CORE ROUTES ============
+  {
+    path: "/",
+    element: <HomePage />,
+    seo: {
+      title: "ExtensionShield - Chrome Extension Security Scanner",
+      description: "Analyze Chrome extensions for hidden threats, malware, and privacy risks. Free security scanning powered by AI and static analysis.",
+      canonical: "/"
+    },
+    priority: 1.0,
+    changefreq: "weekly"
+  },
+
+  // ============ SCAN ROUTES ============
+  {
+    path: "/scan",
+    element: <ScannerPage />,
+    seo: {
+      title: "Scan Chrome Extension | ExtensionShield",
+      description: "Scan any Chrome extension for security vulnerabilities, privacy risks, and compliance issues.",
+      canonical: "/scan"
+    },
+    priority: 0.9,
+    changefreq: "weekly"
+  },
+  {
+    path: "/scan/history",
+    element: <ScanHistoryPage />,
+    seo: {
+      title: "Scan History | ExtensionShield",
+      description: "View your Chrome extension scan history and past security reports.",
+      canonical: "/scan/history"
+    },
+    priority: 0.7,
+    changefreq: "weekly"
+  },
+  {
+    path: "/scan/progress/:scanId",
+    element: <ScanProgressPage />
+  },
+  {
+    path: "/scan/results/:scanId",
+    element: <ScanResultsPageV2 />
+  },
+
+  // ============ EXTENSION ROUTES (CANONICAL) ============
+  {
+    path: "/extension/:extensionId",
+    element: <ExtensionPage />,
+    seo: {
+      title: "Extension Security Report | ExtensionShield",
+      description: "Security analysis and risk assessment for Chrome extension.",
+      canonical: "/extension/:extensionId"
+    }
+  },
+  {
+    path: "/extension/:extensionId/version/:buildHash",
+    element: <ExtensionVersionPage />,
+    seo: {
+      title: "Extension Version Report | ExtensionShield",
+      description: "Detailed security report for specific extension build.",
+      canonical: "/extension/:extensionId/version/:buildHash"
+    }
+  },
+
+  // ============ RESEARCH ROUTES ============
+  {
+    path: "/research",
+    element: <ResearchPage />,
+    seo: {
+      title: "Extension Threat Research & Case Studies | ExtensionShield",
+      description: "In-depth security research on Chrome extension threats, malware analysis, and case studies.",
+      canonical: "/research"
+    },
+    priority: 0.8,
+    changefreq: "weekly"
+  },
+  {
+    path: "/research/case-studies",
+    element: <CaseStudiesPage />,
+    seo: {
+      title: "Extension Security Case Studies | ExtensionShield",
+      description: "Real-world case studies of malicious Chrome extensions.",
+      canonical: "/research/case-studies"
+    },
+    priority: 0.8,
+    changefreq: "weekly"
+  },
+  {
+    path: "/research/case-studies/honey",
+    element: <HoneyCaseStudyPage />,
+    seo: {
+      title: "Honey Extension Scam Case Study | ExtensionShield",
+      description: "In-depth analysis of how PayPal's Honey extension hijacked affiliate links and deceived 17 million users.",
+      canonical: "/research/case-studies/honey"
+    },
+    priority: 0.7,
+    changefreq: "monthly"
+  },
+  {
+    path: "/research/methodology",
+    element: <MethodologyPage />,
+    seo: {
+      title: "Methodology: How ExtensionShield Scores Risk | ExtensionShield",
+      description: "Learn how ExtensionShield analyzes Chrome extensions using static analysis, threat intelligence, and evidence chain-of-custody.",
+      canonical: "/research/methodology"
+    },
+    priority: 0.7,
+    changefreq: "monthly"
+  },
+
+  // ============ ENTERPRISE ROUTES ============
+  {
+    path: "/enterprise",
+    element: <EnterprisePage />,
+    seo: {
+      title: "Enterprise Extension Security | ExtensionShield",
+      description: "Enterprise-grade Chrome extension security with monitoring, governance, and compliance.",
+      canonical: "/enterprise"
+    },
+    priority: 0.8,
+    changefreq: "monthly"
+  },
+
+  // ============ OPEN SOURCE / GSOC ROUTES ============
+  {
+    path: "/open-source",
+    element: <OpenSourcePage />,
+    seo: {
+      title: "Open Source | ExtensionShield",
+      description: "ExtensionShield is open source. Explore our GitHub, contribute code, or join our GSoC program.",
+      canonical: "/open-source"
+    },
+    priority: 0.7,
+    changefreq: "monthly"
+  },
+  {
+    path: "/open-source/gsoc",
+    element: <Navigate to="/gsoc/ideas" replace />
+  },
+  {
+    path: "/gsoc/ideas",
+    element: <GSoCIdeasPage />,
+    seo: {
+      title: "Google Summer of Code Ideas | ExtensionShield",
+      description: "GSoC project ideas for ExtensionShield: ML detection, browser support, real-time monitoring, and more.",
+      canonical: "/gsoc/ideas"
+    },
+    priority: 0.7,
+    changefreq: "monthly"
+  },
+  {
+    path: "/contribute",
+    element: <ContributePage />,
+    seo: {
+      title: "Contribute to ExtensionShield | Open Source",
+      description: "How to contribute to ExtensionShield: setup guide, contribution guidelines, and getting started.",
+      canonical: "/contribute"
+    },
+    priority: 0.6,
+    changefreq: "monthly"
+  },
+  {
+    path: "/gsoc/community",
+    element: <CommunityPage />,
+    seo: {
+      title: "Join the Community | ExtensionShield",
+      description: "Join the ExtensionShield community: Discord, GitHub Discussions, and more.",
+      canonical: "/gsoc/community"
+    },
+    priority: 0.5,
+    changefreq: "monthly"
+  },
+  {
+    path: "/gsoc/blog",
+    element: <BlogPage />,
+    seo: {
+      title: "Blog | ExtensionShield",
+      description: "ExtensionShield blog: updates, tutorials, and research on browser extension security.",
+      canonical: "/gsoc/blog"
+    },
+    priority: 0.5,
+    changefreq: "weekly"
+  },
+
+  // ============ REPORTS (ENTERPRISE) ============
+  {
+    path: "/reports",
+    element: <ReportsPage />
+  },
+  {
+    path: "/reports/:reportId",
+    element: <ReportDetailPage />
+  },
+
+  // ============ SETTINGS ============
+  {
+    path: "/settings",
+    element: <SettingsPage />
+  },
+
+  // ============ LEGACY REDIRECTS ============
+  {
+    path: "/scanner",
+    element: <Navigate to="/scan" replace />
+  },
+  {
+    path: "/scanner/progress/:scanId",
+    element: <Navigate to="/scan/progress/:scanId" replace />
+  },
+  {
+    path: "/scanner/results/:scanId",
+    element: <Navigate to="/scan/results/:scanId" replace />
+  },
+  {
+    path: "/history",
+    element: <Navigate to="/scan/history" replace />
+  },
+  {
+    path: "/dashboard",
+    element: <Navigate to="/scan" replace />
+  },
+  {
+    path: "/scan-history",
+    element: <Navigate to="/scan/history" replace />
+  },
+  {
+    path: "/sample-report",
+    element: <Navigate to="/research/case-studies/honey" replace />
+  },
+  {
+    path: "/analysis",
+    element: <Navigate to="/scan" replace />
+  },
+
+  // ============ CATCH-ALL ============
+  {
+    path: "*",
+    element: <Navigate to="/" replace />
+  }
+];
+
+/**
+ * Get all routes that should be in the sitemap
+ * Excludes dynamic routes, redirects, and non-SEO routes
+ */
+export const getSitemapRoutes = () => {
+  return routes.filter(route => 
+    route.seo && 
+    !route.path.includes(":") && 
+    !route.path.includes("*")
+  );
+};
+
+export default routes;
+

@@ -1,0 +1,245 @@
+/* ============================================================================
+   GSoC Ideas Page
+   ============================================================================ */
+
+.gsoc-ideas-page {
+  min-height: 100vh;
+  background: var(--atlas-bg-primary, #030712);
+  color: var(--atlas-text-primary, #f8fafc);
+  position: relative;
+}
+
+.gsoc-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 60% 40% at 30% 20%, rgba(251, 191, 36, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 70% 80%, rgba(34, 197, 94, 0.08) 0%, transparent 50%);
+  }
+}
+
+.gsoc-content {
+  position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 6rem 2rem 4rem;
+}
+
+.gsoc-header {
+  text-align: center;
+  margin-bottom: 3rem;
+  
+  h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  p {
+    font-size: 1.125rem;
+    color: var(--atlas-text-secondary, #94a3b8);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+}
+
+.gsoc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(249, 115, 22, 0.1) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fbbf24;
+  margin-bottom: 1.5rem;
+}
+
+.gsoc-logo {
+  font-size: 1.25rem;
+}
+
+.ideas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.idea-card {
+  padding: 2rem;
+  background: rgba(10, 15, 26, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.idea-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--atlas-text-primary, #f8fafc);
+    margin: 0;
+  }
+}
+
+.difficulty-badge {
+  padding: 0.25rem 0.625rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  
+  &.easy {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+  }
+  
+  &.medium {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fde047;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+  }
+  
+  &.hard {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+  }
+}
+
+.idea-description {
+  font-size: 0.9375rem;
+  color: var(--atlas-text-secondary, #94a3b8);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.idea-skills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.skill-tag {
+  padding: 0.25rem 0.625rem;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #a78bfa;
+}
+
+.idea-goals {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  
+  h4 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--atlas-text-primary, #f8fafc);
+    margin-bottom: 0.75rem;
+  }
+  
+  ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    
+    li {
+      font-size: 0.875rem;
+      color: var(--atlas-text-secondary, #94a3b8);
+      line-height: 1.5;
+    }
+  }
+}
+
+.gsoc-cta {
+  margin-top: 3rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(10, 15, 26, 0.6) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 16px;
+  text-align: center;
+  
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--atlas-text-primary, #f8fafc);
+  }
+  
+  p {
+    font-size: 0.9375rem;
+    color: var(--atlas-text-secondary, #94a3b8);
+    margin-bottom: 1.5rem;
+  }
+}
+
+.cta-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  
+  &.primary {
+    background: var(--atlas-accent, #22c55e);
+    color: #030712;
+    
+    &:hover {
+      box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+    }
+  }
+  
+  &.secondary {
+    background: transparent;
+    color: var(--atlas-text-primary, #f8fafc);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    
+    &:hover {
+      border-color: var(--atlas-accent, #22c55e);
+      color: var(--atlas-accent, #22c55e);
+    }
+  }
+}
+
