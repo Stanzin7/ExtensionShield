@@ -17,10 +17,16 @@ const ScanProgressPage = () => {
     currentExtensionId,
   } = useScan();
 
-  // If we have results and the scan is complete, redirect to results page
+  // If we have results and the scan is complete, redirect to canonical URL
   useEffect(() => {
     if (scanResults && !isScanning && currentExtensionId === scanId) {
-      navigate(`/scanner/results/${scanId}`, { replace: true });
+      // If we have both extensionId and buildHash, use canonical URL
+      if (scanResults.extension_id && scanResults.build_hash) {
+        navigate(`/extension/${scanResults.extension_id}/version/${scanResults.build_hash}`, { replace: true });
+      } else {
+        // Fallback to scan results URL (will then redirect to canonical if possible)
+        navigate(`/scan/results/${scanId}`, { replace: true });
+      }
     }
   }, [scanResults, isScanning, scanId, currentExtensionId, navigate]);
 
@@ -32,7 +38,7 @@ const ScanProgressPage = () => {
       <div className="progress-container">
         {/* Header */}
         <div className="progress-header">
-          <Link to="/scanner" className="back-link">
+          <Link to="/scan" className="back-link">
             ← Back to Scanner
           </Link>
           <h1 className="progress-title">
@@ -124,7 +130,7 @@ const ScanProgressPage = () => {
               <Button onClick={() => setError(null)} variant="outline">
                 Dismiss
               </Button>
-              <Button onClick={() => navigate("/scanner")}>
+              <Button onClick={() => navigate("/scan")}>
                 Try Again
               </Button>
             </div>
@@ -141,10 +147,10 @@ const ScanProgressPage = () => {
               You can start a new scan or check the scan history.
             </p>
             <div className="no-scan-actions">
-              <Button onClick={() => navigate("/scanner")} variant="default">
+              <Button onClick={() => navigate("/scan")} variant="default">
                 Start New Scan
               </Button>
-              <Button onClick={() => navigate("/history")} variant="outline">
+              <Button onClick={() => navigate("/scan/history")} variant="outline">
                 View History
               </Button>
             </div>

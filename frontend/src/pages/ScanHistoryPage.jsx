@@ -320,11 +320,11 @@ const ScanHistoryPage = () => {
 
   // Actions
   const handleViewReport = (extId) => {
-    navigate(`/scanner/results/${extId}`);
+    navigate(`/scan/results/${extId}`);
   };
 
   const handleCopyLink = async (extId) => {
-    const link = `${window.location.origin}/scanner/results/${extId}`;
+    const link = `${window.location.origin}/scan/results/${extId}`;
     try {
       await navigator.clipboard.writeText(link);
       setCopiedId(extId);

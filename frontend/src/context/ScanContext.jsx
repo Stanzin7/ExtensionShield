@@ -142,7 +142,7 @@ export const ScanProvider = ({ children }) => {
       }
       
       // Navigate to progress page
-      navigate(`/scanner/progress/${extId}`);
+      navigate(`/scan/progress/${extId}`);
 
       const status = await realScanService.checkScanStatus(extId);
 
@@ -170,7 +170,7 @@ export const ScanProvider = ({ children }) => {
       await loadDashboardStats();
       
       // Navigate to results page
-      navigate(`/scanner/results/${extId}`);
+      navigate(`/scan/results/${extId}`);
     } catch (err) {
       setError(err.message || "Failed to scan extension.");
       setScanStage(null);
@@ -210,7 +210,7 @@ export const ScanProvider = ({ children }) => {
       setCurrentExtensionId(extensionId);
       
       // Navigate to progress page
-      navigate(`/scanner/progress/${extensionId}`);
+      navigate(`/scan/progress/${extensionId}`);
 
       await waitForScanCompletion(extensionId);
 
@@ -224,7 +224,7 @@ export const ScanProvider = ({ children }) => {
       await loadDashboardStats();
       
       // Navigate to results page
-      navigate(`/scanner/results/${extensionId}`);
+      navigate(`/scan/results/${extensionId}`);
     } catch (err) {
       setError(err.message || "Failed to upload and scan file.");
       setScanStage(null);
@@ -250,7 +250,7 @@ export const ScanProvider = ({ children }) => {
       setError("");
       
       // Navigate to results page
-      navigate(`/scanner/results/${extId}`);
+      navigate(`/scan/results/${extId}`);
     } catch (err) {
       console.error(err);
       setError("Failed to load scan results from history.");

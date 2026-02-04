@@ -8,11 +8,12 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run generate:sitemap && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
-    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\""
+    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
+    "generate:sitemap": "node scripts/generate-sitemap.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -23,6 +24,7 @@
     "axios": "^1.12.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-helmet-async": "^2.0.5",
     "react-router-dom": "^7.9.4"
   },
   "devDependencies": {

@@ -62,6 +62,17 @@ const ScanResultsPageV2 = () => {
     loadResults();
   }, [scanId, scanResults, currentExtensionId, loadResultsById]);
 
+  // Redirect to canonical URL if we have extensionId and buildHash
+  useEffect(() => {
+    if (scanResults && scanResults.extension_id && scanResults.build_hash) {
+      const canonicalUrl = `/extension/${scanResults.extension_id}/version/${scanResults.build_hash}`;
+      // Only redirect if we're not already on a canonical URL
+      if (!window.location.pathname.includes('/extension/')) {
+        navigate(canonicalUrl, { replace: true });
+      }
+    }
+  }, [scanResults, navigate]);
+
   // Normalize scan results when they change
   useEffect(() => {
     if (scanResults) {

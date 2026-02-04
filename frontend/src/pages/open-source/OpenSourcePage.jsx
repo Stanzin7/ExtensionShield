@@ -22,7 +22,7 @@ const OpenSourcePage = () => {
             <div className="oss-badge">🌱 Open Source</div>
             <h1>Built in the Open</h1>
             <p>
-              ExtensionShield is open source under the Apache 2.0 license. 
+              ExtensionShield is open source under the MIT license. 
               We believe browser security should be transparent and community-driven.
             </p>
           </header>
@@ -115,7 +115,7 @@ const OpenSourcePage = () => {
           <div className="license-section">
             <h3>License</h3>
             <p>
-              ExtensionShield is licensed under the <strong>Apache License 2.0</strong>. 
+              ExtensionShield is licensed under the <strong>MIT License</strong>. 
               You're free to use, modify, and distribute the code with attribution.
             </p>
           </div>

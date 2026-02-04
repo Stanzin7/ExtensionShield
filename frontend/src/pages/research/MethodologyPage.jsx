@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import RiskDial from "../../components/report/RiskDial";
 import "./MethodologyPage.scss";
 
 const MethodologyPage = () => {
@@ -8,13 +9,14 @@ const MethodologyPage = () => {
     <>
       <Helmet>
         <title>Methodology: How ExtensionShield Scores Risk | ExtensionShield</title>
-        <meta name="description" content="Learn how ExtensionShield analyzes Chrome extensions: static analysis, permission mapping, threat intelligence, and evidence chain-of-custody." />
+        <meta name="description" content="Learn how ExtensionShield analyzes Chrome extensions using three security pipelines: ThreatXtension open-source SAST, privacy analysis, and compliance monitoring." />
         <link rel="canonical" href="https://extensionaudit.com/research/methodology" />
       </Helmet>
 
       <div className="methodology-page">
         <div className="methodology-bg">
           <div className="bg-gradient" />
+          <div className="bg-grid" />
         </div>
 
         <div className="methodology-content">
@@ -26,110 +28,207 @@ const MethodologyPage = () => {
           </nav>
 
           <header className="methodology-header">
-            <h1>How ExtensionShield Scores Risk</h1>
-            <p>
-              Our multi-dimensional analysis combines static code analysis, permission evaluation, 
-              threat intelligence, and behavioral signals to produce an actionable security score.
+            <h1>How We Analyze Extensions</h1>
+            <p className="subtitle">
+              Three independent security pipelines combine to create comprehensive governance.
             </p>
           </header>
 
-          {/* Scan Types */}
-          <section className="methodology-section">
-            <h2>Scan Types</h2>
-            <div className="scan-types-grid">
-              <div className="scan-type-card">
-                <div className="scan-type-icon lookup">⚡</div>
-                <h3>Lookup</h3>
-                <p>
-                  Instant cached results when we've already analyzed that exact extension build hash. 
-                  No compute cost, no daily limit.
-                </p>
-              </div>
-              <div className="scan-type-card">
-                <div className="scan-type-icon deep">🔬</div>
-                <h3>Deep Scan</h3>
-                <p>
-                  Full static analysis + threat intelligence when we encounter a new build. 
-                  Includes LLM-powered code review and VirusTotal checks.
-                </p>
-              </div>
-              <div className="scan-type-card">
-                <div className="scan-type-icon monitor">📡</div>
-                <h3>Monitoring</h3>
-                <p>
-                  Continuous watch for extension updates with automatic re-scanning. 
-                  Get alerts when risk level changes. (Enterprise)
-                </p>
+          {/* Three Pipeline Flow - Vertical */}
+          <div className="pipeline-flow">
+            
+            {/* Pipeline 1: ThreatXtension (Open Source) */}
+            <div className="pipeline-card pipeline-1">
+              <div className="pipeline-number">01</div>
+              <div className="pipeline-content">
+                <div className="pipeline-left">
+                  <div className="pipeline-icon security">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      <path d="M9 12l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div className="pipeline-details">
+                    <div className="pipeline-badge open-source">
+                      <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                      </svg>
+                      OPEN SOURCE
+                    </div>
+                    <h3>Security Analysis</h3>
+                    <h4 className="tech-credit">
+                      Powered by <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer">ThreatXtension</a>
+                    </h4>
+                    <p>Static application security testing (SAST) with custom Semgrep rules detecting malicious patterns, obfuscation, and data exfiltration.</p>
+                    
+                    <div className="pipeline-features">
+                      <div className="feature-tag">Semgrep SAST</div>
+                      <div className="feature-tag">47+ Rules</div>
+                      <div className="feature-tag">Malware Detection</div>
+                      <div className="feature-tag">Code Obfuscation</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="pipeline-right">
+                  <div className="score-dial-wrapper">
+                    <RiskDial score={85} label="SECURITY" size={200} />
+                  </div>
+                </div>
               </div>
             </div>
-          </section>
 
-          {/* Scoring Dimensions */}
-          <section className="methodology-section">
-            <h2>Scoring Dimensions</h2>
-            <div className="dimensions-list">
-              <div className="dimension-item">
-                <div className="dimension-header">
-                  <span className="dimension-icon">🔐</span>
-                  <h3>Security Score</h3>
+            {/* Flow Arrow */}
+            <div className="flow-arrow">
+              <svg viewBox="0 0 24 48" fill="none">
+                <path d="M12 0 L12 40 M12 40 L8 36 M12 40 L16 36" stroke="rgba(148, 163, 184, 0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* Pipeline 2: Privacy Analysis */}
+            <div className="pipeline-card pipeline-2">
+              <div className="pipeline-number">02</div>
+              <div className="pipeline-content">
+                <div className="pipeline-left">
+                  <div className="pipeline-icon privacy">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </div>
+                  <div className="pipeline-details">
+                    <h3>Privacy Analysis</h3>
+                    <h4 className="tech-credit">Proprietary Engine</h4>
+                    <p>Behavioral analysis of data collection, third-party trackers, PII handling, and cross-origin communication patterns.</p>
+                    
+                    <div className="pipeline-features">
+                      <div className="feature-tag">Data Collection</div>
+                      <div className="feature-tag">Third-Party Tracking</div>
+                      <div className="feature-tag">PII Detection</div>
+                      <div className="feature-tag">Storage Audit</div>
+                    </div>
+                  </div>
                 </div>
-                <p>
-                  Evaluates code patterns, obfuscation detection, data exfiltration risks, 
-                  cryptographic operations, and known malicious signatures.
-                </p>
-              </div>
-              <div className="dimension-item">
-                <div className="dimension-header">
-                  <span className="dimension-icon">👁️</span>
-                  <h3>Privacy Score</h3>
+                <div className="pipeline-right">
+                  <div className="score-dial-wrapper">
+                    <RiskDial score={72} label="PRIVACY" size={200} />
+                  </div>
                 </div>
-                <p>
-                  Analyzes data collection patterns, third-party tracking, storage access, 
-                  and alignment with Chrome Web Store privacy disclosures.
-                </p>
-              </div>
-              <div className="dimension-item">
-                <div className="dimension-header">
-                  <span className="dimension-icon">📋</span>
-                  <h3>Governance Score</h3>
-                </div>
-                <p>
-                  Assesses permission justification, update patterns, developer reputation, 
-                  and compliance with enterprise security policies.
-                </p>
               </div>
             </div>
-          </section>
 
-          {/* Evidence Chain */}
-          <section className="methodology-section">
-            <h2>Evidence Chain-of-Custody</h2>
-            <p className="section-intro">
-              Every finding is backed by traceable evidence. Our reports include:
+            {/* Flow Arrow */}
+            <div className="flow-arrow">
+              <svg viewBox="0 0 24 48" fill="none">
+                <path d="M12 0 L12 40 M12 40 L8 36 M12 40 L16 36" stroke="rgba(148, 163, 184, 0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* Pipeline 3: Compliance */}
+            <div className="pipeline-card pipeline-3">
+              <div className="pipeline-number">03</div>
+              <div className="pipeline-content">
+                <div className="pipeline-left">
+                  <div className="pipeline-icon compliance">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path d="M9 12l2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div className="pipeline-details">
+                    <div className="pipeline-badge auto-update">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      AUTO-UPDATED
+                    </div>
+                    <h3>Compliance</h3>
+                    <h4 className="tech-credit">Policy Engine (Enterprise)</h4>
+                    <p>Permission justification, regulatory alignment (GDPR, SOC2), developer reputation, and custom policy enforcement.</p>
+                    
+                    <div className="pipeline-features">
+                      <div className="feature-tag">Permission Audit</div>
+                      <div className="feature-tag">GDPR/SOC2</div>
+                      <div className="feature-tag">Policy Packs</div>
+                      <div className="feature-tag">Dev Reputation</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="pipeline-right">
+                  <div className="score-dial-wrapper">
+                    <RiskDial score={91} label="COMPLIANCE" size={200} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Flow Arrow */}
+            <div className="flow-arrow final">
+              <svg viewBox="0 0 24 48" fill="none">
+                <path d="M12 0 L12 40 M12 40 L8 36 M12 40 L16 36" stroke="rgba(34, 197, 94, 0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* Aggregate Score */}
+            <div className="aggregate-card">
+              <div className="aggregate-header">
+                <h2>Aggregate Risk Score</h2>
+                <p>All three dimensions combined into one actionable metric</p>
+              </div>
+              <div className="aggregate-dial">
+                <RiskDial score={83} label="OVERALL" size={280} decision="ALLOW" />
+              </div>
+              <div className="aggregate-formula">
+                <div className="formula-item">
+                  <span className="formula-label">Security</span>
+                  <span className="formula-weight">× 40%</span>
+                </div>
+                <span className="formula-plus">+</span>
+                <div className="formula-item">
+                  <span className="formula-label">Privacy</span>
+                  <span className="formula-weight">× 35%</span>
+                </div>
+                <span className="formula-plus">+</span>
+                <div className="formula-item">
+                  <span className="formula-label">Compliance</span>
+                  <span className="formula-weight">× 25%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Open Source Credit */}
+          <section className="open-source-credit">
+            <div className="credit-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+              </svg>
+            </div>
+            <h3>Built on Open Source</h3>
+            <p>
+              Pipeline 1 leverages <strong>ThreatXtension</strong> by Bar Haim & Itzik Chanan, 
+              an open-source Chrome extension security scanner. We're grateful for their contribution 
+              to browser security research.
             </p>
-            <ul className="evidence-list">
-              <li>
-                <strong>File paths & line numbers</strong> — Exact locations of flagged code patterns
-              </li>
-              <li>
-                <strong>Code snippets</strong> — Relevant context around each finding
-              </li>
-              <li>
-                <strong>Rule citations</strong> — Which detection rule triggered and why
-              </li>
-              <li>
-                <strong>Threat intel sources</strong> — VirusTotal, malware databases, community reports
-              </li>
-              <li>
-                <strong>Build hash</strong> — Cryptographic fingerprint of the exact analyzed version
-              </li>
-            </ul>
+            <div className="credit-links">
+              <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer" className="credit-link">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View ThreatXtension
+              </a>
+              <a href="https://github.com/barvhaim/ThreatXtension/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" className="credit-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Contribute to ThreatXtension
+              </a>
+            </div>
           </section>
 
           {/* CTA */}
           <div className="methodology-cta">
-            <h3>Want to dive deeper?</h3>
-            <p>Check out our case studies to see the methodology in action.</p>
+            <h3>See the methodology in action</h3>
+            <p>Explore real-world case studies of malicious extensions caught by our pipelines.</p>
             <Link to="/research/case-studies" className="cta-button">
               View Case Studies
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

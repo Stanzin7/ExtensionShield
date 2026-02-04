@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import ShieldLogo from "../components/ShieldLogo";
 import "./HomePage.scss";
 
@@ -280,9 +281,29 @@ const HomePage = () => {
   };
 
   return (
-    <div className="home-page">
-      {/* Hero Section */}
-      <section className="hero-section">
+    <>
+      <Helmet>
+        <title>ExtensionShield - Chrome Extension Security Scanner</title>
+        <meta name="description" content="Analyze Chrome extensions for hidden threats, malware, and privacy risks. Free security scanning powered by AI and static analysis." />
+        <link rel="canonical" href="https://extensionaudit.com/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "ExtensionShield",
+            "url": "https://extensionaudit.com",
+            "logo": "https://extensionaudit.com/logo.png",
+            "description": "Open source Chrome extension security scanner",
+            "sameAs": [
+              "https://github.com/Stanzin7/ExtensionShield"
+            ]
+          })}
+        </script>
+      </Helmet>
+      
+      <div className="home-page">
+        {/* Hero Section */}
+        <section className="hero-section">
         {/* Background Effects */}
         <div className="hero-bg">
           <div className="bg-gradient" />
@@ -964,13 +985,14 @@ const HomePage = () => {
             We aggregate multiple dimensions into a single actionable score. So you can trust the results you find.
           </p>
           <div className="footer-links">
-            <a href="#docs">Documentation</a>
-            <a href="#api">API</a>
-            <a href="#github">GitHub</a>
+            <a href="/research/methodology">Methodology</a>
+            <a href="/contribute">Contribute</a>
+            <a href="https://github.com/Stanzin7/ExtensionShield" target="_blank" rel="noopener noreferrer">GitHub</a>
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 };
 

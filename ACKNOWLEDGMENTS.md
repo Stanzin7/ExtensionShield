@@ -2,15 +2,16 @@
 
 ## Foundation
 
-ExtensionShield builds upon the pioneering work of **ThreatXtension** (https://github.com/ThreatXtension/threatxtension).
+ExtensionShield builds upon the pioneering work of **ThreatXtension** by Bar Haim and Itzik Chanan (https://github.com/barvhaim/ThreatXtension).
 
 ThreatXtension provided the foundational architecture for Chrome extension security analysis, including:
-- Core static analysis workflow
+- Core static analysis workflow (SAST with Semgrep)
 - Permission risk assessment framework
 - Initial scoring methodology
 - Extension parsing and metadata extraction
+- Custom security rules for malicious pattern detection
 
-We are deeply grateful to the ThreatXtension team for creating an excellent open-source foundation that enabled us to accelerate ExtensionShield's development.
+We are deeply grateful to Bar Haim, Itzik Chanan, and the ThreatXtension team for creating an excellent open-source foundation that enabled us to accelerate ExtensionShield's development. ThreatXtension serves as Pipeline 1 (Security Analysis) in our multi-dimensional approach.
 
 ## Key Enhancements in ExtensionShield
 
@@ -65,7 +66,18 @@ We welcome opportunities to contribute improvements back to ThreatXtension and c
 
 If you're interested in any of these enhancements for ThreatXtension, please reach out: snorzang65@gmail.com
 
+## GSoC Considerations
+
+ThreatXtension's architecture and our enhancements make this an excellent candidate for Google Summer of Code projects, including:
+- Browser extension support (Firefox, Safari, Edge)
+- Real-time monitoring and alerting
+- ML-based malware classification
+- Policy pack customization
+- Automated remediation workflows
+
+See `/gsoc/ideas` for detailed project proposals.
+
 ---
 
-**ExtensionShield** — Standing on the shoulders of ThreatXtension
+**ExtensionShield** — Standing on the shoulders of ThreatXtension by Bar Haim & Itzik Chanan
 
