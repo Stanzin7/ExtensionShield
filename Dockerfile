@@ -56,6 +56,9 @@ COPY src/ ./src/
 # Install Python dependencies and build the project
 RUN uv sync --frozen --no-dev
 
+# Prefer running the installed venv entrypoints directly (faster startup than `uv run`)
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Copy frontend build from stage 1
 COPY --from=frontend-builder /app/frontend/dist ./static
 
@@ -74,8 +77,8 @@ ENV PORT=8007
 EXPOSE 8007
 
 # Health check - uses PORT env var that Railway injects
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:${PORT:-8007}/health || exit 1
 
 # Run the application - uses PORT env var for Railway compatibility
-CMD ["sh", "-c", "uv run uvicorn extension_shield.api.main:app --host 0.0.0.0 --port ${PORT:-8007}"]
+CMD ["sh", "-c", "uvicorn extension_shield.api.main:app --host 0.0.0.0 --port ${PORT:-8007}"]

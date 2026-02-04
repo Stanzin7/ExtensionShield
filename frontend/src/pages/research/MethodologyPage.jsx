@@ -34,7 +34,40 @@ const MethodologyPage = () => {
             </p>
           </header>
 
-          {/* Three Pipeline Flow - Vertical */}
+          {/* Aggregate Score - Showing End Result First */}
+          <div className="aggregate-card">
+            <div className="aggregate-header">
+              <h2>Aggregate Risk Score</h2>
+              <p>All three dimensions combined into one actionable metric</p>
+            </div>
+            <div className="aggregate-dial">
+              <RiskDial score={83} label="OVERALL" size={280} decision="ALLOW" />
+            </div>
+            <div className="aggregate-formula">
+              <div className="formula-item">
+                <span className="formula-label">Security</span>
+                <span className="formula-weight">× 40%</span>
+              </div>
+              <span className="formula-plus">+</span>
+              <div className="formula-item">
+                <span className="formula-label">Privacy</span>
+                <span className="formula-weight">× 35%</span>
+              </div>
+              <span className="formula-plus">+</span>
+              <div className="formula-item">
+                <span className="formula-label">Compliance</span>
+                <span className="formula-weight">× 25%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section Divider */}
+          <div className="methodology-divider">
+            <h2>How We Get There</h2>
+            <p>Three independent security pipelines work together</p>
+          </div>
+
+          {/* Three Pipeline Flow */}
           <div className="pipeline-flow">
             
             {/* Pipeline 1: ThreatXtension (Open Source) */}
@@ -161,39 +194,6 @@ const MethodologyPage = () => {
               </div>
             </div>
 
-            {/* Flow Arrow */}
-            <div className="flow-arrow final">
-              <svg viewBox="0 0 24 48" fill="none">
-                <path d="M12 0 L12 40 M12 40 L8 36 M12 40 L16 36" stroke="rgba(34, 197, 94, 0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-
-            {/* Aggregate Score */}
-            <div className="aggregate-card">
-              <div className="aggregate-header">
-                <h2>Aggregate Risk Score</h2>
-                <p>All three dimensions combined into one actionable metric</p>
-              </div>
-              <div className="aggregate-dial">
-                <RiskDial score={83} label="OVERALL" size={280} decision="ALLOW" />
-              </div>
-              <div className="aggregate-formula">
-                <div className="formula-item">
-                  <span className="formula-label">Security</span>
-                  <span className="formula-weight">× 40%</span>
-                </div>
-                <span className="formula-plus">+</span>
-                <div className="formula-item">
-                  <span className="formula-label">Privacy</span>
-                  <span className="formula-weight">× 35%</span>
-                </div>
-                <span className="formula-plus">+</span>
-                <div className="formula-item">
-                  <span className="formula-label">Compliance</span>
-                  <span className="formula-weight">× 25%</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Open Source Credit */}
