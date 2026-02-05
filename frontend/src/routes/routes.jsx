@@ -146,7 +146,7 @@ export const routes = [
     path: "/research/methodology",
     element: <MethodologyPage />,
     seo: {
-      title: "Methodology: How ExtensionShield Scores Risk | ExtensionShield",
+      title: "How We Score: ExtensionShield Risk Analysis | ExtensionShield",
       description: "Learn how ExtensionShield analyzes Chrome extensions using static analysis, threat intelligence, and evidence chain-of-custody.",
       canonical: "/research/methodology"
     },

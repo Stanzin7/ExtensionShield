@@ -105,7 +105,7 @@ const OpenSourcePage = () => {
                 </svg>
               </div>
               <div className="link-content">
-                <h3>Methodology</h3>
+                <h3>How We Score</h3>
                 <p>How we score and analyze extensions.</p>
               </div>
               <span className="arrow">→</span>

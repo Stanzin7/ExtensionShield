@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import ShieldLogo from "../../components/ShieldLogo";
+import StatsIcon from "../../components/ui/StatsIcon";
 import "./ResearchPage.scss";
 
 const ResearchPage = () => {
@@ -46,7 +47,9 @@ const ResearchPage = () => {
 
             {/* Benchmarks */}
             <Link to="/research/benchmarks" className="research-card">
-              <div className="card-icon">📊</div>
+              <div className="card-icon">
+                <StatsIcon size={32} />
+              </div>
               <div className="card-content">
                 <h3>Benchmarks</h3>
                 <p>Open, reproducible comparisons across scanners + industry risk trends.</p>
@@ -59,11 +62,11 @@ const ResearchPage = () => {
               </div>
             </Link>
 
-            {/* Methodology */}
+            {/* How We Score */}
             <Link to="/research/methodology" className="research-card">
               <div className="card-icon">⚙️</div>
               <div className="card-content">
-                <h3>Methodology</h3>
+                <h3>How We Score</h3>
                 <p>How we score risk: static analysis, permission mapping, threat intelligence, and evidence chain-of-custody.</p>
                 <span className="card-link">
                   Learn our approach

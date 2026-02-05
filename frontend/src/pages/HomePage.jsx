@@ -985,7 +985,7 @@ const HomePage = () => {
             We aggregate multiple dimensions into a single actionable score. So you can trust the results you find.
           </p>
           <div className="footer-links">
-            <a href="/research/methodology">Methodology</a>
+            <a href="/research/methodology">How We Score</a>
             <a href="/contribute">Contribute</a>
             <a href="https://github.com/Stanzin7/ExtensionShield" target="_blank" rel="noopener noreferrer">GitHub</a>
           </div>

@@ -131,6 +131,13 @@
 .card-icon {
   font-size: 2rem;
   margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  svg {
+    display: block;
+  }
 }
 
 .card-content h3 {

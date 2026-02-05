@@ -87,7 +87,7 @@ export const megaMenuConfig = {
         },
         {
           icon: "⚙️",
-          label: "Methodology",
+          label: "How We Score",
           description: "How we score risk",
           path: "/research/methodology"
         }
@@ -158,7 +158,7 @@ export const userMenuItems = [
  */
 export const footerLinks = [
   {
-    label: "Methodology",
+    label: "How We Score",
     path: "/research/methodology"
   },
   {

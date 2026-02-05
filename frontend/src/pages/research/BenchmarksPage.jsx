@@ -66,7 +66,7 @@ const BenchmarksPage = () => {
   return (
     <>
       <Helmet>
-        <title>Benchmarks & Methodology | ExtensionShield</title>
+        <title>Benchmarks & How We Score | ExtensionShield</title>
         <meta name="description" content="Coverage, performance, and governance/privacy signals — transparently documented. ExtensionShield scores beyond security into privacy and compliance signals." />
         <link rel="canonical" href="https://extensionaudit.com/research/benchmarks" />
       </Helmet>
@@ -81,7 +81,7 @@ const BenchmarksPage = () => {
           {/* Hero Section */}
           <header className="benchmarks-header">
             <span className="benchmarks-badge">Benchmarks</span>
-            <h1>Benchmarks & Methodology</h1>
+            <h1>Benchmarks & How We Score</h1>
             <p>
               Coverage, performance, and governance/privacy signals — transparently documented. ExtensionShield scores beyond security into privacy and compliance signals.
             </p>
