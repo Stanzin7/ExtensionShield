@@ -2,6 +2,40 @@
 
 This guide covers production deployment basics and the Supabase migration flow.
 
+## Railway Deployment (Recommended)
+
+For detailed Railway deployment instructions, see **[RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)**.
+
+**Quick Railway Deploy:**
+
+```bash
+# 1. Set environment variables in Railway dashboard
+# 2. Deploy using CLI
+railway up
+
+# OR use the helper script
+./scripts/deploy.sh
+
+# OR use make
+make deploy
+```
+
+**Required Environment Variables for Railway:**
+
+Frontend (build-time):
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous/public key
+
+Backend (runtime):
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (keep secret!)
+- `LLM_PROVIDER` - LLM provider (e.g., "openai")
+- `OPENAI_API_KEY` - OpenAI API key (if using OpenAI)
+
+See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for complete setup instructions.
+
+---
+
 ## Key Environment Variables
 
 Required for Supabase-backed production:

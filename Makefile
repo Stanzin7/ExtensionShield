@@ -30,6 +30,13 @@ help:
 	@echo "  make install         - Install dependencies with uv"
 	@echo "  make clean           - Remove output files and caches"
 	@echo ""
+	@echo "Deployment (Railway):"
+	@echo "  make deploy-check    - Check Railway environment variables"
+	@echo "  make deploy          - Deploy to Railway"
+	@echo "  make deploy-link     - Link to Railway project (first time)"
+	@echo "  make deploy-logs     - View Railway production logs"
+	@echo "  make deploy-status   - Check Railway deployment status"
+	@echo ""
 
 # Format code with Black
 format:
@@ -171,6 +178,11 @@ docker-logs:
 # =============================================================================
 # Deployment Commands
 # =============================================================================
+
+# Check Railway environment variables
+deploy-check:
+	@echo "Checking Railway environment variables..."
+	@./scripts/check_railway_env.sh
 
 # Deploy to Railway (requires Railway CLI and RAILWAY_TOKEN)
 deploy:

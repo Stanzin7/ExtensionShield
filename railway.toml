@@ -6,6 +6,14 @@
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
+# Build arguments (set these in Railway dashboard as environment variables)
+# These are passed to Docker build for frontend compilation
+# REQUIRED for authentication to work:
+#   VITE_SUPABASE_URL=https://xxxxx.supabase.co
+#   VITE_SUPABASE_ANON_KEY=your-anon-key-here
+# OPTIONAL:
+#   VITE_API_BASE_URL=/api (if you want to override the API base URL)
+
 [deploy]
 # Number of replicas (Railway handles scaling)
 numReplicas = 1
