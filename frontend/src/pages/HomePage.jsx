@@ -834,14 +834,14 @@ const HomePage = () => {
         <div className="pricing-grid">
           {/* Community Plan */}
           <div className="pricing-card popular">
-            <div className="popular-badge">ALWAYS FREE</div>
+            <div className="popular-badge">BETA</div>
             <div className="pricing-card-header">
               <h3>Community</h3>
-              <p>Always free for individuals</p>
+              <p>Help us test — free during beta</p>
             </div>
             <div className="pricing-amount">
               <span className="price">$0</span>
-              <span className="credits">Always Free</span>
+              <span className="credits">Beta Launch</span>
             </div>
             <div className="scan-credit-note">
               Deep scans are only used when we encounter a new extension version/build hash; cached results are instant.

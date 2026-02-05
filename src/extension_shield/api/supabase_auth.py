@@ -55,9 +55,20 @@ def _get_jwks_by_kid(jwks_url: str) -> Dict[str, Dict[str, Any]]:
     return keys
 
 
+def _get_expected_issuer(supabase_url: str) -> str:
+    """Derive the expected JWT issuer from the Supabase URL."""
+    return f"{supabase_url.rstrip('/')}/auth/v1"
+
+
 def verify_supabase_access_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Verify a Supabase access token using the project's JWKS.
+
+    Validates:
+    - Signature (RS256 via JWKS)
+    - Expiration (exp)
+    - Audience (aud) if configured
+    - Issuer (iss) must match {SUPABASE_URL}/auth/v1
 
     Returns:
         Decoded JWT payload dict if valid; otherwise None.
@@ -65,8 +76,11 @@ def verify_supabase_access_token(token: str) -> Optional[Dict[str, Any]]:
     settings = get_settings()
     jwks_url = settings.supabase_jwks_url
     aud = settings.supabase_jwt_aud
-    if not jwks_url:
+    supabase_url = settings.supabase_url
+    if not jwks_url or not supabase_url:
         return None
+
+    expected_issuer = _get_expected_issuer(supabase_url)
 
     try:
         header = jwt.get_unverified_header(token)
@@ -99,7 +113,11 @@ def verify_supabase_access_token(token: str) -> Optional[Dict[str, Any]]:
             public_key.to_pem().decode("utf-8"),
             algorithms=[header.get("alg", "RS256")],
             audience=aud,
-            options={"verify_aud": bool(aud)},
+            issuer=expected_issuer,
+            options={
+                "verify_aud": bool(aud),
+                "verify_iss": True,
+            },
         )
         return payload
     except Exception:

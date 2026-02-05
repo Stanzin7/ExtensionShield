@@ -41,6 +41,14 @@ export const AuthProvider = ({ children }) => {
 
     const load = async () => {
       try {
+        // Check if Supabase is configured
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) {
+          console.warn("Supabase not configured - running in anonymous mode");
+          if (isMounted) setIsLoading(false);
+          return;
+        }
+        
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (!isMounted) return;
@@ -48,6 +56,7 @@ export const AuthProvider = ({ children }) => {
         setUser(toUiUser(data.session?.user));
       } catch (error) {
         console.error("Auth session load failed:", error);
+        // Don't crash - just continue without auth
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -55,15 +64,24 @@ export const AuthProvider = ({ children }) => {
 
     load();
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!isMounted) return;
-      setSession(nextSession || null);
-      setUser(toUiUser(nextSession?.user));
-    });
+    let authStateSubscription;
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+          if (!isMounted) return;
+          setSession(nextSession || null);
+          setUser(toUiUser(nextSession?.user));
+        });
+        authStateSubscription = data;
+      }
+    } catch (error) {
+      console.error("Auth state change subscription failed:", error);
+    }
 
     return () => {
       isMounted = false;
-      data?.subscription?.unsubscribe();
+      authStateSubscription?.subscription?.unsubscribe();
     };
   }, [toUiUser]);
 
