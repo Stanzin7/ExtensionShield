@@ -21,7 +21,8 @@ COPY frontend/package*.json ./
 
 # Install dependencies with increased memory for production builds
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm ci
+# Try npm ci first (faster, more reliable), fallback to npm install if lock file is out of sync
+RUN npm ci || (echo "npm ci failed, regenerating lock file..." && npm install --package-lock-only && npm ci)
 
 # Copy frontend source
 COPY frontend/ ./
