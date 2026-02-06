@@ -11,8 +11,9 @@ import "./AuthCallbackPage.scss";
  * Handles OAuth callback with PKCE flow:
  * 1. Receives code from URL query params
  * 2. Exchanges code for session using exchangeCodeForSession()
- * 3. Redirects to stored return URL or home page
- * 4. Shows loading state during processing
+ * 3. Waits for auth state change to ensure session is propagated
+ * 4. Redirects to stored return URL or home page
+ * 5. Shows loading state during processing
  */
 const AuthCallbackPage = () => {
   const navigate = useNavigate();
@@ -22,6 +23,9 @@ const AuthCallbackPage = () => {
   
   // Guard against React 18 StrictMode double-run in dev
   const hasExchangedRef = useRef(false);
+  const redirectTimeoutRef = useRef(null);
+  const fallbackTimeoutRef = useRef(null);
+  const authStateListenerRef = useRef(null);
 
   useEffect(() => {
     // Prevent double execution in React 18 StrictMode
@@ -46,7 +50,7 @@ const AuthCallbackPage = () => {
           setStatus("error");
           
           // Redirect to validated return URL with error after a delay
-          setTimeout(() => {
+          redirectTimeoutRef.current = setTimeout(() => {
             const returnTo = validateReturnTo(sessionStorage.getItem("auth:returnTo"));
             sessionStorage.removeItem("auth:returnTo");
             navigate(`${returnTo}?authError=${encodeURIComponent(errorDescription || errorParam)}`, { replace: true });
@@ -61,7 +65,7 @@ const AuthCallbackPage = () => {
           setError("Missing authorization code. Please try signing in again.");
           setStatus("error");
           
-          setTimeout(() => {
+          redirectTimeoutRef.current = setTimeout(() => {
             const returnTo = validateReturnTo(sessionStorage.getItem("auth:returnTo"));
             sessionStorage.removeItem("auth:returnTo");
             navigate(`${returnTo}?authError=missing_code`, { replace: true });
@@ -74,12 +78,13 @@ const AuthCallbackPage = () => {
 
         // Exchange code for session (PKCE flow)
         // Note: Never log the code or any sensitive values
+        console.log("Exchanging authorization code for session...");
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (exchangeError) {
           // Never log the actual error message as it might contain sensitive info
           // Only log error type
-          console.error("Failed to exchange code for session");
+          console.error("Failed to exchange code for session:", exchangeError.message);
           
           // Handle specific PKCE verifier missing error
           const isPKCEError = exchangeError.message?.includes("code verifier") || 
@@ -93,7 +98,7 @@ const AuthCallbackPage = () => {
           
           setStatus("error");
           
-          setTimeout(() => {
+          redirectTimeoutRef.current = setTimeout(() => {
             const returnTo = validateReturnTo(sessionStorage.getItem("auth:returnTo"));
             sessionStorage.removeItem("auth:returnTo");
             navigate(`${returnTo}?authError=${encodeURIComponent(exchangeError.message || "auth_failed")}`, { replace: true });
@@ -104,22 +109,76 @@ const AuthCallbackPage = () => {
         if (data?.session) {
           // Only log non-sensitive info (email is safe)
           console.log("Session created successfully, user:", data.session.user?.email);
-          setStatus("success");
           
           // Get and validate return URL from sessionStorage
           const returnTo = validateReturnTo(sessionStorage.getItem("auth:returnTo"));
           sessionStorage.removeItem("auth:returnTo");
           
-          // Redirect to return URL after brief delay to show success state
-          setTimeout(() => {
-            navigate(returnTo, { replace: true });
-          }, 500);
+          // Wait for auth state change event to ensure session is propagated to AuthContext
+          // This prevents race conditions where we redirect before the context updates
+          let authStateReceived = false;
+          let redirectExecuted = false;
+          
+          const redirectAfterAuthState = () => {
+            if (redirectExecuted) return;
+            redirectExecuted = true;
+            setStatus("success");
+            
+            // Small delay to show success state, then redirect
+            redirectTimeoutRef.current = setTimeout(() => {
+              console.log("Redirecting to:", returnTo);
+              try {
+                navigate(returnTo, { replace: true });
+              } catch (navError) {
+                console.error("Navigation error:", navError);
+                // Fallback to window.location if navigate fails
+                window.location.href = returnTo;
+              }
+            }, 500);
+          };
+
+          // Verify session is actually set by checking immediately
+          const verifySession = async () => {
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (sessionData?.session) {
+                console.log("Session verified, proceeding with redirect");
+                redirectAfterAuthState();
+              }
+            } catch (err) {
+              console.error("Session verification failed:", err);
+              // Continue anyway - the exchange was successful
+              redirectAfterAuthState();
+            }
+          };
+
+          // Set up auth state listener to wait for SIGNED_IN event
+          const { data: authStateData } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log("Auth state change in callback:", event, session ? "has session" : "no session");
+            if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session) {
+              authStateReceived = true;
+              redirectAfterAuthState();
+            }
+          });
+          authStateListenerRef.current = authStateData;
+
+          // Verify session immediately (in case event already fired)
+          verifySession();
+
+          // Fallback: if auth state change doesn't fire within 2 seconds, redirect anyway
+          // This handles edge cases where the event might not fire
+          fallbackTimeoutRef.current = setTimeout(() => {
+            if (!redirectExecuted) {
+              console.warn("Auth state change event not received within timeout, redirecting anyway");
+              redirectAfterAuthState();
+            }
+          }, 2000);
         } else {
           console.error("No session returned from exchangeCodeForSession");
           setError("Session creation failed");
           setStatus("error");
           
-          setTimeout(() => {
+          redirectTimeoutRef.current = setTimeout(() => {
             const returnTo = validateReturnTo(sessionStorage.getItem("auth:returnTo"));
             sessionStorage.removeItem("auth:returnTo");
             navigate(`${returnTo}?authError=session_failed`, { replace: true });
@@ -130,7 +189,7 @@ const AuthCallbackPage = () => {
         setError(err.message || "An unexpected error occurred");
         setStatus("error");
         
-        setTimeout(() => {
+        redirectTimeoutRef.current = setTimeout(() => {
           const returnTo = validateReturnTo(sessionStorage.getItem("auth:returnTo"));
           sessionStorage.removeItem("auth:returnTo");
           navigate(`${returnTo}?authError=unexpected_error`, { replace: true });
@@ -139,6 +198,19 @@ const AuthCallbackPage = () => {
     };
 
     handleCallback();
+
+    // Cleanup function
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+      }
+      if (authStateListenerRef.current?.subscription) {
+        authStateListenerRef.current.subscription.unsubscribe();
+      }
+    };
   }, [searchParams, navigate]);
 
   return (

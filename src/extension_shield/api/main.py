@@ -125,8 +125,15 @@ async def add_security_headers(request: Request, call_next):
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     # Basic CSP (can be customized per route if needed)
+    # Note: connect-src allows Supabase API calls, style-src allows Google Fonts
     if not response.headers.get("Content-Security-Policy"):
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "connect-src 'self' https://*.supabase.co https://*.supabase.co/*; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
+            "font-src 'self' https://fonts.gstatic.com;"
+        )
     return response
 
 # Configure CORS
