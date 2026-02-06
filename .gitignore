@@ -202,3 +202,8 @@ freelancer-repos/
 
 # Exposed secrets (CRITICAL: contains API keys)
 images/env
+
+# Supabase local development files
+supabase/.temp/
+supabase/.branches/
+supabase/.volumes/

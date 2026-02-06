@@ -1667,6 +1667,26 @@ async def get_history(http_request: Request, limit: int = 50):
     return {"history": history, "total": len(history)}
 
 
+@app.get("/api/user/karma")
+async def get_user_karma(http_request: Request):
+    """
+    Get user's karma points and scan statistics.
+    
+    Returns:
+        User karma points, total scans, and timestamps
+    """
+    user_id = getattr(getattr(http_request, "state", None), "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Sign in to view karma")
+    
+    if not isinstance(db, SupabaseDatabase):
+        # SQLite doesn't have karma tracking
+        return {"karma_points": 0, "total_scans": 0, "created_at": None, "updated_at": None}
+    
+    karma = db.get_user_karma(user_id=user_id)
+    return karma
+
+
 @app.get("/api/recent")
 async def get_recent_scans(limit: int = 10):
     """

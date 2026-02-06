@@ -720,9 +720,29 @@ class SupabaseDatabase:
     def add_user_scan_history(self, user_id: str, extension_id: str) -> bool:
         """
         Insert into Supabase `user_scan_history`.
+        The trigger `user_scan_history_increment_karma` will automatically:
+        - Create/update user_profiles record
+        - Increment karma_points by 1
+        - Increment total_scans by 1
         Relies on RLS policies in production.
         """
         try:
+            # Check if this extension was already scanned by this user (avoid duplicate karma)
+            existing = (
+                self.client.table("user_scan_history")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("extension_id", extension_id)
+                .limit(1)
+                .execute()
+            )
+            
+            existing_data = getattr(existing, "data", None) or []
+            if existing_data:
+                # User already scanned this extension, don't add duplicate or increment karma
+                return True
+            
+            # Insert new scan history (trigger will handle karma increment)
             self.client.table("user_scan_history").insert(
                 {"user_id": user_id, "extension_id": extension_id}
             ).execute()
@@ -730,6 +750,27 @@ class SupabaseDatabase:
         except Exception as e:
             print(f"Error adding user scan history (Supabase): {e}")
             return False
+    
+    def get_user_karma(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get user's karma points and scan statistics.
+        """
+        try:
+            resp = (
+                self.client.table("user_profiles")
+                .select("karma_points, total_scans, created_at, updated_at")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            data = getattr(resp, "data", None) or []
+            if data:
+                return data[0]
+            # Return defaults if profile doesn't exist yet
+            return {"karma_points": 0, "total_scans": 0, "created_at": None, "updated_at": None}
+        except Exception as e:
+            print(f"Error getting user karma (Supabase): {e}")
+            return {"karma_points": 0, "total_scans": 0, "created_at": None, "updated_at": None}
 
     def get_user_scan_history(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         """

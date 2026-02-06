@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import databaseService from "../services/databaseService";
+import EnhancedMetricCard from "../components/EnhancedMetricCard";
 import {
   enrichScanWithSignals,
   getRiskColorClass,
@@ -87,6 +88,14 @@ const ScanHistoryPage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [hoveredRow, setHoveredRow] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [dashboardStats, setDashboardStats] = useState({
+    totalScans: { value: 0, sparkline: [0] },
+    highRisk: { value: 0, sparkline: [0] },
+    totalFiles: { value: 0, sparkline: [0] },
+    totalVulnerabilities: { value: 0, sparkline: [0] },
+    avgSecurityScore: 0,
+    riskDistribution: { high: 0, medium: 0, low: 0 }
+  });
   const tableWrapperRef = useRef(null);
   const navigate = useNavigate();
   const { isAuthenticated, openSignInModal, accessToken } = useAuth();
@@ -115,6 +124,14 @@ const ScanHistoryPage = () => {
       try {
         const token = isAuthenticated ? accessToken : undefined;
         const history = await databaseService.getScanHistory(100, token);
+        
+        // Load dashboard stats for charts
+        try {
+          const metrics = await databaseService.getDashboardMetrics();
+          setDashboardStats(metrics);
+        } catch (err) {
+          console.error("Error loading dashboard stats:", err);
+        }
         
         // Fetch full details for each scan to get signals data
         const enrichedScans = await Promise.all(

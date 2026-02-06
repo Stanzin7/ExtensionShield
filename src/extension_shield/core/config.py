@@ -217,8 +217,15 @@ def get_settings() -> Settings:
             )
             db_backend = "sqlite"
     else:
-        # Auto-select: enable Supabase when URL + service role key exist, else use SQLite.
-        db_backend = "supabase" if (supabase_url and supabase_key) else "sqlite"
+        # Auto-select based on environment:
+        # - Production: Use Supabase if URL + key exist, else SQLite
+        # - Local/Dev: Always use SQLite (unless explicitly set via DB_BACKEND)
+        if env == "prod":
+            # Production: prefer Supabase if configured
+            db_backend = "supabase" if (supabase_url and supabase_key) else "sqlite"
+        else:
+            # Local/Dev: always use SQLite for easier local development
+            db_backend = "sqlite"
 
     settings = Settings(
         env=env,

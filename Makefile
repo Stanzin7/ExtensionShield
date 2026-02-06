@@ -1,4 +1,4 @@
-.PHONY: help format lint test api frontend clean install analyze docker-build docker-up docker-down docker-logs migrate start lint-migrations
+.PHONY: help format lint test api frontend clean install analyze docker-build docker-up docker-down docker-logs migrate start lint-migrations supabase-diff supabase-push supabase-start supabase-stop supabase-reset supabase-migration-up
 
 # Default target - show help
 help:
@@ -29,6 +29,14 @@ help:
 	@echo "Development:"
 	@echo "  make install         - Install dependencies with uv"
 	@echo "  make clean           - Remove output files and caches"
+	@echo ""
+	@echo "Supabase (Declarative Schemas):"
+	@echo "  make supabase-diff NAME=... - Generate migration from schema changes"
+	@echo "  make supabase-push          - Push schema changes to remote"
+	@echo "  make supabase-start        - Start local Supabase instance"
+	@echo "  make supabase-stop         - Stop local Supabase instance"
+	@echo "  make supabase-reset        - Reset local database"
+	@echo "  make supabase-migration-up - Apply pending migrations locally"
 	@echo ""
 	@echo "Deployment (Railway):"
 	@echo "  make deploy-check    - Check Railway environment variables"
@@ -205,3 +213,48 @@ deploy-logs:
 # Check production status
 deploy-status:
 	railway status
+
+# =============================================================================
+# Supabase Declarative Schema Commands
+# =============================================================================
+
+# Generate migration from declarative schema changes
+supabase-diff:
+ifndef NAME
+	@echo "Error: NAME parameter is required"
+	@echo "Usage: make supabase-diff NAME=add_new_column"
+	@exit 1
+endif
+	@echo "Generating migration from schema changes..."
+	npx supabase db diff -f $(NAME)
+	@echo "✓ Migration generated. Review supabase/migrations/"
+
+# Push schema changes to remote Supabase project
+supabase-push:
+	@echo "Pushing schema changes to remote Supabase..."
+	npx supabase db push
+	@echo "✓ Schema changes pushed"
+
+# Start local Supabase instance
+supabase-start:
+	@echo "Starting local Supabase instance..."
+	npx supabase start
+	@echo "✓ Supabase started"
+
+# Stop local Supabase instance
+supabase-stop:
+	@echo "Stopping local Supabase instance..."
+	npx supabase stop
+	@echo "✓ Supabase stopped"
+
+# Reset local database
+supabase-reset:
+	@echo "Resetting local database..."
+	npx supabase db reset
+	@echo "✓ Database reset"
+
+# Apply pending migrations locally
+supabase-migration-up:
+	@echo "Applying pending migrations..."
+	npx supabase migration up
+	@echo "✓ Migrations applied"
