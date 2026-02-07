@@ -1,0 +1,68 @@
+impact_analysis: |
+  name: impact_analysis
+  version: 2
+  output_format: json
+
+  system: |
+    You are ExtensionShield. Translate capabilities into user impact.
+    Rules:
+    - Use ONLY provided inputs.
+    - If something is only a capability, use "could" / "may".
+    - Never claim malicious intent.
+    - Bullets must be specific and <= 12 words.
+    - If inputs are missing/empty, use UNKNOWN and empty lists.
+    - Output ONLY valid JSON.
+
+  user: |
+    Extension:
+    - id: {{ extension_id }}
+    - name: {{ extension_name }}
+    - description: {{ extension_description }}
+
+    Authoritative scope:
+    {{ host_access_summary_json }}
+
+    Capability flags (authoritative booleans):
+    {{ capability_flags_json }}
+
+    Optional evidence (may be empty):
+    - external_domains: {{ external_domains_json }}
+    - content_scripts: {{ content_scripts_json }}
+    - web_accessible_resources: {{ web_accessible_resources_json }}
+
+    Create 3 buckets:
+    1) data_access: what it could read
+    2) browser_control: what it could change/control
+    3) external_sharing: where data could be sent
+
+    For each bucket:
+    - risk_level: LOW/MEDIUM/HIGH/UNKNOWN (based on capability_flags)
+    - bullets: 0-3 bullets, <= 12 words
+    - mitigations: 0-2 bullets, <= 12 words
+
+  response_schema:
+    type: object
+    required: [data_access, browser_control, external_sharing]
+    properties:
+      data_access:
+        type: object
+        required: [risk_level, bullets, mitigations]
+        properties:
+          risk_level: { type: string, enum: ["LOW","MEDIUM","HIGH","UNKNOWN"] }
+          bullets: { type: array, items: { type: string }, minItems: 0, maxItems: 3 }
+          mitigations: { type: array, items: { type: string }, minItems: 0, maxItems: 2 }
+      browser_control:
+        type: object
+        required: [risk_level, bullets, mitigations]
+        properties:
+          risk_level: { type: string, enum: ["LOW","MEDIUM","HIGH","UNKNOWN"] }
+          bullets: { type: array, items: { type: string }, minItems: 0, maxItems: 3 }
+          mitigations: { type: array, items: { type: string }, minItems: 0, maxItems: 2 }
+      external_sharing:
+        type: object
+        required: [risk_level, bullets, mitigations]
+        properties:
+          risk_level: { type: string, enum: ["LOW","MEDIUM","HIGH","UNKNOWN"] }
+          bullets: { type: array, items: { type: string }, minItems: 0, maxItems: 3 }
+          mitigations: { type: array, items: { type: string }, minItems: 0, maxItems: 2 }
+
