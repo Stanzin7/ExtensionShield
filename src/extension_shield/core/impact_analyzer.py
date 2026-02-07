@@ -7,7 +7,8 @@ Generates user-facing impact buckets based on extension capabilities.
 import os
 import json
 import logging
-from typing import Dict, Optional, Any, List
+import re
+from typing import Dict, Optional, Any, List, Tuple
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -144,12 +145,75 @@ class ImpactAnalyzer:
         # Dedupe and cap
         return list(dict.fromkeys(domains))[:100]
 
+    @staticmethod
+    def _extract_network_evidence_from_sast(javascript_analysis: Any) -> List[Dict[str, Any]]:
+        """
+        Extract a small set of network evidence objects from SAST findings.
+
+        This is used as optional evidence for `impact_analysis` to avoid over-claiming
+        external sharing when no evidence is provided.
+        """
+        if not isinstance(javascript_analysis, dict):
+            return []
+
+        sast_findings = javascript_analysis.get("sast_findings") or {}
+        if not isinstance(sast_findings, dict):
+            return []
+
+        url_re = re.compile(r"https?://[^\s\"')`]+", re.IGNORECASE)
+        evidence: List[Dict[str, Any]] = []
+
+        for file_path, findings in sast_findings.items():
+            if not isinstance(findings, list):
+                continue
+            for finding in findings:
+                if not isinstance(finding, dict):
+                    continue
+
+                check_id = str(finding.get("check_id", "")).lower()
+                extra = finding.get("extra") or {}
+                message = str(extra.get("message", ""))
+                category = str((extra.get("metadata") or {}).get("category", "")).lower()
+
+                is_networkish = (
+                    "third_party" in check_id
+                    or "external_api" in check_id
+                    or "third-party" in category
+                    or "external domains" in message.lower()
+                )
+                if not is_networkish:
+                    continue
+
+                url_match = url_re.search(message) or url_re.search(str(extra.get("lines", "")))
+                url = url_match.group(0) if url_match else None
+                domain_match = re.search(
+                    r"https?://([a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)+)",
+                    url or "",
+                    re.IGNORECASE,
+                )
+                domain = domain_match.group(1).lower() if domain_match else None
+
+                evidence.append(
+                    {
+                        "source": "sast",
+                        "check_id": finding.get("check_id"),
+                        "file": file_path,
+                        "line": (finding.get("start") or {}).get("line"),
+                        "message": message[:200],
+                        "url": (url[:200] if isinstance(url, str) else None),
+                        "domain": domain,
+                    }
+                )
+
+        return evidence[:20]
+
     def _compute_capability_flags(
         self,
         manifest: Dict[str, Any],
         analysis_results: Dict[str, Any],
         host_access_summary: Dict[str, Any],
         external_domains: List[str],
+        network_evidence: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, bool]:
         """Compute deterministic capability flags for impact analysis."""
         permissions = manifest.get("permissions", []) or []
@@ -171,6 +235,15 @@ class ImpactAnalyzer:
         has_content_scripts = bool(content_scripts)
         has_web_accessible_resources = bool(web_accessible_resources)
         can_read_sites = host_scope_label in ("ALL_WEBSITES", "MULTI_DOMAIN", "SINGLE_DOMAIN")
+
+        # Evidence-based external domain connection check
+        network_evidence = network_evidence or []
+        has_externally_connectable = bool(manifest.get("externally_connectable"))
+        can_connect_external = (
+            bool(external_domains) or 
+            bool(network_evidence) or 
+            has_externally_connectable
+        )
 
         return {
             # Data access
@@ -202,13 +275,10 @@ class ImpactAnalyzer:
             "can_manage_extensions": "management" in api_permissions,
             "can_control_proxy": "proxy" in api_permissions,
             "can_debugger": "debugger" in api_permissions,
-            # External sharing
-            "can_connect_external_domains": any(
-                any(proto in pattern for proto in ("http://", "https://", "*://"))
-                for pattern in host_permissions
-            ),
+            # External sharing - evidence-based
+            "can_connect_external_domains": can_connect_external,
             "has_external_domains": bool(external_domains),
-            "has_externally_connectable": bool(manifest.get("externally_connectable")),
+            "has_externally_connectable": has_externally_connectable,
             "has_web_accessible_resources": has_web_accessible_resources,
         }
 
@@ -219,18 +289,22 @@ class ImpactAnalyzer:
         extension_id: Optional[str],
     ) -> PromptTemplate:
         """Create prompt template for impact analysis."""
-        template_str = get_prompts("impact_analysis")
+        template_str = get_prompts("impact_analysis.yaml")
         template_str = template_str.get("impact_analysis")
         if not template_str:
             raise ValueError("Impact analysis prompt template not found")
 
         host_access_summary = self._classify_host_access_scope(manifest)
         external_domains = self._extract_external_domains(analysis_results)
+        network_evidence = self._extract_network_evidence_from_sast(
+            analysis_results.get("javascript_analysis")
+        )
         capability_flags = self._compute_capability_flags(
             manifest=manifest,
             analysis_results=analysis_results,
             host_access_summary=host_access_summary,
             external_domains=external_domains,
+            network_evidence=network_evidence,
         )
 
         extension_name = manifest.get("name", "Unknown Extension")
@@ -244,6 +318,7 @@ class ImpactAnalyzer:
                 "host_access_summary_json",
                 "capability_flags_json",
                 "external_domains_json",
+                "network_evidence_json",
                 "content_scripts_json",
                 "web_accessible_resources_json",
             ],
@@ -256,6 +331,7 @@ class ImpactAnalyzer:
             host_access_summary_json=self._json_block(host_access_summary),
             capability_flags_json=self._json_block(capability_flags),
             external_domains_json=self._json_block(external_domains),
+            network_evidence_json=self._json_block(network_evidence),
             content_scripts_json=self._json_block(manifest.get("content_scripts", []) or []),
             web_accessible_resources_json=self._json_block(
                 manifest.get("web_accessible_resources", []) or []
@@ -288,7 +364,7 @@ class ImpactAnalyzer:
         }
 
         try:
-            formatted_prompt = prompt.format_prompt({})
+            formatted_prompt = prompt.format_prompt()
             messages = formatted_prompt.to_messages()
 
             response = invoke_with_fallback(
@@ -302,6 +378,7 @@ class ImpactAnalyzer:
             logger.info("Impact analysis generated successfully")
             return impact
         except Exception as exc:
-            logger.exception("Failed to generate impact analysis: %s", exc)
+            # Avoid noisy stack traces in normal operation; callers can fall back deterministically.
+            logger.warning("Failed to generate impact analysis: %s", exc)
             return None
 

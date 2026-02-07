@@ -1,6 +1,6 @@
 impact_analysis: |
   name: impact_analysis
-  version: 2
+  version: 2.1
   output_format: json
 
   system: |
@@ -11,6 +11,11 @@ impact_analysis: |
     - Never claim malicious intent.
     - Bullets must be specific and <= 12 words.
     - If inputs are missing/empty, use UNKNOWN and empty lists.
+    - Do NOT mention cookies unless capability_flags indicate cookie access.
+    - Do NOT mention history unless capability_flags indicate history access.
+    - Do NOT mention script injection/page modification unless capability_flags indicate it.
+    - For external_sharing:
+      - If has_external_domains is false AND network_evidence is empty, set risk_level UNKNOWN and keep bullets empty.
     - Output ONLY valid JSON.
 
   user: |
@@ -27,6 +32,7 @@ impact_analysis: |
 
     Optional evidence (may be empty):
     - external_domains: {{ external_domains_json }}
+    - network_evidence: {{ network_evidence_json }}
     - content_scripts: {{ content_scripts_json }}
     - web_accessible_resources: {{ web_accessible_resources_json }}
 

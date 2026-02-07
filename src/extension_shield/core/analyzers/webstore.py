@@ -239,7 +239,7 @@ class WebstoreAnalyzer(BaseAnalyzer):
         prompt = self._llm_analysis_prompt_template(metadata, red_flags)
 
         # Format prompt to messages
-        formatted_prompt = prompt.format_prompt({})
+        formatted_prompt = prompt.format_prompt()
         messages = formatted_prompt.to_messages()
 
         # Invoke with fallback

@@ -289,7 +289,7 @@ class SummaryGenerator:
 
         try:
             # Format prompt to messages
-            formatted_prompt = prompt.format_prompt({})
+            formatted_prompt = prompt.format_prompt()
             messages = formatted_prompt.to_messages()
 
             # Invoke with fallback
@@ -327,5 +327,6 @@ class SummaryGenerator:
             logger.info("Executive summary generated successfully")
             return summary
         except Exception as exc:
-            logger.exception("Failed to generate executive summary: %s", exc)
+            # Avoid noisy stack traces in normal operation; callers can decide how to handle None.
+            logger.warning("Failed to generate executive summary: %s", exc)
             return None
