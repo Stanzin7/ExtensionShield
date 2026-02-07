@@ -207,3 +207,6 @@ images/env
 supabase/.temp/
 supabase/.branches/
 supabase/.volumes/
+
+# Documentation (for personal convenience, not needed in master repo)
+docs/
