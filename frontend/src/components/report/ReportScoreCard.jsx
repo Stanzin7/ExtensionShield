@@ -87,8 +87,11 @@ const ReportScoreCard = ({
           <span className="score-card-title">{title}</span>
         </div>
         
-        {onClick && (
-          <div className="header-right">
+        <div className="header-right">
+          <div className="score-value-header" style={{ color }}>
+            {displayScore}
+          </div>
+          {onClick && (
             <button 
               className="info-icon-btn" 
               aria-label="View details"
@@ -104,14 +107,11 @@ const ReportScoreCard = ({
               </svg>
               <span className="tooltip">View details</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="score-card-main">
-        <div className="score-value" style={{ color }}>
-          {displayScore}
-        </div>
         <div className="score-band" style={{ color }}>
           <span className="band-icon">{getBandIcon()}</span>
           <span className="band-text">{getBandLabel()}</span>
