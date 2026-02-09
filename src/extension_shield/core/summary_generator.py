@@ -299,9 +299,10 @@ class SummaryGenerator:
             scan_id=scan_id,
             extension_id=extension_id,
         )
-        model_name = os.getenv("LLM_MODEL", "rits/openai/gpt-oss-120b")
+        # Use OpenAI 4-1 (gpt-4o) for better summary generation
+        model_name = os.getenv("LLM_MODEL", "gpt-4o")
         model_parameters = {
-            "temperature": 0.05,
+            "temperature": 0.3,  # Slightly higher for more natural language
             "max_tokens": 4096,
         }
 

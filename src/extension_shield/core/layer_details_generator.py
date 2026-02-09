@@ -274,9 +274,10 @@ class LayerDetailsGenerator:
                 gate_results=gate_results or [],
             )
             
-            model_name = os.getenv("LLM_MODEL", "rits/openai/gpt-oss-120b")
+            # Use OpenAI 4-1 (gpt-4o) for better human-readable output
+            model_name = os.getenv("LLM_MODEL", "gpt-4o")
             model_parameters = {
-                "temperature": 0.05,
+                "temperature": 0.3,  # Higher temperature for more natural, conversational language
                 "max_tokens": 4096,
             }
 
