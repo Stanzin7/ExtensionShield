@@ -281,3 +281,119 @@ def validate_privacy(
 
     return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
 
+
+def validate_layer_details_not_generic(output: Dict[str, Any]) -> ValidationResult:
+    """
+    Validate that layer details do not contain generic filler text.
+    Reuses the banned phrases from summary validation.
+    """
+    reasons: List[str] = []
+    
+    banned_phrases = [
+        "score is based on",
+        "code signals",
+        "store metadata", 
+        "this analysis",
+        "review the notes below",
+        "capabilities indicate what it could do",
+    ]
+    
+    # Extract all text from all layers
+    all_text_fields = []
+    for layer_name in ["security", "privacy", "governance"]:
+        layer_data = output.get(layer_name, {})
+        if isinstance(layer_data, dict):
+            all_text_fields.extend(_get_text_fields(layer_data, ["one_liner", "key_points", "what_to_watch"]))
+    
+    all_text = " ".join(all_text_fields).lower()
+    
+    for phrase in banned_phrases:
+        if phrase in all_text:
+            reasons.append(f"Layer details contain generic filler phrase: '{phrase}'")
+            
+    return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
+
+
+def validate_layer_details_lengths(output: Dict[str, Any]) -> ValidationResult:
+    """
+    Validate that layer details respect length limits.
+    - one_liner <= 120 chars
+    - bullet points <= 90 chars each
+    """
+    reasons: List[str] = []
+    
+    if not isinstance(output, dict):
+        return ValidationResult(ok=False, reasons=["Output is not a dictionary"])
+    
+    required_layers = ["security", "privacy", "governance"]
+    for layer_name in required_layers:
+        if layer_name not in output:
+            reasons.append(f"Missing {layer_name} layer in output")
+            continue
+        
+        layer_data = output[layer_name]
+        if not isinstance(layer_data, dict):
+            reasons.append(f"{layer_name} layer is not a dict")
+            continue
+        
+        # Check one_liner length
+        one_liner = layer_data.get("one_liner", "")
+        if isinstance(one_liner, str) and len(one_liner) > 120:
+            reasons.append(f"{layer_name}.one_liner exceeds 120 characters ({len(one_liner)} chars)")
+        
+        # Check bullet lengths
+        for bullet_list_name in ["key_points", "what_to_watch"]:
+            bullets = layer_data.get(bullet_list_name, [])
+            if not isinstance(bullets, list):
+                continue
+                
+            for i, bullet in enumerate(bullets):
+                if isinstance(bullet, str) and len(bullet) > 90:
+                    reasons.append(f"{layer_name}.{bullet_list_name}[{i}] exceeds 90 characters ({len(bullet)} chars)")
+    
+    return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
+
+
+def validate_layer_details_references(
+    output: Dict[str, Any],
+    concrete_signals: List[str],
+) -> ValidationResult:
+    """
+    Validate that layer details bullets reference concrete signals.
+    Each non-empty bullet must contain at least one concrete signal reference.
+    """
+    reasons: List[str] = []
+    
+    if not isinstance(output, dict):
+        return ValidationResult(ok=False, reasons=["Output is not a dictionary"])
+    
+    if not concrete_signals:
+        # If no signals available, we can't validate references
+        return ValidationResult(ok=True, reasons=[])
+    
+    required_layers = ["security", "privacy", "governance"] 
+    for layer_name in required_layers:
+        if layer_name not in output:
+            continue
+        
+        layer_data = output[layer_name]
+        if not isinstance(layer_data, dict):
+            continue
+        
+        # Check bullets for concrete references
+        for bullet_list_name in ["key_points", "what_to_watch"]:
+            bullets = layer_data.get(bullet_list_name, [])
+            if not isinstance(bullets, list):
+                continue
+                
+            for i, bullet in enumerate(bullets):
+                if isinstance(bullet, str) and bullet.strip():
+                    # Check if bullet contains at least one concrete signal
+                    has_concrete_reference = any(
+                        signal.lower() in bullet.lower() for signal in concrete_signals
+                    )
+                    if not has_concrete_reference:
+                        reasons.append(f"{layer_name}.{bullet_list_name}[{i}] lacks concrete signal reference: '{bullet[:50]}...'")
+    
+    return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
+

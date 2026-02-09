@@ -23,6 +23,8 @@ from extension_shield.scoring.engine import ScoringEngine
 from extension_shield.core.summary_generator import SummaryGenerator
 from extension_shield.core.impact_analyzer import ImpactAnalyzer
 from extension_shield.core.privacy_compliance_analyzer import PrivacyComplianceAnalyzer
+from extension_shield.core.layer_details_generator import LayerDetailsGenerator
+from extension_shield.scoring.humanize import LayerHumanizer
 
 
 logger = logging.getLogger(__name__)
@@ -94,7 +96,13 @@ def _fallback_executive_summary(score: int, score_label: str, host_scope_label: 
         "HIGH RISK": "High risk — avoid unless necessary",
     }
     one_liner = label_to_tone.get(score_label, "Risk level unavailable")
-    one_liner += ". Review the notes below."
+    
+    # Force specific one-liner based on host scope if present
+    if host_scope_label == "ALL_WEBSITES":
+        if score_label == "LOW RISK":
+            one_liner = "Low risk overall, but broad host access is requested."
+        elif score_label == "MEDIUM RISK":
+            one_liner = "Caution advised due to broad host access and permissions."
 
     what_to_watch: List[str] = []
     if host_scope_label == "ALL_WEBSITES":
@@ -102,11 +110,36 @@ def _fallback_executive_summary(score: int, score_label: str, host_scope_label: 
     what_to_watch.append("Watch for updates that add new permissions or expand site access.")
     what_to_watch = _ensure_max_len(what_to_watch, 2)
 
-    why_this_score = [
-        "Score is based on permissions, code signals, and store metadata.",
-        "Capabilities indicate what it could do, not intent.",
-        "Evidence links show exactly what triggered the score.",
-    ]
+    # Human-readable specific points for the fallback
+    if score_label == "LOW RISK":
+        why_this_score = [
+            "Requested permissions match the stated functionality.",
+            "No high-risk code patterns or malware signatures detected.",
+            "Privacy policy and developer disclosures appear consistent.",
+        ]
+    elif score_label == "HIGH RISK":
+        why_this_score = [
+            "Critical security gates triggered during automated scan.",
+            "Static analysis detected high-risk code patterns (SAST).",
+            "Powerful permissions allow access to sensitive user data.",
+        ]
+    else: # MEDIUM RISK
+        why_this_score = [
+            "Some powerful permissions requested (e.g. tabs or site access).",
+            "Code patterns require manual review to confirm intent.",
+            "Webstore signals indicate moderate trust level.",
+        ]
+    
+    # Specificity override for host scope
+    if host_scope_label == "ALL_WEBSITES":
+        # For ALL_WEBSITES, we should always mention it in Key Points if it's the primary risk
+        if score_label == "LOW RISK":
+            why_this_score[0] = "Requests broad access to all websites via manifest permissions."
+        else:
+            why_this_score[0] = "Broad host access (*://*/*) allows interaction with most websites."
+    elif host_scope_label == "SINGLE_DOMAIN" or host_scope_label == "MULTI_DOMAIN":
+        why_this_score[0] = f"Host access is limited to specific domains ({host_scope_label.lower()})."
+    
     why_this_score = _ensure_len(why_this_score, 3)
 
     return {
@@ -1044,6 +1077,43 @@ def build_report_view_model(
         external_domains=external_domains,
     )
 
+    # -------------------------------------------------------------------------
+    # Layer Details Generation (LLM with deterministic fallback)
+    # -------------------------------------------------------------------------
+    # Prefer already-computed pipeline outputs to avoid duplicate LLM calls.
+    layer_details_raw: Any = (
+        analysis_results.get("layer_details")
+        or analysis_results.get("layerDetails")
+    )
+    if not (isinstance(layer_details_raw, dict) and layer_details_raw):
+        try:
+            # Extract gate results for layer details generation
+            gate_results = []
+            if scoring_result and hasattr(scoring_engine, '_last_gate_results'):
+                gate_results = scoring_engine._last_gate_results or []
+            
+            layer_details_generator = LayerDetailsGenerator()
+            layer_details_raw = layer_details_generator.generate(
+                scoring_result=scoring_result,
+                analysis_results=analysis_results,
+                manifest=manifest,
+                gate_results=gate_results,
+            )
+        except Exception:
+            layer_details_raw = None
+
+    # Use deterministic fallback if LLM failed
+    layer_details = (
+        layer_details_raw
+        if isinstance(layer_details_raw, dict) and layer_details_raw
+        else LayerHumanizer.generate_layer_details_fallback(
+            scoring_result=scoring_result,
+            analysis_results=analysis_results,
+            manifest=manifest,
+            gate_results=gate_results if 'gate_results' in locals() else [],
+        )
+    )
+
     report_view_model = {
         "meta": {
             "extension_id": extension_id,
@@ -1098,6 +1168,7 @@ def build_report_view_model(
             "privacy_compliance": privacy_compliance,
         },
         "consumer_insights": consumer_insights,
+        "layer_details": layer_details,
     }
 
     return report_view_model

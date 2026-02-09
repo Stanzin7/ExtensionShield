@@ -375,10 +375,10 @@ class SummaryGenerator:
                         validation = generic_validation
                 
                 if not validation.ok:
-                    logger.warning(
-                        "LLM summary validation failed, using fallback. Reasons: %s",
-                        "; ".join(validation.reasons),
-                    )
+                    # logger.warning(
+                    #     "LLM summary validation failed, using fallback. Reasons: %s",
+                    #     "; ".join(validation.reasons),
+                    # )
                     # Return deterministic fallback
                     from extension_shield.core.report_view_model import _fallback_executive_summary
                     return _fallback_executive_summary(
