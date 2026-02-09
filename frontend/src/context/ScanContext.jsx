@@ -187,6 +187,7 @@ export const ScanProvider = ({ children }) => {
       }
 
       // Fetch results (may take a moment after status flips to scanned)
+      // UNIFIED: Always calls GET /api/scan/results/${extensionId} directly
       const maxAttempts = 10;
       let results = null;
       for (let i = 0; i < maxAttempts; i += 1) {
@@ -197,6 +198,7 @@ export const ScanProvider = ({ children }) => {
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
+      // Results are already in correct format (no transformation needed)
       setScanResults(results);
       setError("");
       setScanStage(null);
@@ -270,6 +272,7 @@ export const ScanProvider = ({ children }) => {
 
       await waitForScanCompletion(extensionId);
 
+      // UNIFIED: Always calls GET /api/scan/results/${extensionId} directly
       const maxAttempts = 10;
       let results = null;
       for (let i = 0; i < maxAttempts; i += 1) {
@@ -279,6 +282,7 @@ export const ScanProvider = ({ children }) => {
         // eslint-disable-next-line no-await-in-loop
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
+      // Results are already in correct format (no transformation needed)
       setScanResults(results);
       setError("");
       setScanStage(null);
@@ -295,19 +299,34 @@ export const ScanProvider = ({ children }) => {
   }, [navigate, waitForScanCompletion, loadScanHistory, loadDashboardStats]);
 
   // Load scan from history
+  // UNIFIED: Always calls GET /api/scan/results/${extensionId} directly
   const loadScanFromHistory = useCallback(async (extId) => {
     try {
-      let results = await databaseService.getScanResult(extId);
+      // Unified endpoint: always use the verified endpoint
+      const baseURL = import.meta.env.VITE_API_URL || "";
+      const url = `${baseURL}/api/scan/results/${extId}`;
+      
+      console.log("RESULTS_ENDPOINT", url);
+      
+      const response = await fetch(url, {
+        headers: {
+          ...realScanService.getRequestHeaders(),
+        },
+      });
 
-      if (!results) {
-        results = await realScanService.getRealScanResults(extId);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError("Scan results not found.");
+          return;
+        }
+        throw new Error(`Failed to fetch scan results: ${response.status}`);
       }
 
-      if (results && !results.files) {
-        results = realScanService.formatRealResults(results);
-      }
-
-      setScanResults(results);
+      const data = await response.json();
+      console.log("TOP_KEYS", Object.keys(data));
+      
+      // Use payload as-is - backend already upgrades legacy payloads and ensures consumer_insights
+      setScanResults(data);
       setCurrentExtensionId(extId);
       setError("");
       
@@ -320,24 +339,40 @@ export const ScanProvider = ({ children }) => {
   }, [navigate]);
 
   // Load results for a specific extension ID (for direct URL access)
+  // UNIFIED: Always calls GET /api/scan/results/${extensionId} directly
+  // No fallbacks, no legacy transformations - returns payload as-is from backend
   const loadResultsById = useCallback(async (extId) => {
     try {
-      let results = await databaseService.getScanResult(extId);
+      // Unified endpoint: always use the verified endpoint that returns report_view_model.consumer_insights
+      const baseURL = import.meta.env.VITE_API_URL || "";
+      const url = `${baseURL}/api/scan/results/${extId}`;
+      
+      console.log("RESULTS_ENDPOINT", url);
+      
+      const response = await fetch(url, {
+        headers: {
+          ...realScanService.getRequestHeaders(),
+        },
+      });
 
-      if (!results) {
-        results = await realScanService.getRealScanResults(extId);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError("Scan results not found. The extension may not have been scanned yet.");
+          return null;
+        }
+        throw new Error(`Failed to fetch scan results: ${response.status}`);
       }
 
-      if (results && !results.files) {
-        results = realScanService.formatRealResults(results);
-      }
-
-      setScanResults(results);
+      const data = await response.json();
+      console.log("TOP_KEYS", Object.keys(data));
+      
+      // Use payload as-is - backend already upgrades legacy payloads and ensures consumer_insights
+      setScanResults(data);
       setCurrentExtensionId(extId);
       setError("");
-      return results;
+      return data;
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load scan results:", err);
       setError("Failed to load scan results.");
       return null;
     }
