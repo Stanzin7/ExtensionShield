@@ -9,14 +9,14 @@ import './RiskDial.scss';
  * Props:
  * - score: number (0-100) - Security score (higher = safer)
  * - band: "GOOD" | "WARN" | "BAD" | "NA" - Band classification
- * - label?: string - Optional label (default: "RISK")
+ * - label?: string - Optional label (default: "SAFETY SCORE")
  * - decision?: "ALLOW" | "WARN" | "BLOCK" | null - Decision badge
  * - size?: number - Diameter in pixels (default: 280)
  */
 const RiskDial = ({ 
   score = 0, 
   band = 'NA',
-  label = 'RISK',
+  label = 'SAFETY SCORE',
   decision = null,
   size = 280
 }) => {
