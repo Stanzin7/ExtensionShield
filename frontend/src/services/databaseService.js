@@ -1,8 +1,8 @@
 /**
  * Database Service
  *
- * Handles communication with the backend API for persistent storage
- * using SQLite database instead of localStorage.
+ * Handles communication with the backend API for persistent storage.
+ * Backend uses Postgres (Supabase) in production; SQLite is a dev fallback.
  */
 
 class DatabaseService {
@@ -69,11 +69,16 @@ class DatabaseService {
   }
 
   /**
-   * Get recent scans from the database
+   * Get recent scans from the database (Postgres/SQLite).
+   * @param {number} limit - Max rows to return
+   * @param {string} [search] - Optional filter by extension name or ID (server-side)
    */
-  async getRecentScans(limit = 10) {
+  async getRecentScans(limit = 10, search = "") {
     try {
-      const url = `${this.API_BASE_URL}/recent?limit=${limit}`;
+      let url = `${this.API_BASE_URL}/recent?limit=${limit}`;
+      if (search && search.trim()) {
+        url += `&search=${encodeURIComponent(search.trim())}`;
+      }
       console.log(`[databaseService] Fetching recent scans from: ${url}`);
       
       const response = await fetch(url);
