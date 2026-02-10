@@ -1851,6 +1851,8 @@ async def get_scan_results(extension_id: str, http_request: Request):
             formatted_results["scoring_v2"] = results.get("scoring_v2")
         if results.get("governance_bundle"):
             formatted_results["governance_bundle"] = results.get("governance_bundle")
+        if results.get("virustotal_analysis"):
+            formatted_results["virustotal_analysis"] = results.get("virustotal_analysis")
 
         # Upgrade legacy payload and ensure consumer_insights
         payload = _upgrade_legacy_payload(formatted_results, extension_id)

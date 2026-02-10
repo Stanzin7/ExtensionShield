@@ -269,13 +269,13 @@ class TestLayerDetailsGenerator:
 
     def test_validate_layer_details_length_limits(self, sample_scoring_result, sample_analysis_results,
                                                   sample_manifest, sample_gate_results):
-        """Test validation enforces length limits."""
+        """Test validation enforces length limits (150/120/120)."""
         generator = LayerDetailsGenerator()
         
         invalid_output = {
             "security": {
-                "one_liner": "A" * 150,  # Exceeds 120 char limit
-                "key_points": ["B" * 100],  # Exceeds 90 char limit
+                "one_liner": "A" * 151,  # Exceeds 150 char limit
+                "key_points": ["B" * 121],  # Exceeds 120 char limit
                 "what_to_watch": []
             },
             "privacy": {
@@ -296,8 +296,8 @@ class TestLayerDetailsGenerator:
         )
         
         assert not validation.ok
+        assert any("exceeds 150 characters" in reason for reason in validation.reasons)
         assert any("exceeds 120 characters" in reason for reason in validation.reasons)
-        assert any("exceeds 90 characters" in reason for reason in validation.reasons)
 
     def test_extract_concrete_signals(self, sample_scoring_result, sample_analysis_results,
                                      sample_manifest, sample_gate_results):
@@ -349,12 +349,12 @@ class TestLayerHumanizer:
             assert isinstance(layer["key_points"], list)
             assert isinstance(layer["what_to_watch"], list)
             
-            # Should respect length limits
-            assert len(layer["one_liner"]) <= 120
+            # Should respect length limits (150/120/120)
+            assert len(layer["one_liner"]) <= 150
             for point in layer["key_points"]:
-                assert len(point) <= 90
+                assert len(point) <= 120
             for watch in layer["what_to_watch"]:
-                assert len(watch) <= 90
+                assert len(watch) <= 120
 
     def test_security_layer_with_gates(self, sample_scoring_result, sample_analysis_results,
                                       sample_manifest, sample_gate_results):
@@ -401,4 +401,60 @@ class TestLayerHumanizer:
         
         # Should detect broad host access
         assert LayerHumanizer._has_broad_host_access(sample_manifest) == True
+
+    def test_layer_details_generator_uses_gpt4o_default(self, sample_scoring_result, sample_analysis_results,
+                                                         sample_manifest, sample_gate_results):
+        """Test that LayerDetailsGenerator uses gpt-4o as default model if LLM_MODEL env not set."""
+        import os
+        from unittest.mock import patch
+        
+        generator = LayerDetailsGenerator()
+        
+        # Save original env value
+        original_model = os.environ.get("LLM_MODEL")
+        if "LLM_MODEL" in os.environ:
+            del os.environ["LLM_MODEL"]
+        
+        try:
+            with patch('extension_shield.core.layer_details_generator.invoke_with_fallback') as mock_llm:
+                mock_llm.return_value = Mock(content='{"security": {"one_liner": "test", "key_points": [], "what_to_watch": []}, "privacy": {"one_liner": "test", "key_points": [], "what_to_watch": []}, "governance": {"one_liner": "test", "key_points": [], "what_to_watch": []}}')
+                
+                generator.generate(
+                    scoring_result=sample_scoring_result,
+                    analysis_results=sample_analysis_results,
+                    manifest=sample_manifest,
+                    gate_results=sample_gate_results
+                )
+                
+                # Check that invoke_with_fallback was called with gpt-4o
+                assert mock_llm.called
+                call_kwargs = mock_llm.call_args[1]
+                assert call_kwargs.get("model_name") == "gpt-4o"
+        finally:
+            # Restore original env value
+            if original_model:
+                os.environ["LLM_MODEL"] = original_model
+
+    def test_layer_details_generator_uses_temperature_0_3(self, sample_scoring_result, sample_analysis_results,
+                                                          sample_manifest, sample_gate_results):
+        """Test that LayerDetailsGenerator uses temperature 0.3 by default."""
+        from unittest.mock import patch, call
+        
+        generator = LayerDetailsGenerator()
+        
+        with patch('extension_shield.core.layer_details_generator.invoke_with_fallback') as mock_llm:
+            mock_llm.return_value = Mock(content='{"security": {"one_liner": "test", "key_points": [], "what_to_watch": []}, "privacy": {"one_liner": "test", "key_points": [], "what_to_watch": []}, "governance": {"one_liner": "test", "key_points": [], "what_to_watch": []}}')
+            
+            generator.generate(
+                scoring_result=sample_scoring_result,
+                analysis_results=sample_analysis_results,
+                manifest=sample_manifest,
+                gate_results=sample_gate_results
+            )
+            
+            # Check that invoke_with_fallback was called with temperature 0.3
+            assert mock_llm.called
+            call_kwargs = mock_llm.call_args[1]  # Get keyword arguments
+            model_parameters = call_kwargs.get("model_parameters", {})
+            assert model_parameters.get("temperature") == 0.3
 

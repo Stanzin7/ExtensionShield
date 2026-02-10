@@ -70,10 +70,10 @@ class TestValidateLayerDetailsLengths:
     """Tests for validate_layer_details_lengths validator."""
 
     def test_rejects_long_one_liner(self):
-        """Test that one-liners exceeding 120 characters are rejected."""
+        """Test that one-liners exceeding 150 characters are rejected."""
         output = {
             "security": {
-                "one_liner": "A" * 150,  # Exceeds 120 char limit
+                "one_liner": "A" * 151,  # Exceeds 150 char limit
                 "key_points": ["Short point"],
                 "what_to_watch": ["Short watch"]
             },
@@ -92,20 +92,20 @@ class TestValidateLayerDetailsLengths:
         result = validate_layer_details_lengths(output)
         
         assert not result.ok
-        assert any("exceeds 120 characters" in reason for reason in result.reasons)
+        assert any("exceeds 150 characters" in reason for reason in result.reasons)
 
     def test_rejects_long_bullets(self):
-        """Test that bullet points exceeding 90 characters are rejected."""
+        """Test that bullet points exceeding 120 characters are rejected."""
         output = {
             "security": {
                 "one_liner": "Short summary",
-                "key_points": ["B" * 100],  # Exceeds 90 char limit
+                "key_points": ["B" * 121],  # Exceeds 120 char limit
                 "what_to_watch": []
             },
             "privacy": {
                 "one_liner": "Short",
                 "key_points": [],
-                "what_to_watch": ["C" * 100]  # Exceeds 90 char limit
+                "what_to_watch": ["C" * 121]  # Exceeds 120 char limit
             },
             "governance": {
                 "one_liner": "Short",
@@ -117,25 +117,25 @@ class TestValidateLayerDetailsLengths:
         result = validate_layer_details_lengths(output)
         
         assert not result.ok
-        assert sum(1 for reason in result.reasons if "exceeds 90 characters" in reason) == 2
+        assert sum(1 for reason in result.reasons if "exceeds 120 characters" in reason) == 2
 
     def test_accepts_valid_lengths(self):
         """Test that content within length limits is accepted."""
         output = {
             "security": {
-                "one_liner": "High security risk due to dangerous code patterns",  # Under 120 chars
-                "key_points": ["CRITICAL_SAST: eval() usage detected"],  # Under 90 chars
-                "what_to_watch": ["Monitor for code injection"]  # Under 90 chars
+                "one_liner": "High security risk due to dangerous code patterns that could execute arbitrary code",  # Under 150 chars
+                "key_points": ["CRITICAL_SAST: code can run injected scripts which is dangerous"],  # Under 120 chars
+                "what_to_watch": ["Monitor for code injection attempts that could compromise security"]  # Under 120 chars
             },
             "privacy": {
-                "one_liner": "Moderate privacy risk from data access",
-                "key_points": ["cookies permission can read site data"],
-                "what_to_watch": ["Extension runs on all websites"]
+                "one_liner": "Moderate privacy risk from data access permissions",
+                "key_points": ["cookies permission can read your site data"],
+                "what_to_watch": ["Extension runs on all websites which may pose privacy risks"]
             },
             "governance": {
-                "one_liner": "Low governance risk",
-                "key_points": ["Good policy compliance"],
-                "what_to_watch": ["Monitor updates"]
+                "one_liner": "Low governance risk with good policy compliance",
+                "key_points": ["Good policy compliance and disclosure practices"],
+                "what_to_watch": ["Monitor for security updates and policy changes"]
             }
         }
         
@@ -202,19 +202,78 @@ class TestValidateLayerDetailsReferences:
             "security": {
                 "one_liner": "Security issues with eval usage",
                 "key_points": [
-                    "CRITICAL_SAST: eval() usage detected in content.js",
-                    "webRequest permission allows network interception"
+                    "CRITICAL_SAST: code can run injected scripts which is dangerous",
+                    "webRequest permission can intercept and modify network traffic"
                 ],
-                "what_to_watch": ["Monitor eval() usage patterns"]
+                "what_to_watch": ["Monitor eval() usage patterns for security risks"]
             },
             "privacy": {
                 "one_liner": "Privacy risk from cookies permission",
-                "key_points": ["cookies permission can read site data"],
-                "what_to_watch": ["Extension runs on https://*/* pattern"]
+                "key_points": ["cookies permission can read your site data"],
+                "what_to_watch": ["Extension runs on https://*/* which means all HTTPS websites"]
             },
             "governance": {
                 "one_liner": "Good compliance",
                 "key_points": [],
+                "what_to_watch": []
+            }
+        }
+        
+        result = validate_layer_details_references(output, concrete_signals)
+        
+        assert result.ok
+    
+    def test_rejects_bullets_with_only_gate_name(self):
+        """Test that bullets containing only a gate name without explanation are rejected."""
+        concrete_signals = ["CRITICAL_SAST", "SENSITIVE_EXFIL", "cookies"]
+        
+        output = {
+            "security": {
+                "one_liner": "Security issues found",
+                "key_points": [
+                    "CRITICAL_SAST detected",  # Only gate name, no explanation
+                    "CRITICAL_SAST: code can run injected scripts (dangerous)"  # Has explanation, should pass
+                ],
+                "what_to_watch": []
+            },
+            "privacy": {
+                "one_liner": "Privacy concerns",
+                "key_points": ["SENSITIVE_EXFIL"],  # Only gate name, no explanation
+                "what_to_watch": []
+            },
+            "governance": {
+                "one_liner": "Governance review",
+                "key_points": [],
+                "what_to_watch": []
+            }
+        }
+        
+        result = validate_layer_details_references(output, concrete_signals)
+        
+        assert not result.ok
+        assert sum(1 for reason in result.reasons if "lacks human explanation" in reason or "without explanation" in reason) >= 2
+    
+    def test_accepts_bullets_with_gate_and_explanation(self):
+        """Test that bullets with gate names plus human explanation are accepted."""
+        concrete_signals = ["CRITICAL_SAST", "SENSITIVE_EXFIL", "PURPOSE_MISMATCH"]
+        
+        output = {
+            "security": {
+                "one_liner": "Security issues found",
+                "key_points": [
+                    "CRITICAL_SAST: code can run injected scripts which is dangerous",
+                    "CRITICAL_SAST: dangerous code patterns found that could execute arbitrary code"
+                ],
+                "what_to_watch": []
+            },
+            "privacy": {
+                "one_liner": "Privacy concerns",
+                "key_points": ["SENSITIVE_EXFIL: extension may send your data to other websites"],
+                "what_to_watch": []
+            },
+            "governance": {
+                "one_liner": "Governance review",
+                "key_points": ["PURPOSE_MISMATCH: extension says it's for looks but can access webpages"],
                 "what_to_watch": []
             }
         }

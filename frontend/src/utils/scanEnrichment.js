@@ -91,23 +91,33 @@ export async function enrichScan(scan, options = {}) {
     logo: metadata?.logo || null,
   };
 
-  // If skipFullFetch is true and we have metadata, try to calculate signals from available data
-  // This avoids the N+1 query problem
-  if (hasMetadata && skipFullFetch) {
-    // Try to calculate signals from metadata/scan data if available
-    // If sast_results, permissions_analysis, etc. are in metadata, use them
+  // If skipFullFetch is true and we have metadata AND scoring_v2 info, skip extra API calls
+  const hasScoringV2 = Boolean(
+    scan.scoring_v2 ||
+    scan.summary?.scoring_v2 ||
+    scan.report_view_model?.scoring_v2 ||
+    scan.governance_bundle?.scoring_v2
+  );
+
+  if (hasMetadata && skipFullFetch && hasScoringV2) {
     const scanDataForSignals = {
       ...scan,
       metadata,
       sast_results: scan.sast_results || metadata?.sast_results,
       permissions_analysis: scan.permissions_analysis || metadata?.permissions_analysis,
-      virustotal_analysis: scan.virustotal_analysis || metadata?.virustotal_analysis,
+      virustotal_analysis: scan.virustotal_analysis || metadata?.virustotal_analysis || scan.virustotal_analysis,
       manifest: scan.manifest || metadata?.manifest,
+      scoring_v2: scan.scoring_v2 || scan.summary?.scoring_v2,
+      report_view_model: scan.report_view_model || scan.summary?.report_view_model,
+      governance_bundle: scan.governance_bundle || scan.summary?.governance_bundle,
     };
 
-    // Calculate signals from available data
     const enriched = enrichScanWithSignals(baseScan, scanDataForSignals);
     return enriched;
+  }
+
+  if (hasMetadata && skipFullFetch && !hasScoringV2) {
+    console.info(`[enrichScan] Missing scoring_v2 for ${scan.extension_id}, fetching full result`);
   }
 
   // Original behavior: fetch full result if metadata not available or skipFullFetch is false
@@ -157,6 +167,7 @@ export async function enrichScan(scan, options = {}) {
  */
 export async function enrichScans(scans, options = {}) {
   if (!scans || scans.length === 0) {
+    console.warn('[enrichScans] No scans provided');
     return [];
   }
 
@@ -173,11 +184,23 @@ export async function enrichScans(scans, options = {}) {
     skipFullFetch: hasMetadata && options.skipFullFetch !== false,
   };
 
+  console.log(`[enrichScans] Enriching ${scans.length} scans, skipFullFetch=${enrichmentOptions.skipFullFetch}`);
+
   const enrichmentPromises = scans.map((scan) => enrichScan(scan, enrichmentOptions));
   const results = await Promise.allSettled(enrichmentPromises);
   
-  return results
-    .map((result) => (result.status === 'fulfilled' ? result.value : null))
+  const enriched = results
+    .map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        console.warn(`[enrichScans] Failed to enrich scan ${index}:`, result.reason);
+        return null;
+      }
+    })
     .filter(Boolean);
+  
+  console.log(`[enrichScans] Successfully enriched ${enriched.length} of ${scans.length} scans`);
+  return enriched;
 }
 

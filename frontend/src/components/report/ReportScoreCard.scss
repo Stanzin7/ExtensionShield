@@ -1,13 +1,16 @@
 .report-score-card {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  transition: all 0.2s ease-in-out;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  min-height: 200px;
 
   &.is-clickable {
     cursor: pointer;
@@ -16,12 +19,12 @@
     &:hover {
       background: rgba(255, 255, 255, 0.04);
       border-color: rgba(255, 255, 255, 0.12);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
 
     &:active {
-      transform: translateY(0);
+      transform: translateY(-2px);
     }
 
     &:focus-visible {
@@ -31,161 +34,172 @@
   }
 
   &.band-good {
-    border-color: rgba(16, 185, 129, 0.1);
-    &.is-clickable:hover { border-color: rgba(16, 185, 129, 0.3); }
+    border-color: rgba(16, 185, 129, 0.15);
+    &.is-clickable:hover { 
+      border-color: rgba(16, 185, 129, 0.3);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15);
+    }
   }
 
   &.band-warn {
-    border-color: rgba(245, 158, 11, 0.1);
-    &.is-clickable:hover { border-color: rgba(245, 158, 11, 0.3); }
+    border-color: rgba(245, 158, 11, 0.15);
+    &.is-clickable:hover { 
+      border-color: rgba(245, 158, 11, 0.3);
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
+    }
   }
 
   &.band-bad {
-    border-color: rgba(239, 68, 68, 0.1);
-    &.is-clickable:hover { border-color: rgba(239, 68, 68, 0.3); }
+    border-color: rgba(239, 68, 68, 0.15);
+    &.is-clickable:hover { 
+      border-color: rgba(239, 68, 68, 0.3);
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);
+    }
   }
 }
 
-.score-card-header {
+// Score at top
+.score-card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem; // More space for bigger icon
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .score-value-header {
-    font-family: 'JetBrains Mono', 'SF Mono', monospace;
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.02em;
-  }
-
-  .info-icon-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: none;
-    background: transparent;
-    color: rgba(248, 250, 252, 0.2);
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-
-    &:hover {
-      color: rgba(248, 250, 252, 0.6);
-      background: rgba(255, 255, 255, 0.05);
-
-      .tooltip {
-        opacity: 1;
-        visibility: visible;
-        transform: translate(-50%, -8px);
-      }
-    }
-
-    .info-svg {
-      width: 16px;
-      height: 16px;
-    }
-
-    .tooltip {
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translate(-50%, 0);
-      background: #1e293b;
-      color: white;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 4px;
-      white-space: nowrap;
-      pointer-events: none;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.2s;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-      z-index: 10;
-    }
-  }
+  width: 100%;
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  padding: 0 20px;
 }
 
-.score-card-icon {
-  font-size: 2rem; // Bigger icon as requested
-  line-height: 1;
-}
-
-.score-card-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: rgba(248, 250, 252, 0.9);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.score-card-main {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-// Score value moved to header, keeping for backward compatibility if needed
-.score-value {
+.score-value-display {
   font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  font-size: 2.25rem;
+  font-size: 32px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
 }
 
-.score-band {
+.info-icon-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(248, 250, 252, 0.4);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  margin-left: auto;
+
+  &:hover {
+    color: rgba(248, 250, 252, 0.8);
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+
+    .tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, -8px);
+    }
+  }
+
+  .info-svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translate(-50%, 0);
+    background: #1e293b;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    margin-bottom: 8px;
+  }
+}
+
+// Centered icon wrapper
+.score-card-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 40px;
+  margin-bottom: 8px;
+}
+
+.score-card-icon {
+  font-size: 64px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+  display: block;
+}
+
+// Content section
+.score-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.score-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(248, 250, 252, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.score-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid currentColor;
+  opacity: 0.8;
 }
 
 .band-icon {
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
 .score-confidence {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.confidence-label {
-  font-size: 0.6875rem;
-  color: rgba(248, 250, 252, 0.4);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
+  gap: 6px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: auto;
 }
 
 .confidence-bar-container {
-  flex: 1;
+  width: 100%;
   height: 4px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
@@ -199,27 +213,28 @@
 }
 
 .confidence-value {
-  font-size: 0.6875rem;
+  font-size: 12px;
   font-family: 'JetBrains Mono', monospace;
   color: rgba(248, 250, 252, 0.5);
-  min-width: 32px;
-  text-align: right;
+  font-weight: 500;
 }
 
 .score-contributors {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.25rem;
+  gap: 6px;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
 }
 
 .contributor-chip {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  font-size: 0.6875rem;
+  padding: 4px 10px;
+  font-size: 12px;
   font-weight: 500;
-  border-radius: 4px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(248, 250, 252, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -246,11 +261,24 @@
 // Responsive
 @media (max-width: 640px) {
   .report-score-card {
-    padding: 1rem;
+    padding: 16px;
+    min-height: 180px;
   }
 
-  .score-value {
-    font-size: 1.75rem;
+  .score-card-top {
+    padding: 0 16px;
+  }
+
+  .score-value-display {
+    font-size: 28px;
+  }
+
+  .score-card-icon {
+    font-size: 56px;
+  }
+
+  .score-card-icon-wrapper {
+    margin-top: 36px;
   }
 }
 

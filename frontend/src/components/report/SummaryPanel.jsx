@@ -59,93 +59,55 @@ const SummaryPanel = ({
     <section className="summary-panel">
       <div className="summary-header">
         <h2 className="summary-title">
-          <span className="title-icon">📋</span>
-          Summary
+          <span className="title-icon">✨</span>
+          Quick Summary
         </h2>
         {getDecisionBadge()}
       </div>
 
       <div className="summary-content">
-        {/* One-liner summary */}
+        {/* One-liner summary - Prominent */}
         {oneLiner && (
-          <p className="summary-one-liner">
-            {oneLiner}
-          </p>
+          <div className="summary-one-liner-wrapper">
+            <p className="summary-one-liner">
+              {oneLiner}
+            </p>
+          </div>
         )}
 
-        {/* Key Points - Single merged section */}
-        <div className="summary-section key-points">
-          {keyPoints.length > 0 ? (
-            <ul className="summary-bullets">
+        {/* Key Points - Visual cards */}
+        {keyPoints.length > 0 && (
+          <div className="summary-section key-points">
+            <h3 className="section-subtitle">
+              <span className="subtitle-icon">📌</span>
+              Why This Score
+            </h3>
+            <div className="key-points-grid">
               {keyPoints.map((point, idx) => (
-                <li key={idx} className="bullet-item">
-                  <span className="bullet-icon">•</span>
-                  {point}
-                </li>
+                <div key={idx} className="key-point-card">
+                  <span className="point-number">{idx + 1}</span>
+                  <p className="point-text">{point}</p>
+                </div>
               ))}
-            </ul>
-          ) : (
-            <p className="placeholder-text">No key points available.</p>
-          )}
-        </div>
-
-        {/* Key Findings - Top 2-3 items, no tags */}
-        {keyFindings && keyFindings.length > 0 && (() => {
-          // Sort by severity and take top 2-3
-          const sortedFindings = [...keyFindings].sort((a, b) => {
-            const severityOrder = { high: 3, medium: 2, low: 1 };
-            return (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
-          }).slice(0, 3);
-
-          if (sortedFindings.length === 0) return null;
-
-          return (
-            <div className="summary-section key-findings">
-              <h3 className="section-subtitle">Key Findings</h3>
-              <ul className="summary-bullets">
-                {sortedFindings.map((finding, idx) => (
-                  <li key={idx} className="bullet-item finding-item">
-                    <span className="bullet-icon">•</span>
-                    <span className="finding-content">
-                      {finding.summary && finding.summary !== finding.title ? (
-                        <>
-                          <span className="finding-title-text">{finding.title}</span>
-                          <span className="finding-summary-text">{finding.summary}</span>
-                        </>
-                      ) : (
-                        <span className="finding-title-text">{finding.title}</span>
-                      )}
-                    </span>
-                    {finding.evidenceIds && finding.evidenceIds.length > 0 && onViewEvidence && (
-                      <button
-                        className="view-evidence-link"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewEvidence(finding.evidenceIds);
-                        }}
-                      >
-                        View Evidence
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
-        {/* What to Watch (if available) */}
+        {/* What to Watch - Compact warnings */}
         {whatToWatch.length > 0 && (
           <div className="summary-section what-to-watch">
-            <h3 className="section-subtitle">What to watch</h3>
-            <ul className="summary-bullets">
+            <h3 className="section-subtitle">
+              <span className="subtitle-icon">👀</span>
+              What to Watch
+            </h3>
+            <div className="watch-items">
               {whatToWatch.map((item, idx) => (
-                <li key={idx} className="bullet-item">
-                  <span className="bullet-icon">⚠️</span>
-                  {item}
-                </li>
+                <div key={idx} className="watch-item">
+                  <span className="watch-icon">⚠️</span>
+                  <span className="watch-text">{item}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>

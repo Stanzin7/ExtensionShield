@@ -186,6 +186,22 @@ class Database:
                 # Calculate risk distribution
                 risk_dist = result.get("risk_distribution", {})
 
+                # Enhance summary with modern fields for signals and risk calculation
+                summary_data = result.get("summary", {}) or {}
+                if not isinstance(summary_data, dict):
+                    summary_data = {}
+                
+                # Store modern fields in summary JSON for backward compatibility
+                # These fields are needed for frontend signal calculation
+                if result.get("scoring_v2"):
+                    summary_data["scoring_v2"] = result.get("scoring_v2")
+                if result.get("report_view_model"):
+                    summary_data["report_view_model"] = result.get("report_view_model")
+                if result.get("governance_bundle"):
+                    summary_data["governance_bundle"] = result.get("governance_bundle")
+                if result.get("virustotal_analysis"):
+                    summary_data["virustotal_analysis"] = result.get("virustotal_analysis")
+
                 cursor.execute(
                     """
                     INSERT OR REPLACE INTO scan_results (
@@ -215,7 +231,7 @@ class Database:
                         json.dumps(result.get("permissions_analysis", {})),
                         json.dumps(result.get("sast_results", {})),
                         json.dumps(result.get("webstore_analysis", {})),
-                        json.dumps(result.get("summary", {})),
+                        json.dumps(summary_data),
                         result.get("extracted_path"),
                         json.dumps(result.get("extracted_files", [])),
                         result.get("error"),
@@ -506,7 +522,8 @@ class Database:
                         extension_id, extension_name, timestamp,
                         security_score, risk_level, total_findings,
                         total_files, metadata, 
-                        sast_results, permissions_analysis, manifest
+                        sast_results, permissions_analysis, manifest, 
+                        webstore_analysis, summary
                     FROM scan_results
                     WHERE status = 'completed'
                     ORDER BY timestamp DESC
@@ -517,7 +534,25 @@ class Database:
 
                 # Use _row_to_dict to parse JSON fields like metadata, sast_results, etc.
                 rows = cursor.fetchall()
-                return [self._row_to_dict(row) for row in rows]
+                result_rows = []
+                for row in rows:
+                    row_dict = self._row_to_dict(row)
+                    
+                    # Extract modern fields from summary JSON if present (for signal calculation)
+                    summary = row_dict.get("summary", {})
+                    if isinstance(summary, dict):
+                        if "scoring_v2" in summary:
+                            row_dict["scoring_v2"] = summary.get("scoring_v2")
+                        if "report_view_model" in summary:
+                            row_dict["report_view_model"] = summary.get("report_view_model")
+                        if "governance_bundle" in summary:
+                            row_dict["governance_bundle"] = summary.get("governance_bundle")
+                        if "virustotal_analysis" in summary:
+                            row_dict["virustotal_analysis"] = summary.get("virustotal_analysis")
+                    
+                    result_rows.append(row_dict)
+                
+                return result_rows
         except Exception as e:
             print(f"Error getting recent scans: {e}")
             return []
@@ -688,6 +723,22 @@ class SupabaseDatabase:
             else:
                 scanned_at = datetime.now(timezone.utc).isoformat()
             
+            # Enhance summary with modern fields for signals and risk calculation
+            summary_data = result.get("summary", {}) or {}
+            if not isinstance(summary_data, dict):
+                summary_data = {}
+            
+            # Store modern fields in summary JSONB for backward compatibility
+            # These fields are needed for frontend signal calculation
+            if result.get("scoring_v2"):
+                summary_data["scoring_v2"] = result.get("scoring_v2")
+            if result.get("report_view_model"):
+                summary_data["report_view_model"] = result.get("report_view_model")
+            if result.get("governance_bundle"):
+                summary_data["governance_bundle"] = result.get("governance_bundle")
+            if result.get("virustotal_analysis"):
+                summary_data["virustotal_analysis"] = result.get("virustotal_analysis")
+            
             row = {
                 "extension_id": extension_id,
                 "extension_name": extension_name,
@@ -706,7 +757,7 @@ class SupabaseDatabase:
                 "permissions_analysis": result.get("permissions_analysis", {}) or {},
                 "sast_results": result.get("sast_results", {}) or {},
                 "webstore_analysis": result.get("webstore_analysis", {}) or {},
-                "summary": result.get("summary", {}) or {},
+                "summary": summary_data,  # Enhanced with modern fields
                 "extracted_path": result.get("extracted_path"),
                 "extracted_files": extracted_files,
                 "error": result.get("error"),
@@ -797,7 +848,7 @@ class SupabaseDatabase:
             scans_resp = (
                 self.client.table(self.table_scan_results)
                 .select(
-                    "extension_id, extension_name, url, scanned_at, status, security_score, risk_level, total_findings, total_files, high_risk_count, medium_risk_count, low_risk_count"
+                    "extension_id, extension_name, url, scanned_at, status, security_score, risk_level, total_findings, total_files, high_risk_count, medium_risk_count, low_risk_count, metadata, sast_results, permissions_analysis, manifest, summary"
                 )
                 .in_("extension_id", ext_ids)
                 .execute()
@@ -808,6 +859,19 @@ class SupabaseDatabase:
                 # Map scanned_at → timestamp for API compatibility
                 if "scanned_at" in r:
                     r["timestamp"] = r.pop("scanned_at")
+                
+                # Extract modern fields from summary JSONB if present
+                summary = r.get("summary", {})
+                if isinstance(summary, dict):
+                    if "scoring_v2" in summary:
+                        r["scoring_v2"] = summary.get("scoring_v2")
+                    if "report_view_model" in summary:
+                        r["report_view_model"] = summary.get("report_view_model")
+                    if "governance_bundle" in summary:
+                        r["governance_bundle"] = summary.get("governance_bundle")
+                    if "virustotal_analysis" in summary:
+                        r["virustotal_analysis"] = summary.get("virustotal_analysis")
+                
                 by_id[r.get("extension_id")] = r
 
             # Preserve user history ordering; attach scan summary where available.
@@ -838,6 +902,27 @@ class SupabaseDatabase:
             result = data[0]
             if "scanned_at" in result:
                 result["timestamp"] = result.pop("scanned_at")
+            
+            # Extract modern fields from summary JSONB if present
+            # Also check top-level in case they were stored there (backward compatibility)
+            summary = result.get("summary", {})
+            if isinstance(summary, dict):
+                if "scoring_v2" in summary:
+                    result["scoring_v2"] = summary.get("scoring_v2")
+                if "report_view_model" in summary:
+                    result["report_view_model"] = summary.get("report_view_model")
+                if "governance_bundle" in summary:
+                    result["governance_bundle"] = summary.get("governance_bundle")
+                if "virustotal_analysis" in summary:
+                    result["virustotal_analysis"] = summary.get("virustotal_analysis")
+            
+            # If not found in summary, check top-level (for backward compatibility with old scans)
+            # Note: Supabase might return these as top-level fields if they were stored that way
+            if "scoring_v2" not in result and result.get("scoring_v2"):
+                pass  # Already at top level
+            if "virustotal_analysis" not in result and result.get("virustotal_analysis"):
+                pass  # Already at top level
+            
             return result
         except Exception as e:
             print(f"Error getting scan result (Supabase): {e}")
@@ -848,7 +933,7 @@ class SupabaseDatabase:
             resp = (
                 self.client.table(self.table_scan_results)
                 .select(
-                    "extension_id, extension_name, url, scanned_at, status, security_score, risk_level, total_findings, total_files, high_risk_count, medium_risk_count, low_risk_count"
+                    "extension_id, extension_name, url, scanned_at, status, security_score, risk_level, total_findings, total_files, high_risk_count, medium_risk_count, low_risk_count, metadata, sast_results, permissions_analysis, manifest, summary"
                 )
                 .order("scanned_at", desc=True)
                 .limit(limit)
@@ -856,9 +941,22 @@ class SupabaseDatabase:
             )
             rows = getattr(resp, "data", None) or []
             # Map scanned_at → timestamp for API compatibility
+            # Extract modern fields from summary for frontend compatibility
             for row in rows:
                 if "scanned_at" in row:
                     row["timestamp"] = row.pop("scanned_at")
+                
+                # Extract modern fields from summary JSONB if present
+                summary = row.get("summary", {})
+                if isinstance(summary, dict):
+                    if "scoring_v2" in summary:
+                        row["scoring_v2"] = summary.get("scoring_v2")
+                    if "report_view_model" in summary:
+                        row["report_view_model"] = summary.get("report_view_model")
+                    if "governance_bundle" in summary:
+                        row["governance_bundle"] = summary.get("governance_bundle")
+                    if "virustotal_analysis" in summary:
+                        row["virustotal_analysis"] = summary.get("virustotal_analysis")
             return rows
         except Exception as e:
             print(f"Error getting scan history (Supabase): {e}")
@@ -868,7 +966,7 @@ class SupabaseDatabase:
         try:
             resp = (
                 self.client.table(self.table_scan_results)
-                .select("extension_id, extension_name, scanned_at, security_score, risk_level, total_findings, total_files, metadata, sast_results, permissions_analysis, manifest")
+                .select("extension_id, extension_name, scanned_at, security_score, risk_level, total_findings, total_files, metadata, sast_results, permissions_analysis, manifest, summary")
                 .eq("status", "completed")
                 .order("scanned_at", desc=True)
                 .limit(limit)
@@ -876,9 +974,22 @@ class SupabaseDatabase:
             )
             rows = getattr(resp, "data", None) or []
             # Map scanned_at → timestamp for API compatibility
+            # Extract modern fields from summary for frontend compatibility
             for row in rows:
                 if "scanned_at" in row:
                     row["timestamp"] = row.pop("scanned_at")
+                
+                # Extract modern fields from summary JSONB if present
+                summary = row.get("summary", {})
+                if isinstance(summary, dict):
+                    if "scoring_v2" in summary:
+                        row["scoring_v2"] = summary.get("scoring_v2")
+                    if "report_view_model" in summary:
+                        row["report_view_model"] = summary.get("report_view_model")
+                    if "governance_bundle" in summary:
+                        row["governance_bundle"] = summary.get("governance_bundle")
+                    if "virustotal_analysis" in summary:
+                        row["virustotal_analysis"] = summary.get("virustotal_analysis")
             return rows
         except Exception as e:
             print(f"Error getting recent scans (Supabase): {e}")

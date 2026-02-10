@@ -81,37 +81,38 @@ const ReportScoreCard = ({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
-      <div className="score-card-header">
-        <div className="header-left">
-          <span className="score-card-icon">{getLayerIcon()}</span>
-          <span className="score-card-title">{title}</span>
+      {/* Score at top */}
+      <div className="score-card-top">
+        <div className="score-value-display" style={{ color }}>
+          {displayScore}
         </div>
-        
-        <div className="header-right">
-          <div className="score-value-header" style={{ color }}>
-            {displayScore}
-          </div>
-          {onClick && (
-            <button 
-              className="info-icon-btn" 
-              aria-label="View details"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClick();
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="info-svg">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-              <span className="tooltip">View details</span>
-            </button>
-          )}
-        </div>
+        {onClick && (
+          <button 
+            className="info-icon-btn" 
+            aria-label="View details"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="info-svg">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span className="tooltip">View details</span>
+          </button>
+        )}
       </div>
 
-      <div className="score-card-main">
+      {/* Centered icon */}
+      <div className="score-card-icon-wrapper">
+        <span className="score-card-icon">{getLayerIcon()}</span>
+      </div>
+
+      {/* Title and status */}
+      <div className="score-card-content">
+        <h3 className="score-card-title">{title}</h3>
         <div className="score-band" style={{ color }}>
           <span className="band-icon">{getBandIcon()}</span>
           <span className="band-text">{getBandLabel()}</span>
@@ -121,7 +122,6 @@ const ReportScoreCard = ({
       {/* Confidence indicator */}
       {confidencePercent !== null && (
         <div className="score-confidence">
-          <span className="confidence-label">Confidence</span>
           <div className="confidence-bar-container">
             <div 
               className="confidence-bar-fill"

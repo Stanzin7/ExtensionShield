@@ -37,10 +37,18 @@ const THRESHOLDS = {
 
 /**
  * Calculate code signal from SAST and entropy analysis
+ * Also considers scoring_v2 hard gates for more accurate signal
  */
 export function calculateCodeSignal(scanResult) {
   const sastResults = scanResult?.sast_results || scanResult?.sastResults || {};
   const entropyAnalysis = scanResult?.entropy_analysis || scanResult?.entropyAnalysis || {};
+  const scoringV2 = scanResult?.scoring_v2 || {};
+  
+  // Check if scoring_v2 indicates critical issues (hard gates triggered)
+  const hardGates = scoringV2?.hard_gates_triggered || [];
+  const hasCriticalGate = hardGates.some(gate => 
+    gate.includes('CRITICAL') || gate.includes('CRITICAL_SAST')
+  );
   
   // Count SAST findings by severity
   const findings = sastResults?.sast_findings || sastResults?.findings || {};
@@ -51,10 +59,15 @@ export function calculateCodeSignal(scanResult) {
   Object.values(findings).forEach(fileFindings => {
     if (Array.isArray(fileFindings)) {
       fileFindings.forEach(finding => {
-        const severity = (finding.extra?.severity || finding.severity || '').toUpperCase();
-        if (severity === 'CRITICAL') criticalCount++;
-        else if (severity === 'HIGH' || severity === 'ERROR') highCount++;
-        else if (severity === 'MEDIUM' || severity === 'WARNING') mediumCount++;
+        const severity = (finding.extra?.severity || finding.severity || finding.check_id || '').toUpperCase();
+        // Also check check_id for patterns like CRITICAL_SAST
+        if (severity.includes('CRITICAL') || finding.check_id?.includes('CRITICAL')) {
+          criticalCount++;
+        } else if (severity === 'HIGH' || severity === 'ERROR' || severity.includes('HIGH')) {
+          highCount++;
+        } else if (severity === 'MEDIUM' || severity === 'WARNING' || severity.includes('MEDIUM')) {
+          mediumCount++;
+        }
       });
     }
   });
@@ -62,13 +75,13 @@ export function calculateCodeSignal(scanResult) {
   // Check obfuscation
   const obfuscatedFiles = entropyAnalysis?.obfuscated_files || entropyAnalysis?.obfuscatedFiles || 0;
   
-  // Determine signal level
+  // Determine signal level - prioritize critical gates from scoring_v2
   let level = SIGNAL_LEVELS.OK;
   let label = 'Clean';
   
-  if (criticalCount >= THRESHOLDS.SAST.CRITICAL_HIGH) {
+  if (hasCriticalGate || criticalCount >= THRESHOLDS.SAST.CRITICAL_HIGH) {
     level = SIGNAL_LEVELS.HIGH;
-    label = `${criticalCount} critical`;
+    label = hasCriticalGate ? 'Critical' : `${criticalCount} critical`;
   } else if (highCount >= THRESHOLDS.SAST.HIGH_WARN || obfuscatedFiles >= THRESHOLDS.ENTROPY.OBFUSCATED_HIGH) {
     level = SIGNAL_LEVELS.HIGH;
     const issues = [];
@@ -277,11 +290,50 @@ export function getTopFindingSummary(scanResult) {
 }
 
 /**
+ * Map risk level from various formats to UI format
+ */
+function normalizeRiskLevel(riskLevel) {
+  if (!riskLevel) return null;
+  
+  const riskStr = String(riskLevel).toUpperCase();
+  
+  // Handle scoring_v2 format: "critical", "high", "medium", "low", "none"
+  if (riskStr === 'CRITICAL') return 'HIGH';
+  if (riskStr === 'HIGH') return 'HIGH';
+  if (riskStr === 'MEDIUM' || riskStr === 'MED' || riskStr === 'MODERATE') return 'MEDIUM';
+  if (riskStr === 'LOW' || riskStr === 'NONE') return 'LOW';
+  
+  return riskStr; // Return as-is if unknown format
+}
+
+/**
  * Enrich scan data with signals and risk info
  */
 export function enrichScanWithSignals(scan, fullResult) {
-  const score = fullResult?.overall_security_score || fullResult?.security_score || scan?.security_score || 0;
-  const riskLevel = fullResult?.overall_risk || fullResult?.risk_level || getRiskLevel(score);
+  // Prefer risk level from scoring_v2 if available (most up-to-date)
+  let riskLevel = null;
+  if (fullResult?.scoring_v2?.risk_level) {
+    // scoring_v2 uses lowercase: "critical", "high", "medium", "low", "none"
+    riskLevel = normalizeRiskLevel(fullResult.scoring_v2.risk_level);
+  } else if (fullResult?.scoring_v2?.overall_score !== undefined) {
+    // Calculate risk from scoring_v2 overall_score if risk_level not available
+    riskLevel = getRiskLevel(fullResult.scoring_v2.overall_score);
+  } else {
+    // Fallback to legacy fields
+    const legacyRisk = fullResult?.overall_risk || fullResult?.risk_level;
+    riskLevel = legacyRisk ? normalizeRiskLevel(legacyRisk) : null;
+  }
+  
+  // Calculate score - prefer scoring_v2 overall_score if available
+  const score = fullResult?.scoring_v2?.overall_score !== undefined 
+    ? fullResult.scoring_v2.overall_score
+    : (fullResult?.overall_security_score || fullResult?.security_score || scan?.security_score || 0);
+  
+  // If we still don't have a risk level, calculate it from score
+  if (!riskLevel) {
+    riskLevel = getRiskLevel(score);
+  }
+  
   const findingsCount = fullResult?.total_findings || countFindings(fullResult) || 0;
   
   return {

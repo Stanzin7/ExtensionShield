@@ -354,8 +354,8 @@ class LayerDetailsGenerator:
             layer_data = output[layer_name]
             
             one_liner = layer_data.get("one_liner", "")
-            if len(one_liner) > 120:
-                reasons.append(f"{layer_name}.one_liner exceeds 120 characters")
+            if len(one_liner) > 150:
+                reasons.append(f"{layer_name}.one_liner exceeds 150 characters")
             
             for bullet_list_name in ["key_points", "what_to_watch"]:
                 bullets = layer_data.get(bullet_list_name, [])
@@ -363,8 +363,8 @@ class LayerDetailsGenerator:
                     continue
                     
                 for i, bullet in enumerate(bullets):
-                    if isinstance(bullet, str) and len(bullet) > 90:
-                        reasons.append(f"{layer_name}.{bullet_list_name}[{i}] exceeds 90 characters")
+                    if isinstance(bullet, str) and len(bullet) > 120:
+                        reasons.append(f"{layer_name}.{bullet_list_name}[{i}] exceeds 120 characters")
 
         # Check for generic filler
         banned_phrases = [
@@ -399,12 +399,71 @@ class LayerDetailsGenerator:
                     
                 for i, bullet in enumerate(bullets):
                     if isinstance(bullet, str) and bullet.strip():
+                        bullet_lower = bullet.lower()
                         # Check if bullet contains at least one concrete signal
                         has_concrete_reference = any(
-                            signal.lower() in bullet.lower() for signal in concrete_signals
+                            signal.lower() in bullet_lower for signal in concrete_signals
                         )
                         if not has_concrete_reference:
                             reasons.append(f"{layer_name}.{bullet_list_name}[{i}] lacks concrete signal reference")
+                            continue
+
+                        # If bullet mentions a gate, require a human explanation
+                        gate_ids = [
+                            "CRITICAL_SAST",
+                            "VT_MALWARE",
+                            "SENSITIVE_EXFIL",
+                            "PURPOSE_MISMATCH",
+                            "TOS_VIOLATION",
+                            "MANIFEST_POSTURE",
+                            "CAPTURE_SIGNALS",
+                        ]
+                        for gate_id in gate_ids:
+                            if gate_id.lower() in bullet_lower:
+                                parts = bullet_lower.split(gate_id.lower(), 1)
+                                text_after_gate = parts[1].strip() if len(parts) > 1 else ""
+                                if len(text_after_gate) < 20 or text_after_gate in ["detected", "triggered", "found", "present"]:
+                                    reasons.append(
+                                        f"{layer_name}.{bullet_list_name}[{i}] mentions {gate_id} but lacks human explanation"
+                                    )
+
+                        # If bullet mentions a permission/host, require a human explanation
+                        common_permissions = [
+                            "cookies",
+                            "webrequest",
+                            "activetab",
+                            "tabs",
+                            "storage",
+                            "history",
+                            "bookmarks",
+                            "all_urls",
+                            "<all_urls>",
+                            "https://*/*",
+                            "*://*/*",
+                        ]
+                        permission_patterns = [
+                            "permission",
+                            "perm",
+                            "can ",
+                            "can access",
+                            "can read",
+                            "can write",
+                            "can modify",
+                            "requests ",
+                            "has ",
+                            "uses ",
+                        ]
+                        for perm in common_permissions:
+                            if perm in bullet_lower:
+                                has_explanation = any(pattern in bullet_lower for pattern in permission_patterns) or (
+                                    len(bullet_lower.replace(perm, "").strip()) > 15
+                                )
+                                if not has_explanation:
+                                    words = bullet_lower.split()
+                                    if perm in words and len(words) <= 3:
+                                        reasons.append(
+                                            f"{layer_name}.{bullet_list_name}[{i}] mentions {perm} but lacks human explanation"
+                                        )
 
         return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
 

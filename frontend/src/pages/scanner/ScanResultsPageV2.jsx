@@ -486,15 +486,6 @@ const ScanResultsPageV2 = () => {
 
       {/* Main Content */}
       <main className="results-v2-main">
-        {/* Summary Panel - Single merged summary with key findings */}
-        <SummaryPanel 
-          scores={scores}
-          factorsByLayer={factorsByLayer}
-          rawScanResult={scanResults}
-          keyFindings={keyFindings}
-          onViewEvidence={openEvidenceDrawer}
-        />
-
         {/* Score Cards Row - Clickable tiles */}
         <section className="scores-section">
           <ReportScoreCard 
@@ -540,6 +531,15 @@ const ScanResultsPageV2 = () => {
             />
           )}
         </section>
+
+        {/* Summary Panel - Single merged summary with key findings */}
+        <SummaryPanel 
+          scores={scores}
+          factorsByLayer={factorsByLayer}
+          rawScanResult={scanResults}
+          keyFindings={keyFindings}
+          onViewEvidence={openEvidenceDrawer}
+        />
       </main>
 
       {/* Evidence Drawer - Global, mounted once */}

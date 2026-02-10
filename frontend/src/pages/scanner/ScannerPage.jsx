@@ -162,7 +162,10 @@ const ScannerPage = () => {
         const historyPromise = databaseService.getRecentScans(initialLimit);
         const history = await Promise.race([historyPromise, timeoutPromise]);
 
+        console.log(`[ScannerPage] Loaded ${history?.length || 0} scans from API`);
+
         if (!history || history.length === 0) {
+          console.warn("[ScannerPage] No scans found in API response");
           if (isMounted) {
             setAllScans([]);
             setLoading(false);
@@ -183,6 +186,7 @@ const ScannerPage = () => {
           const enrichedScans = await enrichScans(history, { skipFullFetch: true });
           
           if (isMounted) {
+            console.log(`[ScannerPage] Enriched ${enrichedScans.length} scans (skipFullFetch=true)`);
             setAllScans(enrichedScans);
             setLoading(false);
           }
@@ -191,6 +195,7 @@ const ScannerPage = () => {
           const enrichedScans = await enrichScans(history);
           
           if (isMounted) {
+            console.log(`[ScannerPage] Enriched ${enrichedScans.length} scans (full fetch)`);
             setAllScans(enrichedScans);
             setLoading(false);
           }

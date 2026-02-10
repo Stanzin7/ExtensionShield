@@ -158,10 +158,14 @@ class SummaryGenerator:
         metadata: Optional[Dict],
         scan_id: Optional[str],
         extension_id: Optional[str],
-    ) -> tuple[int, str]:
+        return_details: bool = False,
+    ):
         """Compute score + label for summary prompt, with safe fallback."""
         score = 0
         score_label = "LOW RISK"
+        scoring_result = None
+        scoring_engine = None
+        signal_pack = None
 
         try:
             from extension_shield.governance.tool_adapters import SignalPackBuilder
@@ -201,7 +205,131 @@ class SummaryGenerator:
             score = 0
             score_label = "MEDIUM RISK"
 
+        if return_details:
+            return score, score_label, scoring_result, scoring_engine, signal_pack
+
         return score, score_label
+
+    def _build_facts_pack(
+        self,
+        analysis_results: Dict,
+        manifest: Dict,
+        metadata: Optional[Dict],
+        scan_id: Optional[str],
+        extension_id: Optional[str],
+    ) -> tuple[Dict[str, Any], int, str, str]:
+        """
+        Build a structured facts pack for summary_rewrite.
+
+        Returns:
+            facts_pack, score, score_label, host_scope_label
+        """
+        metadata = metadata or {}
+        score, score_label, scoring_result, scoring_engine, signal_pack = self._compute_score_context(
+            analysis_results=analysis_results,
+            manifest=manifest,
+            metadata=metadata,
+            scan_id=scan_id,
+            extension_id=extension_id,
+            return_details=True,
+        )
+
+        host_access_summary = self._classify_host_access_scope(manifest or {})
+        host_scope_label = host_access_summary.get("host_scope_label", "UNKNOWN")
+
+        gate_results = []
+        if scoring_engine and hasattr(scoring_engine, "_last_gate_results"):
+            gate_results = scoring_engine._last_gate_results or []
+
+        gate_summaries = [
+            {
+                "gate_id": g.gate_id,
+                "decision": g.decision,
+                "confidence": g.confidence,
+                "reasons": g.reasons,
+            }
+            for g in gate_results
+            if getattr(g, "triggered", False)
+        ]
+
+        # Gather permissions from manifest
+        manifest_permissions = {
+            "permissions": manifest.get("permissions", []) if isinstance(manifest, dict) else [],
+            "host_permissions": manifest.get("host_permissions", []) if isinstance(manifest, dict) else [],
+            "optional_permissions": manifest.get("optional_permissions", []) if isinstance(manifest, dict) else [],
+        }
+
+        # Compute capability flags for richer facts
+        impact_analyzer = ImpactAnalyzer()
+        external_domains = impact_analyzer._extract_external_domains(analysis_results)
+        network_evidence = ImpactAnalyzer._extract_network_evidence_from_sast(
+            analysis_results.get("javascript_analysis")
+        )
+        capability_flags = impact_analyzer._compute_capability_flags(
+            manifest=manifest,
+            analysis_results=analysis_results,
+            host_access_summary=host_access_summary,
+            external_domains=external_domains,
+            network_evidence=network_evidence,
+        )
+
+        facts_pack = {
+            "score": score,
+            "score_label": score_label,
+            "host_access": host_access_summary,
+            "manifest_permissions": manifest_permissions,
+            "permissions_summary": analysis_results.get("permissions_analysis") or {},
+            "webstore": analysis_results.get("webstore_analysis") or {},
+            "sast": analysis_results.get("javascript_analysis") or {},
+            "virustotal": analysis_results.get("virustotal_analysis") or {},
+            "entropy": analysis_results.get("entropy_analysis") or {},
+            "gates_triggered": gate_summaries,
+            "capability_flags": capability_flags,
+            "external_domains": external_domains,
+            "network_evidence": network_evidence,
+            "extension": {
+                "name": (
+                    (manifest or {}).get("name")
+                    or metadata.get("title")
+                    or metadata.get("name")
+                    or extension_id
+                ),
+                "version": (manifest or {}).get("version") or metadata.get("version"),
+                "user_count": metadata.get("user_count")
+                or metadata.get("users")
+                or (signal_pack.webstore_stats.installs if signal_pack else None),
+                "rating": metadata.get("rating")
+                or metadata.get("avg_rating")
+                or (analysis_results.get("webstore_analysis") or {}).get("rating"),
+            },
+        }
+
+        return facts_pack, score, score_label, host_scope_label
+
+    def _get_summary_rewrite_prompt_template(
+        self,
+        facts_pack: Dict[str, Any],
+        draft_summary: Dict[str, Any],
+    ) -> Optional[PromptTemplate]:
+        """Create prompt template for summary_rewrite, if available."""
+        templates = get_prompts("summary_generation")
+        template_str = templates.get("summary_rewrite")
+        if not template_str:
+            return None
+
+        facts_pack_json = self._json_block(facts_pack)
+        draft_summary_json = self._json_block(draft_summary)
+
+        template = PromptTemplate(
+            input_variables=["facts_pack_json", "draft_summary_json"],
+            template=template_str,
+            template_format="jinja2",
+        ).partial(
+            facts_pack_json=facts_pack_json,
+            draft_summary_json=draft_summary_json,
+        )
+
+        return template
 
     def _get_summary_prompt_template(
         self,
@@ -292,13 +420,41 @@ class SummaryGenerator:
             logger.warning("No manifest data provided for summary generation")
             return None
 
-        prompt = self._get_summary_prompt_template(
-            analysis_results=analysis_results,
-            manifest=manifest,
-            metadata=metadata,
-            scan_id=scan_id,
-            extension_id=extension_id,
-        )
+        prompt = None
+        facts_score = None
+        facts_score_label = None
+        facts_host_scope_label = None
+
+        # Prefer summary_rewrite prompt if available (facts pack + draft fallback)
+        try:
+            facts_pack, facts_score, facts_score_label, facts_host_scope_label = self._build_facts_pack(
+                analysis_results=analysis_results,
+                manifest=manifest,
+                metadata=metadata,
+                scan_id=scan_id,
+                extension_id=extension_id,
+            )
+            from extension_shield.core.report_view_model import _fallback_executive_summary
+            draft_summary = _fallback_executive_summary(
+                score=facts_score,
+                score_label=facts_score_label,
+                host_scope_label=facts_host_scope_label,
+            )
+            prompt = self._get_summary_rewrite_prompt_template(
+                facts_pack=facts_pack,
+                draft_summary=draft_summary,
+            )
+        except Exception as exc:
+            logger.warning("Failed to build summary_rewrite prompt; falling back: %s", exc)
+
+        if prompt is None:
+            prompt = self._get_summary_prompt_template(
+                analysis_results=analysis_results,
+                manifest=manifest,
+                metadata=metadata,
+                scan_id=scan_id,
+                extension_id=extension_id,
+            )
         # Use OpenAI 4-1 (gpt-4o) for better summary generation
         model_name = os.getenv("LLM_MODEL", "gpt-4o")
         model_parameters = {
@@ -325,13 +481,17 @@ class SummaryGenerator:
                 score = summary.get("score")
                 score_label = summary.get("score_label")
                 if score is None:
-                    score, score_label = self._compute_score_context(
-                        analysis_results=analysis_results,
-                        manifest=manifest,
-                        metadata=metadata,
-                        scan_id=scan_id,
-                        extension_id=extension_id,
-                    )
+                    if facts_score is not None and facts_score_label is not None:
+                        score = facts_score
+                        score_label = facts_score_label
+                    else:
+                        score, score_label = self._compute_score_context(
+                            analysis_results=analysis_results,
+                            manifest=manifest,
+                            metadata=metadata,
+                            scan_id=scan_id,
+                            extension_id=extension_id,
+                        )
                     summary["score"] = score
                     summary["score_label"] = score_label
 

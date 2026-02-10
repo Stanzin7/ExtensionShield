@@ -317,8 +317,8 @@ def validate_layer_details_not_generic(output: Dict[str, Any]) -> ValidationResu
 def validate_layer_details_lengths(output: Dict[str, Any]) -> ValidationResult:
     """
     Validate that layer details respect length limits.
-    - one_liner <= 120 chars
-    - bullet points <= 90 chars each
+    - one_liner <= 150 chars
+    - bullet points (key_points, what_to_watch) <= 120 chars each
     """
     reasons: List[str] = []
     
@@ -336,20 +336,20 @@ def validate_layer_details_lengths(output: Dict[str, Any]) -> ValidationResult:
             reasons.append(f"{layer_name} layer is not a dict")
             continue
         
-        # Check one_liner length
+        # Check one_liner length (150 chars limit)
         one_liner = layer_data.get("one_liner", "")
-        if isinstance(one_liner, str) and len(one_liner) > 120:
-            reasons.append(f"{layer_name}.one_liner exceeds 120 characters ({len(one_liner)} chars)")
+        if isinstance(one_liner, str) and len(one_liner) > 150:
+            reasons.append(f"{layer_name}.one_liner exceeds 150 characters ({len(one_liner)} chars)")
         
-        # Check bullet lengths
+        # Check bullet lengths (120 chars limit)
         for bullet_list_name in ["key_points", "what_to_watch"]:
             bullets = layer_data.get(bullet_list_name, [])
             if not isinstance(bullets, list):
                 continue
                 
             for i, bullet in enumerate(bullets):
-                if isinstance(bullet, str) and len(bullet) > 90:
-                    reasons.append(f"{layer_name}.{bullet_list_name}[{i}] exceeds 90 characters ({len(bullet)} chars)")
+                if isinstance(bullet, str) and len(bullet) > 120:
+                    reasons.append(f"{layer_name}.{bullet_list_name}[{i}] exceeds 120 characters ({len(bullet)} chars)")
     
     return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
 
@@ -360,7 +360,15 @@ def validate_layer_details_references(
 ) -> ValidationResult:
     """
     Validate that layer details bullets reference concrete signals.
-    Each non-empty bullet must contain at least one concrete signal reference.
+    
+    Rules:
+    - Each non-empty bullet must contain at least one concrete signal reference
+    - If a bullet contains a gate/permission/host name, it MUST also contain additional descriptive text
+    - Examples:
+      ✅ "CRITICAL_SAST: code can run injected scripts (dangerous)" - has gate + explanation
+      ❌ "CRITICAL_SAST detected" - only gate name, no explanation
+      ✅ "cookies permission can read your site data" - has permission + explanation
+      ❌ "cookies" - only permission name, no explanation
     """
     reasons: List[str] = []
     
@@ -370,6 +378,14 @@ def validate_layer_details_references(
     if not concrete_signals:
         # If no signals available, we can't validate references
         return ValidationResult(ok=True, reasons=[])
+    
+    # Common gate IDs that need explanation
+    gate_ids = ["CRITICAL_SAST", "VT_MALWARE", "SENSITIVE_EXFIL", "PURPOSE_MISMATCH", 
+                "TOS_VIOLATION", "MANIFEST_POSTURE", "CAPTURE_SIGNALS"]
+    
+    # Common permission patterns
+    permission_patterns = ["permission", "perm", "can ", "can access", "can read", "can write", 
+                          "can modify", "requests ", "has ", "uses "]
     
     required_layers = ["security", "privacy", "governance"] 
     for layer_name in required_layers:
@@ -387,13 +403,52 @@ def validate_layer_details_references(
                 continue
                 
             for i, bullet in enumerate(bullets):
-                if isinstance(bullet, str) and bullet.strip():
-                    # Check if bullet contains at least one concrete signal
-                    has_concrete_reference = any(
-                        signal.lower() in bullet.lower() for signal in concrete_signals
-                    )
-                    if not has_concrete_reference:
-                        reasons.append(f"{layer_name}.{bullet_list_name}[{i}] lacks concrete signal reference: '{bullet[:50]}...'")
+                if not isinstance(bullet, str) or not bullet.strip():
+                    continue
+                
+                bullet_lower = bullet.lower()
+                
+                # Check if bullet contains at least one concrete signal
+                has_concrete_reference = any(
+                    signal.lower() in bullet_lower for signal in concrete_signals
+                )
+                
+                if not has_concrete_reference:
+                    reasons.append(f"{layer_name}.{bullet_list_name}[{i}] lacks concrete signal reference: '{bullet[:50]}...'")
+                    continue
+                
+                # Check if bullet only contains a gate name without explanation
+                for gate_id in gate_ids:
+                    if gate_id.lower() in bullet_lower:
+                        # Check if bullet is essentially just the gate name (with minimal words)
+                        # Allow if it has additional descriptive text beyond the gate name
+                        words_after_gate = bullet_lower.split(gate_id.lower(), 1)
+                        if len(words_after_gate) > 1:
+                            text_after_gate = words_after_gate[1].strip()
+                            # If text after gate is very short (just "detected", "triggered", etc.), reject
+                            if len(text_after_gate) < 20 or text_after_gate in ["detected", "triggered", "found", "present"]:
+                                reasons.append(f"{layer_name}.{bullet_list_name}[{i}] mentions {gate_id} but lacks human explanation: '{bullet[:50]}...'")
+                        else:
+                            # Gate name at end or only gate name
+                            if len(bullet_lower.replace(gate_id.lower(), "").strip()) < 10:
+                                reasons.append(f"{layer_name}.{bullet_list_name}[{i}] only mentions {gate_id} without explanation: '{bullet[:50]}...'")
+                
+                # Check if bullet only contains a permission name without explanation
+                # Look for permission names from concrete_signals that are common permissions
+                common_permissions = ["cookies", "webrequest", "activetab", "tabs", "storage", 
+                                     "history", "bookmarks", "all_urls", "<all_urls>", "https://*/*"]
+                for perm in common_permissions:
+                    if perm.lower() in bullet_lower:
+                        # Check if bullet has explanatory text (not just the permission name)
+                        has_explanation = any(
+                            pattern in bullet_lower for pattern in permission_patterns
+                        ) or len(bullet_lower.replace(perm.lower(), "").strip()) > 15
+                        
+                        if not has_explanation:
+                            # Might be just the permission name, check if it's a standalone mention
+                            words = bullet_lower.split()
+                            if perm.lower() in words and len(words) <= 3:
+                                reasons.append(f"{layer_name}.{bullet_list_name}[{i}] mentions {perm} but lacks human explanation: '{bullet[:50]}...'")
     
     return ValidationResult(ok=len(reasons) == 0, reasons=reasons)
 
