@@ -6,9 +6,16 @@ and retrieve results.
 """
 
 import os
+from pathlib import Path
+
+# Load .env from project root so DB_BACKEND, SUPABASE_*, etc. are set before config/database init
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if (_PROJECT_ROOT / ".env").exists():
+    from dotenv import load_dotenv
+    load_dotenv(_PROJECT_ROOT / ".env")
+
 import json
 import logging
-from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 
@@ -2562,8 +2569,9 @@ async def get_recent_scans(limit: int = 10):
         limit: Maximum number of results to return
 
     Returns:
-        List of recent scans with risk_and_signals mapping
+        List of recent scans with risk_and_signals mapping; db_backend for verification (supabase|sqlite).
     """
+    db_backend = "supabase" if isinstance(db, SupabaseDatabase) else "sqlite"
     try:
         logger.info(f"[get_recent_scans] Fetching {limit} recent scans")
         recent = db.get_recent_scans(limit=limit)
@@ -2614,11 +2622,10 @@ async def get_recent_scans(limit: int = 10):
                 scan["risk_and_signals"] = {"risk": 0, "signals": {}}
 
         logger.info(f"[get_recent_scans] Returning {len(recent)} enriched scans")
-        return {"recent": recent}
+        return {"recent": recent, "db_backend": db_backend}
     except Exception as e:
         logger.error(f"[get_recent_scans] Error fetching recent scans: {e}", exc_info=True)
-        # Return empty list instead of raising to prevent frontend crashes
-        return {"recent": []}
+        return {"recent": [], "db_backend": db_backend}
 
 
 @app.get("/api/diagnostic/scans")
