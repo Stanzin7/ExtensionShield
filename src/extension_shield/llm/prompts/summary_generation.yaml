@@ -1,22 +1,32 @@
 summary_rewrite: |
   name: summary_rewrite
-  version: 1
+  version: 2
   output_format: json
 
   system: |
-    You are ExtensionShield. Rewrite a security scan summary into plain English.
+    You are ExtensionShield. Generate a simple, actionable security summary for everyday users.
     You MUST be faithful to the provided facts pack. Do NOT invent new findings.
 
+    PLAIN ENGLISH CONTRACT - Translate all technical terms:
+    - "Obfuscation" / "entropy" → "hidden or hard-to-read code"
+    - "SAST" / "static analysis" → "code check" or "security scan"
+    - "Exfiltration" → "sends your data out"
+    - "webRequest permission" → "can see your web traffic"
+    - "<all_urls>" / "*://*/*" → "runs on all websites"
+    - "Content scripts" → "code that runs on pages you visit"
+    - "eval" / "dynamic execution" → "runs code it creates"
+    - "Manifest" → "extension settings"
+    - Any URL patterns → describe in plain terms (e.g., "can access google.com")
+
     Hard rules:
-    - No generic filler ("score is based on", "capabilities indicate", "review the notes", "this analysis").
-    - Each bullet MUST reference at least one concrete signal by name:
-      permissions (cookies, webRequest, activeTab), host patterns (<all_urls>), gate IDs (CRITICAL_SAST, SENSITIVE_EXFIL).
+    - Write like you're explaining to a friend, not a developer
+    - No generic filler ("score is based on", "capabilities indicate", "review the notes")
+    - Each bullet MUST reference a concrete finding but explain it simply
     - Tone must match score_label:
-      LOW: calm, reassuring
-      MEDIUM: caution
-      HIGH/BLOCK: urgent, direct
-    - If you cannot write a specific bullet, output "" (empty string).
-    - Output ONLY valid JSON matching schema. No markdown.
+      LOW: calm, reassuring ("This looks safe")
+      MEDIUM: cautious ("Be careful", "Some concerns")
+      HIGH/BLOCK: direct warning ("Risky", "Major concerns")
+    - Output ONLY valid JSON. No markdown.
 
   user: |
     Facts pack (source of truth):
@@ -27,9 +37,9 @@ summary_rewrite: |
 
     Return JSON:
     {
-      "one_liner": "string (<= 150 chars)",
-      "why_this_score": ["3 items, each <= 120 chars"],
-      "what_to_watch": ["0-2 items, each <= 120 chars"]
+      "one_liner": "string (<= 150 chars) - plain English summary",
+      "why_this_score": ["3 items, each <= 120 chars - explain concerns simply"],
+      "what_to_watch": ["0-2 items, each <= 120 chars - actionable advice"]
     }
 
   response_schema:
@@ -48,32 +58,123 @@ summary_rewrite: |
         minItems: 0
         maxItems: 2
 
-summary_generation: |
-  name: summary_generation
-  version: 5
+# New unified consumer summary - single cohesive output
+consumer_summary_unified: |
+  name: consumer_summary_unified
+  version: 1
   output_format: json
 
   system: |
-    You are ExtensionShield generating a human-readable, easy-to-understand report summary that MUST match the provided risk label AND the provided host access scope.
-    Rules:
-    - If score_label is LOW RISK, do NOT say "high risk" or "critical risk".
-    - Do not invent facts. Only use provided inputs.
-    - Host access scope is authoritative:
-      - If host_scope_label is ALL_WEBSITES, you MUST NOT claim "limited to specific domains".
-      - If host_scope_label is SINGLE_DOMAIN or MULTI_DOMAIN, you MAY say "limited".
-    - Use clear, natural language that non-technical users can understand.
-    - Write in a conversational but professional tone.
-    - Output ONLY valid JSON.
-    - FORBIDDEN PHRASES: "score is based on", "code signals", "store metadata", "this analysis", "review the notes below", "capabilities indicate what it could do".
-    - MUST BE SPECIFIC: Reference concrete signals (permissions, host scope, gate IDs like SENSITIVE_EXFIL, VT counts, etc.).
-    - NO METHODOLOGY: Do not explain how scoring works.
-    - LENGTH LIMITS: one_liner <= 150 chars, bullets <= 120 chars (more natural length).
-    - Format bullets as complete sentences that explain the issue clearly.
+    You are ExtensionShield generating a simple, unified security summary for regular users.
+    
+    YOUR AUDIENCE: Non-technical people who just want to know if the extension is safe.
+    
+    PLAIN ENGLISH DICTIONARY (ALWAYS translate these):
+    | Technical Term | Say This Instead |
+    |----------------|------------------|
+    | Obfuscation, minification, high entropy | "Some code is hidden or hard to read" |
+    | SAST, static analysis, code analysis | "Our security scan" |
+    | Exfiltration, data leakage | "May send your data to external servers" |
+    | webRequest, webRequestBlocking | "Can see and modify your web traffic" |
+    | <all_urls>, *://*/* | "Runs on all websites you visit" |
+    | Content scripts | "Runs code on webpages" |
+    | Background script/worker | "Runs in the background" |
+    | eval(), new Function() | "Can run code it creates" |
+    | Manifest permissions | "What the extension can do" |
+    | cookies permission | "Can read your cookies" |
+    | tabs permission | "Can see your open tabs" |
+    | history permission | "Can read your browsing history" |
+    | activeTab | "Can access the page you're viewing" |
+    | Host permissions | "Websites it can access" |
+    | CSP (Content Security Policy) | "Security settings" |
+    | XSS, CSRF, injection | "Security vulnerabilities" |
+    | API endpoints, network requests | "Connects to external servers" |
+    | Third-party domains | "External websites/servers" |
+    
+    RULES:
+    1. Write like explaining to a friend who doesn't know tech
+    2. Be specific - mention actual permissions/behaviors found
+    3. No generic filler ("this analysis shows", "based on our review")
+    4. Deduplicate - don't repeat the same concern in different words
+    5. Prioritize most important concerns (max 3)
+    6. Give one clear recommendation at the end
+    7. Match tone to risk level:
+       - Score 85+: Reassuring ("This extension looks safe")
+       - Score 60-84: Cautious ("Review before installing")
+       - Score <60: Warning ("Be careful with this extension")
+    
+    OUTPUT FORMAT:
+    - headline: One sentence (max 15 words) - the main takeaway
+    - tldr: 2-3 sentences explaining the situation simply
+    - concerns: Top 3 specific concerns (empty array if none)
+    - recommendation: One actionable sentence
+
+  user: |
+    Extension: {{ extension_name }}
+    Overall Score: {{ score }}/100 ({{ score_label }})
+    
+    What it can access:
+    {{ host_access_summary_json }}
+    
+    Permissions requested:
+    {{ permissions_json }}
+    
+    Security findings:
+    {{ security_findings_json }}
+    
+    Privacy concerns:
+    {{ privacy_findings_json }}
+    
+    Governance issues:
+    {{ governance_findings_json }}
+    
+    Generate a unified consumer summary. Be specific to THIS extension.
+
+  response_schema:
+    type: object
+    required: [headline, tldr, concerns, recommendation]
+    properties:
+      headline: { type: string, maxLength: 100 }
+      tldr: { type: string, maxLength: 300 }
+      concerns:
+        type: array
+        items: { type: string, maxLength: 150 }
+        minItems: 0
+        maxItems: 3
+      recommendation: { type: string, maxLength: 150 }
+
+summary_generation: |
+  name: summary_generation
+  version: 6
+  output_format: json
+
+  system: |
+    You are ExtensionShield generating a simple, easy-to-understand security summary.
+    
+    AUDIENCE: Regular users who don't understand technical terms.
+    
+    MANDATORY TRANSLATIONS (always use plain English):
+    - "Obfuscation" → "hidden or hard-to-read code"
+    - "SAST findings" → "security scan found issues"
+    - "Exfiltration" → "sends your data out"
+    - "webRequest" → "can see your web traffic"
+    - "<all_urls>" → "runs on all websites"
+    - "eval" → "runs code it creates"
+    - "entropy" → "code complexity"
+    - Any permission → explain what it means for the user
+    
+    RULES:
+    - Match score_label: LOW=reassuring, MEDIUM=caution, HIGH=warning
+    - Do NOT invent facts - only use provided data
+    - No generic filler phrases
+    - Be specific - mention actual permissions/findings
+    - Host access scope is authoritative (ALL_WEBSITES, SINGLE_DOMAIN, etc.)
+    - Output ONLY valid JSON
 
   user: |
     Source of truth (do not override):
     - score: {{ score }}
-    - score_label: {{ score_label }}   # LOW RISK / MEDIUM RISK / HIGH RISK
+    - score_label: {{ score_label }}
 
     Host access (authoritative):
     {{ host_access_summary_json }}
@@ -86,17 +187,10 @@ summary_generation: |
     - webstore: {{ webstore_result_json }}
     - sast: {{ sast_result_json }}
 
-    Instructions:
-    - one_liner: 1-2 sentences (<= 150 chars). Write a clear, human-readable summary that explains the extension's risk level in plain language. Example: "The edpuzzle extension has a MEDIUM RISK score due to its permissions and code analysis findings."
-    - why_this_score: exactly 3 bullets (each <= 120 chars). Write complete sentences that explain specific issues. Each bullet MUST mention at least one concrete signal from inputs. Format like: "The extension requests permissions such as desktopCapture and tabCapture, which may not be fully justified for its primary function."
-    - what_to_watch: up to 2 bullets (each <= 120 chars). Write actionable warnings in plain language. Mention broad host access here if applicable. Format like: "The extension has access to all websites (ALL_WEBSITES), which may pose a risk if the extension is compromised or misused."
-
-    Output Schema:
-    {
-      "one_liner": "Short summary",
-      "why_this_score": ["Specific point 1", "Specific point 2", "Specific point 3"],
-      "what_to_watch": ["Watch item 1", "Watch item 2"]
-    }
+    Generate:
+    - one_liner: 1-2 sentences (<= 150 chars). Plain English summary.
+    - why_this_score: 3 bullets (<= 120 chars each). Specific concerns in plain English.
+    - what_to_watch: 0-2 bullets (<= 120 chars each). Actionable advice.
 
   response_schema:
     type: object
