@@ -9,51 +9,52 @@ import './LayerModal.scss';
 
 // ---------------------------------------------------------------------------
 // Human-readable translations for internal factor names
+// Plain English descriptions - no technical jargon
 // ---------------------------------------------------------------------------
 const FACTOR_HUMAN = {
   // Security layer
-  SAST:                 { label: 'Code Safety',           icon: '🔍', category: 'code',   desc: 'Static analysis of extension source code' },
-  VirusTotal:           { label: 'Malware Scan',          icon: '🦠', category: 'threat', desc: 'Malware detection across 70+ antivirus engines' },
-  Obfuscation:          { label: 'Hidden Code',           icon: '🫣', category: 'code',   desc: 'Code that is intentionally hard to read' },
-  Manifest:             { label: 'Extension Config',      icon: '⚙️', category: 'code',   desc: 'Security posture of the extension manifest' },
-  ChromeStats:          { label: 'Threat Intelligence',   icon: '📡', category: 'threat', desc: 'Behavioral signals from Chrome threat feeds' },
-  Webstore:             { label: 'Store Reputation',      icon: '🏪', category: 'trust',  desc: 'Webstore listing signals and reputation' },
-  Maintenance:          { label: 'Update Freshness',      icon: '📅', category: 'trust',  desc: 'How recently the extension was updated' },
+  SAST:                 { label: 'Code Safety',           icon: '🔍', category: 'code',   desc: 'Checks the code for security problems' },
+  VirusTotal:           { label: 'Malware Scan',          icon: '🦠', category: 'threat', desc: 'Checks if antivirus tools flag this extension' },
+  Obfuscation:          { label: 'Hidden Code',           icon: '🫣', category: 'code',   desc: 'Some code is hidden or hard to read' },
+  Manifest:             { label: 'Extension Config',      icon: '⚙️', category: 'code',   desc: 'How the extension is set up and configured' },
+  ChromeStats:          { label: 'Threat Intelligence',   icon: '📡', category: 'threat', desc: 'Known security issues from Chrome data' },
+  Webstore:             { label: 'Store Reputation',      icon: '🏪', category: 'trust',  desc: 'Ratings and reviews from the Chrome store' },
+  Maintenance:          { label: 'Update Freshness',      icon: '📅', category: 'trust',  desc: 'When the extension was last updated' },
   // Privacy layer
-  PermissionsBaseline:  { label: 'Permission Risk',       icon: '🔑', category: 'access', desc: 'Individual permission risk assessment' },
-  PermissionCombos:     { label: 'Dangerous Combos',      icon: '⚡', category: 'access', desc: 'Risky combinations of permissions together' },
-  NetworkExfil:         { label: 'Data Sharing',           icon: '📤', category: 'data',   desc: 'Potential for sending your data externally' },
-  CaptureSignals:       { label: 'Screen / Tab Capture',  icon: '📹', category: 'data',   desc: 'Can record your screen, tabs, or desktop' },
+  PermissionsBaseline:  { label: 'Permission Risk',       icon: '🔑', category: 'access', desc: 'What the extension can access on your browser' },
+  PermissionCombos:     { label: 'Dangerous Combos',      icon: '⚡', category: 'access', desc: 'Risky combinations of what it can do' },
+  NetworkExfil:         { label: 'Data Sharing',          icon: '📤', category: 'data',   desc: 'Can it send your data to external servers?' },
+  CaptureSignals:       { label: 'Screen / Tab Capture',  icon: '📹', category: 'data',   desc: 'Can record your screen or browser tabs' },
   // Governance layer
-  ToSViolations:        { label: 'Policy Violations',     icon: '📜', category: 'policy', desc: 'Chrome Web Store Terms of Service compliance' },
-  Consistency:          { label: 'Behavior Match',        icon: '🎯', category: 'policy', desc: 'Does what it claims match what it does?' },
-  DisclosureAlignment:  { label: 'Disclosure Accuracy',   icon: '📋', category: 'policy', desc: 'Privacy policy vs actual data practices' },
+  ToSViolations:        { label: 'Policy Violations',     icon: '📜', category: 'policy', desc: 'Does it follow Chrome store rules?' },
+  Consistency:          { label: 'Behavior Match',        icon: '🎯', category: 'policy', desc: 'Does it do what it says it does?' },
+  DisclosureAlignment:  { label: 'Disclosure Accuracy',   icon: '📋', category: 'policy', desc: 'Is the privacy policy accurate?' },
 };
 
 const CATEGORY_LABELS = {
-  code:   'Code Analysis',
+  code:   'Code Checks',
   threat: 'Threat Detection',
   trust:  'Trust Signals',
-  access: 'Data Access',
+  access: 'What It Can Access',
   data:   'Data Handling',
-  policy: 'Policy Compliance',
+  policy: 'Rules & Policies',
 };
 
 const LAYER_CONFIG = {
   security: {
     title: 'Security',
     icon: '🛡️',
-    tagline: 'How safe is the code and configuration?',
+    tagline: 'Is the extension code safe to run?',
   },
   privacy: {
     title: 'Privacy',
     icon: '🔒',
-    tagline: 'What data can it access and where does it go?',
+    tagline: 'What can it see and where does your data go?',
   },
   governance: {
     title: 'Governance',
     icon: '📋',
-    tagline: 'Does it follow the rules and do what it claims?',
+    tagline: 'Does it follow the rules and match its claims?',
   },
 };
 
@@ -106,6 +107,13 @@ function bandLabel(band) {
     case 'BAD':  return 'Bad';
     default:     return '';
   }
+}
+
+function getSeverityClass(severity) {
+  if (severity >= 0.7) return 'high';
+  if (severity >= 0.4) return 'medium';
+  if (severity >= 0.05) return 'low';
+  return 'clear';
 }
 
 // Human-friendly permission name
@@ -171,11 +179,9 @@ const LayerModal = ({
   const bc = bandColor(band);
   const bl = bandLabel(band);
 
-  // LLM plain-language content
+  // LLM plain-language content (one-liner only; key_points & what_to_watch removed as redundant)
   const ld = layerDetails?.[layer] || {};
   const oneLiner = ld.one_liner || '';
-  const keyPoints = (ld.key_points || []).filter(p => p?.trim());
-  const whatToWatch = (ld.what_to_watch || []).filter(p => p?.trim());
 
   // Categorised & humanised factors
   const humanised = factors.map(humanizeFactor);
@@ -184,14 +190,40 @@ const LayerModal = ({
   // Build a flat permissions list for display
   const permsList = buildPermsList(layer, permissions, powerfulPermissions);
 
+  // Score ring: circumference ≈ 97.4 for r=15.5
+  const ringCirc = 2 * Math.PI * 15.5;
+  const ringOffset = score !== null ? (score / 100) * ringCirc : 0;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="lm-content">
+      <DialogContent className="lm-content lm-dialog-smooth">
         <DialogHeader>
           <DialogTitle className="lm-header">
             <span className="lm-icon">{config.icon}</span>
             <span className="lm-title">{config.title}</span>
             <div className="lm-score-area">
+              {/* Mini score ring – echoes risk dial */}
+              {score !== null && (
+                <div className="lm-score-ring" aria-hidden>
+                  <svg viewBox="0 0 36 36" className="lm-ring-svg">
+                    <path
+                      className="lm-ring-bg"
+                      d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31"
+                      fill="none"
+                      strokeWidth="3"
+                    />
+                    <path
+                      className="lm-ring-fill"
+                      stroke={bc}
+                      strokeDasharray={`${ringOffset} ${ringCirc}`}
+                      d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31"
+                      fill="none"
+                      strokeWidth="3"
+                    />
+                  </svg>
+                  <span className="lm-ring-value" style={{ color: bc }}>{displayScore}</span>
+                </div>
+              )}
               <span className="lm-score" style={{ color: bc }}>
                 {score !== null ? `${displayScore}/100` : displayScore}
               </span>
@@ -202,41 +234,52 @@ const LayerModal = ({
 
         <div className="lm-body">
           {/* One-liner insight */}
+          {/* Quick Summary Block – one-liner from LLM */}
           {oneLiner ? (
             <p className="lm-insight">{oneLiner}</p>
           ) : (
             <p className="lm-tagline">{config.tagline}</p>
           )}
 
-          {/* Key Findings (plain English) */}
-          {keyPoints.length > 0 && (
-            <div className="lm-section">
-              <h3 className="lm-section-title">Key Findings</h3>
-              <ul className="lm-bullets">
-                {keyPoints.map((pt, i) => (
-                  <li key={i}><span className="lm-bullet-num">{i + 1}</span>{pt}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Risk Breakdown - grouped by category */}
+          {/* Risk Breakdown - visual gauge cards by category */}
           {grouped.length > 0 && (
-            <div className="lm-section">
+            <div className="lm-section lm-section-risk">
               <h3 className="lm-section-title">Risk Breakdown</h3>
               <div className="lm-categories">
-                {grouped.map(([cat, items]) => (
-                  <div key={cat} className="lm-cat">
+                {grouped.map(([cat, items], catIdx) => (
+                  <div key={cat} className="lm-cat" style={{ animationDelay: `${catIdx * 60}ms` }}>
                     <span className="lm-cat-label">{CATEGORY_LABELS[cat] || cat}</span>
                     <div className="lm-cat-items">
                       {items.map((item, idx) => (
-                        <div key={idx} className="lm-factor">
-                          <span className="lm-factor-icon">{item.icon}</span>
+                        <div
+                          key={idx}
+                          className={`lm-factor-card lm-severity-${getSeverityClass(item.severity)}`}
+                          style={{ animationDelay: `${(catIdx * 60 + (idx + 1) * 40)}ms` }}
+                        >
+                          <div className="lm-factor-visual">
+                            <span className="lm-factor-icon">{item.icon}</span>
+                            <div className="lm-factor-gauge">
+                              <div
+                                className="lm-gauge-fill"
+                                style={{
+                                  width: `${Math.min(100, item.severity * 100)}%`,
+                                  backgroundColor: item.levelColor,
+                                }}
+                              />
+                            </div>
+                          </div>
                           <div className="lm-factor-info">
                             <span className="lm-factor-label">{item.label}</span>
                             {item.desc && <span className="lm-factor-desc">{item.desc}</span>}
                           </div>
-                          <span className="lm-factor-level" style={{ color: item.levelColor }}>
+                          <span
+                            className="lm-factor-badge"
+                            style={{
+                              color: item.levelColor,
+                              borderColor: `${item.levelColor}40`,
+                              backgroundColor: `${item.levelColor}12`,
+                            }}
+                          >
                             {item.level}
                           </span>
                         </div>
@@ -258,18 +301,6 @@ const LayerModal = ({
                     <span className="lm-perm-dot" />
                     <span className="lm-perm-text">{p.label}</span>
                   </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* What to Watch */}
-          {whatToWatch.length > 0 && (
-            <div className="lm-section">
-              <h3 className="lm-section-title">What to Watch</h3>
-              <ul className="lm-watch">
-                {whatToWatch.map((w, i) => (
-                  <li key={i}>{w}</li>
                 ))}
               </ul>
             </div>
