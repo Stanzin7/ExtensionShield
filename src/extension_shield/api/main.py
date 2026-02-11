@@ -3486,6 +3486,12 @@ async def get_extension_icon(extension_id: str):
                                     continue
                 except Exception as e:
                     logger.debug(f"Error searching for extracted extension: {e}")
+
+    # Best practice: if we have a persisted icon blob, serve it immediately.
+    # This avoids relying on filesystem state (ephemeral/persistent) and prevents slow fallbacks.
+    persisted = _extension_icon_response_from_base64(icon_base64, icon_media_type)
+    if persisted:
+        return persisted
     
     if not extracted_path:
         # Search for extracted extension directory by extension_id in storage
