@@ -463,6 +463,7 @@ const ScanResultsPageV2 = () => {
           keyFindings={keyFindings}
           onViewEvidence={openEvidenceDrawer}
         />
+
       </main>
 
       {/* Evidence Drawer - Global, mounted once */}
