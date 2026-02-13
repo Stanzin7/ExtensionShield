@@ -16,31 +16,61 @@ from extension_shield.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Single source of truth: Chrome extension IDs are exactly 32 lowercase letters [a-z]
+CHROME_EXTENSION_ID_PATTERN = re.compile(r"^[a-z]{32}$")
+
+
+def _check_zip_bomb_limits(zip_ref: zipfile.ZipFile, max_files: int, max_uncompressed_bytes: int) -> None:
+    """
+    Reject archive before extraction if it exceeds zip-bomb limits.
+    Raises ValueError if file count or total uncompressed size is over limit.
+    """
+    file_count = 0
+    total_uncompressed = 0
+    for member in zip_ref.infolist():
+        if member.is_dir():
+            continue
+        file_count += 1
+        if file_count > max_files:
+            raise ValueError(
+                f"Zip file count ({file_count}) exceeds limit ({max_files}). "
+                "Refusing to extract (zip-bomb protection)."
+            )
+        # file_size is uncompressed size; may be -1 for unknown in some zips
+        size = getattr(member, "file_size", 0) or 0
+        if size < 0:
+            size = 0
+        total_uncompressed += size
+        if total_uncompressed > max_uncompressed_bytes:
+            raise ValueError(
+                f"Zip total uncompressed size ({total_uncompressed}) exceeds limit ({max_uncompressed_bytes}). "
+                "Refusing to extract (zip-bomb protection)."
+            )
+
 
 def extract_extension_id_by_url(url):
-    """Extract extension ID from Chrome Web Store URL"""
+    """Extract extension ID from Chrome Web Store URL. Returns only if it matches ^[a-z]{32}$."""
     try:
+        if not url or not isinstance(url, str):
+            return None
+        candidate = None
         # Handle different URL formats
         if "/detail/" in url:
-            # Format: https://chromewebstore.google.com/detail/name/id or
-            # https://chromewebstore.google.com/detail/id
             parts = url.split("/detail/")
             if len(parts) > 1:
                 extension_part = parts[1]
-                # Split by '/' and take the last part (the ID)
-                extension_id = extension_part.split("/")[-1]
-                # Remove query parameters (e.g., ?utm_source=...)
-                extension_id = extension_id.split("?")[0]
-                # Remove any trailing slashes
-                extension_id = extension_id.rstrip("/")
-                return extension_id
+                candidate = extension_part.split("/")[-1].split("?")[0].rstrip("/").strip().lower()
         elif "id=" in url:
-            # Format: https://chromewebstore.google.com/detail/...?id=...
             match = re.search(r"id=([^&]+)", url)
             if match:
-                return match.group(1)
+                candidate = match.group(1).strip().lower()
 
-        logger.warning("Could not extract extension ID from URL")
+        if candidate and CHROME_EXTENSION_ID_PATTERN.match(candidate):
+            return candidate
+        if candidate:
+            logger.warning("Extracted ID from URL did not match Chrome ID format [a-z]{32}: %s", candidate[:50])
+        else:
+            logger.warning("Could not extract extension ID from URL")
         return None
 
     except Exception as exc:
@@ -92,6 +122,12 @@ def extract_extension_crx(file_path: str) -> Optional[str]:
                 f.write(zip_data)
 
             with zipfile.ZipFile(temp_zip, "r") as zip_ref:
+                settings = get_settings()
+                _check_zip_bomb_limits(
+                    zip_ref,
+                    settings.zip_extract_max_files,
+                    settings.zip_extract_max_uncompressed_bytes,
+                )
                 # Safe extraction with zip-slip protection
                 for member in zip_ref.infolist():
                     # Normalize path and check for zip-slip
@@ -107,6 +143,12 @@ def extract_extension_crx(file_path: str) -> Optional[str]:
         elif file_path.endswith(".zip"):
             # Direct ZIP extraction with zip-slip protection
             with zipfile.ZipFile(file_path, "r") as zip_ref:
+                settings = get_settings()
+                _check_zip_bomb_limits(
+                    zip_ref,
+                    settings.zip_extract_max_files,
+                    settings.zip_extract_max_uncompressed_bytes,
+                )
                 # Safe extraction with zip-slip protection
                 for member in zip_ref.infolist():
                     # Normalize path and check for zip-slip
@@ -122,6 +164,9 @@ def extract_extension_crx(file_path: str) -> Optional[str]:
             return None
 
         return extract_dir
+    except ValueError:
+        # Zip-bomb and zip-slip rejections: propagate to caller
+        raise
     except Exception as exc:
         logger.error("Error extracting .crx file: %s", exc)
         return None
@@ -201,20 +246,8 @@ def is_local_extension_crx_file(path: str) -> bool:
 def is_chrome_extension_id(path: str) -> bool:
     """
     Check if the provided string is a valid Chrome extension ID.
-    
-    Chrome extension IDs are 32-character lowercase alphanumeric strings.
-    Example: gbbilodpoldeopifonmibfboicpafpjo
-    
-    Args:
-        path (str): The string to check.
-        
-    Returns:
-        bool: True if the string matches Chrome extension ID pattern, False otherwise.
+    Must match ^[a-z]{32}$ (32 lowercase letters).
     """
     if not path or not isinstance(path, str):
         return False
-    
-    # Chrome extension IDs are exactly 32 characters, lowercase letters a-p only
-    # (base16 encoding using letters a-p instead of 0-9a-f)
-    pattern = r'^[a-p]{32}$'
-    return bool(re.match(pattern, path.strip().lower()))
+    return bool(CHROME_EXTENSION_ID_PATTERN.match(path.strip().lower()))
