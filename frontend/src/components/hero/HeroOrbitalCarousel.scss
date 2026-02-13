@@ -1,0 +1,721 @@
+/* ============================================================================
+   Hero Orbital Carousel - Multi-Ring Atomic 3D Orbit
+   Uses perspective: 1200px, transform-style: preserve-3d (no three.js)
+   ============================================================================ */
+
+.hero-orbital-carousel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  margin: 0 auto;
+}
+
+/* Static mode for reduced motion - no rotation */
+.hero-orbital-carousel--static .hero-orbital-ring--primary,
+.hero-orbital-carousel--static .hero-orbital-ring--secondary {
+  animation: none !important;
+  transform: rotateY(0deg) !important;
+}
+
+/* Minimal layout: horizontal strip of icons (tablet/mobile) */
+.hero-orbital-carousel--minimal {
+  max-width: 100%;
+  gap: 1.5rem;
+}
+
+.hero-orbital-minimal-hint {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--atlas-text-muted);
+  opacity: 0.85;
+}
+
+.hero-orbital-mini-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.75rem 1rem;
+  margin: 0 -1rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   3D Scene Container
+   ============================================================================ */
+
+.hero-orbital-scene {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective-origin: 50% 50%;
+}
+
+/* Soft radial spotlight behind orbit group */
+.hero-orbital-spotlight {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 420px;
+  height: 420px;
+  margin-left: -210px;
+  margin-top: -210px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(20, 184, 166, 0.08) 0%,
+    rgba(20, 184, 166, 0.03) 35%,
+    transparent 65%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================================================
+   Central Sun / Star - Glowing core at the center of the solar system
+   ============================================================================ */
+
+.hero-orbital-sun {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.hero-orbital-sun__core {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 40%,
+    rgba(255, 245, 220, 1) 0%,
+    rgba(255, 210, 120, 0.95) 30%,
+    rgba(255, 180, 80, 0.8) 60%,
+    rgba(230, 140, 50, 0.6) 100%
+  );
+  box-shadow:
+    0 0 8px 2px rgba(255, 200, 100, 0.6),
+    0 0 18px 6px rgba(255, 180, 80, 0.35),
+    0 0 32px 12px rgba(255, 160, 60, 0.18);
+  animation: sunPulse 4s ease-in-out infinite;
+}
+
+.hero-orbital-sun__glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin-left: -30px;
+  margin-top: -30px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 200, 100, 0.25) 0%,
+    rgba(255, 180, 80, 0.12) 35%,
+    rgba(255, 160, 60, 0.04) 60%,
+    transparent 80%
+  );
+  pointer-events: none;
+  animation: sunGlowPulse 4s ease-in-out infinite;
+}
+
+@keyframes sunPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 8px 2px rgba(255, 200, 100, 0.6),
+      0 0 18px 6px rgba(255, 180, 80, 0.35),
+      0 0 32px 12px rgba(255, 160, 60, 0.18);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow:
+      0 0 10px 3px rgba(255, 200, 100, 0.7),
+      0 0 22px 8px rgba(255, 180, 80, 0.4),
+      0 0 40px 16px rgba(255, 160, 60, 0.22);
+  }
+}
+
+@keyframes sunGlowPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12);
+  }
+}
+
+/* Orbit group: holds both rings with rotateX tilt for 3D depth */
+.hero-orbital-group {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  transform-style: preserve-3d;
+}
+
+/* ============================================================================
+   Orbit Path Indicators - Solar system style rings with subtle glow
+   ============================================================================ */
+
+.hero-orbital-path {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  transform-style: preserve-3d;
+  box-shadow:
+    inset 0 0 12px 1px rgba(255, 200, 100, 0.04),
+    0 0 8px 1px rgba(255, 200, 100, 0.03);
+}
+
+.hero-orbital-path--primary {
+  width: 340px;
+  height: 340px;
+  margin-left: -170px;
+  margin-top: -170px;
+  border-color: rgba(255, 220, 150, 0.1);
+}
+
+.hero-orbital-path--secondary {
+  width: 480px;
+  height: 480px;
+  margin-left: -240px;
+  margin-top: -240px;
+  border-color: rgba(255, 200, 120, 0.06);
+}
+
+/* ============================================================================
+   Orbit Rings - Primary (interactive) + Secondary (depth only)
+   ============================================================================ */
+
+.hero-orbital-ring {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.hero-orbital-ring--primary {
+  z-index: 2;
+}
+
+.hero-orbital-ring--secondary {
+  z-index: 1;
+}
+
+/* ============================================================================
+   Orbit Slot - Positions each icon on its ring
+   ============================================================================ */
+
+.hero-orbital-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -32px;
+  margin-top: -32px;
+  width: 64px;
+  height: 64px;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+/* ============================================================================
+   CTA - "Click an extension" below the orbit (does not overlap design)
+   ============================================================================ */
+
+.hero-orbital-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0.6rem 1.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(20, 184, 166, 0.15);
+  pointer-events: none;
+  align-self: center;
+}
+
+.hero-orbital-cta__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--atlas-accent);
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.6);
+  flex-shrink: 0;
+  animation: ctaDotPulse 2s ease-in-out infinite;
+}
+
+.hero-orbital-cta__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.95);
+  white-space: nowrap;
+}
+
+@keyframes ctaDotPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(20, 184, 166, 0.6);
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 14px rgba(20, 184, 166, 0.8);
+  }
+}
+
+/* ============================================================================
+   Orbit Icon - Clean, minimal with hover effects
+   ============================================================================ */
+
+.hero-orbit-icon {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transition: transform 0.2s ease;
+
+  &:focus-visible {
+    outline: none;
+
+    .hero-orbit-icon__ring {
+      box-shadow: 0 0 0 3px var(--atlas-accent);
+    }
+  }
+}
+
+.hero-orbit-icon__ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--atlas-bg-secondary);
+  background: color-mix(in srgb, var(--atlas-bg-secondary) 92%, var(--atlas-bg-primary) 8%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 calc(4px + var(--orbit-shadow-depth, 0) * 2px) calc(16px + var(--orbit-shadow-depth, 0) * 3px) rgba(0, 0, 0, calc(0.25 + var(--orbit-shadow-depth, 0) * 0.08)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.25s ease;
+  overflow: hidden;
+
+  img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    border-radius: 6px;
+  }
+}
+
+/* Selected state - 2px teal outline, no glow */
+.hero-orbit-icon__ring--active,
+.hero-orbit-icon--selected .hero-orbit-icon__ring {
+  border-color: var(--atlas-accent);
+  box-shadow: 0 0 0 2px var(--atlas-accent), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Secondary ring: non-interactive, depth only */
+.hero-orbit-icon--secondary {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Hover tooltip */
+.hero-orbit-icon__tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 130px;
+  padding: 0.5rem 0.75rem;
+  background: var(--atlas-bg-tertiary);
+  background: color-mix(in srgb, var(--atlas-bg-tertiary) 96%, black 4%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: center;
+  z-index: 1000;
+  pointer-events: none;
+  animation: tooltipFadeIn 0.2s ease;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: var(--atlas-bg-tertiary) transparent transparent transparent;
+  }
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tooltip-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--atlas-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.tooltip-status {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  display: inline-block;
+  margin: 0.1rem auto;
+
+  &--safe {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+  &--warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+  }
+  &--danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
+}
+
+.tooltip-cta {
+  font-size: 0.625rem;
+  color: var(--atlas-text-muted);
+  margin-top: 0.1rem;
+}
+
+/* Compact mode for mobile strip */
+.hero-orbit-icon--compact {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+
+  .hero-orbit-icon__ring {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+
+    img {
+      width: 24px;
+      height: 24px;
+    }
+  }
+}
+
+/* ============================================================================
+   Report Card Modal - Pop overlay so orbit never shifts
+   ============================================================================ */
+
+.hero-orbital-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.hero-orbital-modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.hero-orbital-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  transition: color 0.2s, opacity 0.2s;
+  opacity: 0.5;
+
+  &:hover {
+    color: var(--atlas-text-primary);
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--atlas-accent);
+    outline-offset: 2px;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Focus card when inside modal */
+.hero-orbital-modal-content .hero-orbital-focus-card {
+  margin-top: 0;
+}
+
+/* ============================================================================
+   Focus Card - Report card with pop animation
+   ============================================================================ */
+
+.hero-orbital-focus-wrap {
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
+  min-height: 0;
+}
+
+.hero-orbital-focus-card {
+  pointer-events: auto;
+  padding: 1.5rem 1.75rem;
+  background: var(--atlas-bg-secondary);
+  background: color-mix(in srgb, var(--atlas-bg-secondary) 96%, var(--atlas-bg-primary) 4%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--atlas-border);
+  border-radius: 18px;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform-origin: center center;
+  animation: focusCardPopGlow 0.6s ease-out forwards;
+}
+
+@keyframes focusCardPopGlow {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(20, 184, 166, 0.35),
+      0 20px 50px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 28px 4px rgba(20, 184, 166, 0.2),
+      0 20px 50px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+  }
+  100% {
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+}
+
+.hero-orbital-focus-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 auto 1.125rem;
+}
+
+.hero-orbital-focus-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+
+  img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+}
+
+.hero-orbital-focus-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--atlas-text-primary);
+  letter-spacing: 0.01em;
+  margin: 0;
+  text-align: center;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.hero-orbital-focus-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.hero-orbital-focus-row-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin-bottom: 0.4rem;
+
+  .hero-orbital-focus-row-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin-top: 2px;
+
+    &.safe {
+      color: #22c55e;
+    }
+    &.warning {
+      color: #f59e0b;
+    }
+    &.danger {
+      color: #ef4444;
+    }
+  }
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+
+    strong {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--atlas-text-primary);
+    }
+    span {
+      font-size: 0.6875rem;
+      color: var(--atlas-text-muted);
+    }
+  }
+}
+
+.hero-orbital-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hero-orbital-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+
+  &.safe {
+    background: linear-gradient(90deg, #22c55e, #4ade80);
+  }
+  &.warning {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  }
+  &.danger {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+  }
+}
+
+.hero-orbital-focus-meta {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.625rem;
+  color: var(--atlas-text-muted);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================================
+   Reduced motion: static display
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-orbital-carousel {
+    .hero-orbital-ring {
+      animation: none !important;
+      transform: rotateY(0deg) !important;
+    }
+
+    .hero-orbit-icon__tooltip {
+      animation: none;
+    }
+
+    .hero-orbital-focus-card {
+      animation: none;
+    }
+
+    .hero-orbital-cta__dot {
+      animation: none;
+    }
+  }
+}
