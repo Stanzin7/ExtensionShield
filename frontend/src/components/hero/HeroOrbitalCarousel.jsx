@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import databaseService from "../../services/databaseService";
 import extensionCacheService from "../../services/extensionCacheService";
-import { enrichScans } from "../../utils/scanEnrichment";
-import { getExtensionIconUrl, EXTENSION_ICON_PLACEHOLDER } from "../../utils/constants";
+import { EXTENSION_ICON_PLACEHOLDER } from "../../utils/constants";
+import { HERO_SNAPSHOT, getHeroIconUrl } from "../../data/heroSnapshot";
 import "./HeroOrbitalCarousel.scss";
 
 const VIEWPORT_COMPACT = 1024;
@@ -23,21 +22,8 @@ const SECONDARY_ICON_COUNT = 5;
 const ORBIT_TILT = 17; // rotateX 16–18deg
 const MAX_SCANS = PRIMARY_ICON_COUNT + SECONDARY_ICON_COUNT;
 
-// Placeholder scan data for empty state
-const PLACEHOLDER_SCANS = [
-  { extensionId: "session-buddy", name: "Session Buddy", security: { level: "ok", label: "No critical issues", score: 95 }, privacy: { level: "warn", label: "Trackers detected", score: 72 }, governance: { level: "ok", label: "Standard permissions", score: 94 }, lastAnalyzed: "1m ago" },
-  { extensionId: "hover-zoom", name: "Hover Zoom+", security: { level: "ok", label: "Good", score: 93 }, privacy: { level: "ok", label: "No trackers", score: 91 }, governance: { level: "ok", label: "Standard permissions", score: 96 }, lastAnalyzed: "2m ago" },
-  { extensionId: "stylus", name: "Stylus", security: { level: "ok", label: "No critical issues", score: 90 }, privacy: { level: "warn", label: "Third-party scripts", score: 70 }, governance: { level: "ok", label: "Standard permissions", score: 95 }, lastAnalyzed: "5m ago" },
-  { extensionId: "adblock", name: "Adblock Plus", security: { level: "ok", label: "No critical issues", score: 97 }, privacy: { level: "ok", label: "Minimal data", score: 95 }, governance: { level: "ok", label: "Standard permissions", score: 97 }, lastAnalyzed: "8m ago" },
-  { extensionId: "honey", name: "PayPal Honey", security: { level: "warn", label: "Review recommended", score: 72 }, privacy: { level: "warn", label: "Trackers detected", score: 58 }, governance: { level: "ok", label: "Standard permissions", score: 90 }, lastAnalyzed: "12m ago" },
-  { extensionId: "grammarly", name: "Grammarly", security: { level: "ok", label: "No critical issues", score: 96 }, privacy: { level: "warn", label: "Data collection", score: 65 }, governance: { level: "ok", label: "Standard permissions", score: 94 }, lastAnalyzed: "15m ago" },
-  { extensionId: "hola", name: "Hola VPN", security: { level: "warn", label: "Review recommended", score: 55 }, privacy: { level: "warn", label: "Trackers detected", score: 48 }, governance: { level: "warn", label: "Broad permissions", score: 60 }, lastAnalyzed: "20m ago" },
-  { extensionId: "vdh", name: "Video DownloadHelper", security: { level: "ok", label: "No critical issues", score: 94 }, privacy: { level: "ok", label: "No trackers", score: 92 }, governance: { level: "ok", label: "Standard permissions", score: 95 }, lastAnalyzed: "25m ago" },
-  { extensionId: "ublock", name: "uBlock Origin", security: { level: "ok", label: "No critical issues", score: 98 }, privacy: { level: "ok", label: "Minimal data", score: 96 }, governance: { level: "ok", label: "Standard permissions", score: 98 }, lastAnalyzed: "30m ago" },
-  { extensionId: "lastpass", name: "LastPass", security: { level: "warn", label: "Review recommended", score: 78 }, privacy: { level: "warn", label: "Data collection", score: 62 }, governance: { level: "ok", label: "Standard permissions", score: 88 }, lastAnalyzed: "35m ago" },
-  { extensionId: "react-devtools", name: "React DevTools", security: { level: "ok", label: "No critical issues", score: 92 }, privacy: { level: "ok", label: "No trackers", score: 95 }, governance: { level: "ok", label: "Standard permissions", score: 94 }, lastAnalyzed: "40m ago" },
-  { extensionId: "json-viewer", name: "JSON Viewer", security: { level: "ok", label: "No critical issues", score: 91 }, privacy: { level: "ok", label: "No trackers", score: 93 }, governance: { level: "ok", label: "Standard permissions", score: 92 }, lastAnalyzed: "45m ago" },
-];
+// Fallback when snapshot is empty (should not happen)
+const PLACEHOLDER_SCANS = HERO_SNAPSHOT.slice(0, MAX_SCANS);
 
 function mapSignal(signal, fallbackLabel = "—") {
   if (!signal) return { level: "ok", label: fallbackLabel, score: 0 };
@@ -72,8 +58,19 @@ function getOverallStatus(scan) {
 }
 
 function FocusCard({ scan, isVisible }) {
-  const iconUrl = scan?.extensionId ? extensionCacheService.getIconUrl(scan.extensionId) : EXTENSION_ICON_PLACEHOLDER;
-  const detailsHref = scan?.extensionId ? `/scan/results/${encodeURIComponent(scan.extensionId)}` : null;
+  const extensionId = scan?.extensionId;
+  const staticIconUrl = extensionId ? getHeroIconUrl(extensionId) : "";
+  const apiIconUrl = extensionId ? extensionCacheService.getIconUrl(extensionId) : EXTENSION_ICON_PLACEHOLDER;
+  const detailsHref = extensionId ? `/scan/results/${encodeURIComponent(extensionId)}` : null;
+
+  const handleIconError = (e) => {
+    e.target.onerror = null;
+    if (e.target.src === staticIconUrl) {
+      e.target.src = apiIconUrl;
+    } else {
+      e.target.src = EXTENSION_ICON_PLACEHOLDER;
+    }
+  };
 
   return (
     <motion.div
@@ -87,7 +84,7 @@ function FocusCard({ scan, isVisible }) {
     >
       <div className="hero-orbital-focus-icon-wrap">
         <div className="hero-orbital-focus-icon">
-          <img src={iconUrl} alt="" onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }} />
+          <img src={staticIconUrl || apiIconUrl} alt="" onError={handleIconError} />
         </div>
         <div className="hero-orbital-focus-title-row">
           <p className="hero-orbital-focus-label">{scan?.name || "Extension"}</p>
@@ -173,7 +170,17 @@ function computeDepth(ringAngleDeg, index, cardCount, tiltDeg, maxOpacity = 1) {
 
 function OrbitIcon({ scan, depth, isSelected, isHovered, interactive = true, compact = false, onClick, onHoverStart, onHoverEnd }) {
   const extensionId = scan?.extensionId || scan?.extension_id;
-  const iconUrl = extensionId ? extensionCacheService.getIconUrl(extensionId) : EXTENSION_ICON_PLACEHOLDER;
+  const staticIconUrl = extensionId ? getHeroIconUrl(extensionId) : "";
+  const apiIconUrl = extensionId ? extensionCacheService.getIconUrl(extensionId) : EXTENSION_ICON_PLACEHOLDER;
+
+  const handleIconError = (e) => {
+    e.target.onerror = null;
+    if (e.target.src === staticIconUrl) {
+      e.target.src = apiIconUrl;
+    } else {
+      e.target.src = EXTENSION_ICON_PLACEHOLDER;
+    }
+  };
   const scale = depth?.scale ?? 1;
   const opacity = depth?.opacity ?? 1;
   const zIndex = depth?.zIndex ?? 1;
@@ -198,7 +205,7 @@ function OrbitIcon({ scan, depth, isSelected, isHovered, interactive = true, com
   const content = (
     <>
       <div className={`hero-orbit-icon__ring ${isSelected ? "hero-orbit-icon__ring--active" : ""}`}>
-        <img src={iconUrl} alt="" onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }} />
+        <img src={staticIconUrl || apiIconUrl} alt="" onError={handleIconError} />
       </div>
       {interactive && isHovered && opacity >= 0.6 && (
         <div className="hero-orbit-icon__tooltip">
@@ -350,7 +357,7 @@ export default function HeroOrbitalCarousel() {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [cardRevealed, setCardRevealed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [scans, setScans] = useState(PLACEHOLDER_SCANS);
+  const [scans, setScans] = useState(HERO_SNAPSHOT);
   const [iconCacheVersion, setIconCacheVersion] = useState(0);
   const [compact, setCompact] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -366,33 +373,23 @@ export default function HeroOrbitalCarousel() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Hero uses static snapshot for instant load (no API wait). Icons from /hero-icons/*.png.
+  // Optional: prefill extension cache for other pages by fetching in background (does not block hero).
   useEffect(() => {
     let cancelled = false;
-
-    // Check cache first for instant load
-    const cached = extensionCacheService.get();
-    if (cached && cached.length > 0) {
-      setScans(cached);
-      setFocusedIndex(0);
-    }
-
-    // Fetch fresh data in background
     (async () => {
       try {
+        const { default: databaseService } = await import("../../services/databaseService");
+        const { enrichScans } = await import("../../utils/scanEnrichment");
         const recent = await databaseService.getRecentScans(MAX_SCANS);
-        if (cancelled || !recent || recent.length === 0) return;
+        if (cancelled || !recent?.length) return;
         const enriched = await enrichScans(recent);
         const simplified = enriched.map(simplifyScan).filter((s) => s.extensionId).slice(0, MAX_SCANS);
         if (!cancelled && simplified.length > 0) {
-          // Update cache and re-render when icons are stored so they display
           extensionCacheService.set(simplified, () => setIconCacheVersion((v) => v + 1));
-          setScans(simplified);
-          if (!cached || cached.length === 0) {
-            setFocusedIndex(0);
-          }
         }
       } catch {
-        // fallback to placeholders if no cache
+        // Hero already shows snapshot; cache prefill is best-effort
       }
     })();
     return () => { cancelled = true; };
