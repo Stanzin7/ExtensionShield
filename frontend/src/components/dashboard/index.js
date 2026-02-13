@@ -1,6 +1,4 @@
-// Dashboard Components - Clean, Robinhood-inspired UI
-export { default as RiskGauge } from './RiskGauge';
+// Dashboard Components - Scan results dashboard (e.g. ScanResultsDashboardPage)
 export { default as ScoreCard } from './ScoreCard';
-export { default as StatsPanel, StatItem, MiniSparkline } from './StatsPanel';
-export { default as FactorBreakdown, FactorRing } from './FactorBreakdown';
-
+export { default as ExtensionHeaderCard } from './ExtensionHeaderCard';
+export { default as QuickSummaryCard } from './QuickSummaryCard';

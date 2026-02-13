@@ -15,13 +15,19 @@ import { normalizeHighlights } from '../../utils/normalizeScanResult';
  * - verdict + reasons + access + action
  * 
  * Falls back gracefully through multiple data sources.
+ * 
+ * topFindings: Array of { title, summary } - Top 3 findings for instant proof (one line each)
+ * onViewRiskyPermissions, onViewNetworkDomains: Optional click handlers for action buttons
  */
 const SummaryPanel = ({ 
   scores = {},
   factorsByLayer = {},
   rawScanResult = null,
   keyFindings = [],
-  onViewEvidence = null
+  onViewEvidence = null,
+  topFindings = [],
+  onViewRiskyPermissions = null,
+  onViewNetworkDomains = null
 }) => {
   // Priority 1: New unified_summary format (simpler, LLM-powered)
   const unifiedSummary = rawScanResult?.report_view_model?.unified_summary;
@@ -41,32 +47,64 @@ const SummaryPanel = ({
   const hasUnifiedSummary = unifiedSummary && (unifiedSummary.headline || unifiedSummary.tldr);
   const hasConsumerSummary = consumerSummary && consumerSummary.verdict;
   const hasLegacy = oneLiner || keyPoints.length > 0 || engineConcerns.length > 0;
-
-  if (!hasUnifiedSummary && !hasConsumerSummary && !hasLegacy) {
-    return null;
-  }
+  const hasAnySummary = hasUnifiedSummary || hasConsumerSummary || hasLegacy;
+  const showPlaceholder = !hasAnySummary && (onViewRiskyPermissions || onViewNetworkDomains);
 
   const getDecisionBadge = () => {
     const decision = scores?.decision;
     if (!decision) return null;
-
     const badges = {
-      'ALLOW': { label: 'Safe', color: '#10B981', icon: '✓' },
-      'WARN': { label: 'Review', color: '#F59E0B', icon: '⚡' },
-      'BLOCK': { label: 'Blocked', color: '#EF4444', icon: '✕' },
+      'ALLOW': { label: 'SAFE', color: '#10B981', icon: '✓' },
+      'WARN': { label: 'REVIEW', color: '#F59E0B', icon: '⚡' },
+      'BLOCK': { label: 'BLOCKED', color: '#EF4444', icon: '✕' },
     };
-
     const badge = badges[decision] || badges['WARN'];
     return (
-      <span 
-        className="decision-badge"
-        style={{ backgroundColor: badge.color }}
-      >
+      <span className="decision-badge" style={{ backgroundColor: badge.color }}>
         <span className="badge-icon">{badge.icon}</span>
         <span className="badge-text">{badge.label}</span>
       </span>
     );
   };
+
+  // Placeholder Quick Summary when no summary data (match design: description tags + action buttons)
+  if (showPlaceholder) {
+    return (
+      <section className="summary-panel summary-panel--unified">
+        <div className="summary-header">
+          <h2 className="summary-title">
+            <span className="title-icon">✨</span>
+            Quick Summary
+          </h2>
+          {getDecisionBadge()}
+        </div>
+        <div className="summary-content">
+          <div className="summary-placeholder-wrapper">
+            <p className="summary-placeholder-line">This extension needs review before installing.</p>
+            <p className="summary-placeholder-line">Avoid on sensitive sites (banking/email).</p>
+          </div>
+          {(onViewRiskyPermissions || onViewNetworkDomains) && (
+            <div className="summary-action-buttons">
+              {onViewRiskyPermissions && (
+                <button type="button" className="summary-action-btn" onClick={onViewRiskyPermissions}>
+                  <span className="action-dot" /> View risky permissions
+                </button>
+              )}
+              {onViewNetworkDomains && (
+                <button type="button" className="summary-action-btn" onClick={onViewNetworkDomains}>
+                  <span className="action-dot" /> View network domains
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  if (!hasAnySummary) {
+    return null;
+  }
 
   // NEW: Unified summary – single cohesive narrative (no fragmented AI-looking sections)
   if (hasUnifiedSummary) {
@@ -129,6 +167,34 @@ const SummaryPanel = ({
                 <span className="recommendation-icon">👉</span>
                 <span className="recommendation-text">{recommendation}</span>
               </div>
+            </div>
+          )}
+
+          {/* Action buttons + Top 3 findings (dashboard layout) */}
+          {(onViewRiskyPermissions || onViewNetworkDomains) && (
+            <div className="summary-action-buttons">
+              {onViewRiskyPermissions && (
+                <button type="button" className="summary-action-btn" onClick={onViewRiskyPermissions}>
+                  <span className="action-dot" /> View risky permissions
+                </button>
+              )}
+              {onViewNetworkDomains && (
+                <button type="button" className="summary-action-btn" onClick={onViewNetworkDomains}>
+                  <span className="action-dot" /> View network domains
+                </button>
+              )}
+            </div>
+          )}
+          {topFindings.length > 0 && (
+            <div className="summary-top-findings">
+              <h4 className="top-findings-title">TOP 3 FINDINGS</h4>
+              <ul className="top-findings-list">
+                {topFindings.slice(0, 3).map((f, idx) => (
+                  <li key={idx} className="top-finding-item">
+                    {f.title || f.summary || String(f)}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
@@ -201,6 +267,33 @@ const SummaryPanel = ({
               </div>
             </div>
           )}
+
+          {(onViewRiskyPermissions || onViewNetworkDomains) && (
+            <div className="summary-action-buttons">
+              {onViewRiskyPermissions && (
+                <button type="button" className="summary-action-btn" onClick={onViewRiskyPermissions}>
+                  <span className="action-dot" /> View risky permissions
+                </button>
+              )}
+              {onViewNetworkDomains && (
+                <button type="button" className="summary-action-btn" onClick={onViewNetworkDomains}>
+                  <span className="action-dot" /> View network domains
+                </button>
+              )}
+            </div>
+          )}
+          {topFindings.length > 0 && (
+            <div className="summary-top-findings">
+              <h4 className="top-findings-title">TOP 3 FINDINGS</h4>
+              <ul className="top-findings-list">
+                {topFindings.slice(0, 3).map((f, idx) => (
+                  <li key={idx} className="top-finding-item">
+                    {f.title || f.summary || String(f)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
     );
@@ -242,6 +335,33 @@ const SummaryPanel = ({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {(onViewRiskyPermissions || onViewNetworkDomains) && (
+          <div className="summary-action-buttons">
+            {onViewRiskyPermissions && (
+              <button type="button" className="summary-action-btn" onClick={onViewRiskyPermissions}>
+                <span className="action-dot" /> View risky permissions
+              </button>
+            )}
+            {onViewNetworkDomains && (
+              <button type="button" className="summary-action-btn" onClick={onViewNetworkDomains}>
+                <span className="action-dot" /> View network domains
+              </button>
+            )}
+          </div>
+        )}
+        {topFindings.length > 0 && (
+          <div className="summary-top-findings">
+            <h4 className="top-findings-title">TOP 3 FINDINGS</h4>
+            <ul className="top-findings-list">
+              {topFindings.slice(0, 3).map((f, idx) => (
+                <li key={idx} className="top-finding-item">
+                  {f.title || f.summary || String(f)}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

@@ -4,6 +4,8 @@
  */
 
 export { default as RiskDial } from './RiskDial';
+export { default as DonutScore } from './DonutScore';
+export { default as ResultsSidebarTile } from './ResultsSidebarTile';
 export { default as ReportScoreCard } from './ReportScoreCard';
 export { default as KeyFindings } from './KeyFindings';
 export { default as FactorBars } from './FactorBars';
