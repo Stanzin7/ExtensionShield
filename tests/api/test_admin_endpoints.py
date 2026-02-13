@@ -134,6 +134,40 @@ class TestDeleteScanEndpoint:
             assert "not configured" in response.json()["detail"].lower()
 
 
+class TestDiagnosticScansEndpoint:
+    """Minimal test for GET /api/diagnostic/scans."""
+
+    def test_diagnostic_scans_without_admin_key_returns_403(self, client, admin_key):
+        """GET /api/diagnostic/scans without X-Admin-Key should return 403."""
+        with patch("extension_shield.api.main.get_settings") as mock_get_settings:
+            from unittest.mock import MagicMock
+            settings = MagicMock()
+            settings.admin_api_key = admin_key
+            settings.telemetry_admin_key = None
+            mock_get_settings.return_value = settings
+
+            response = client.get("/api/diagnostic/scans")
+            assert response.status_code == 403
+            assert "admin" in response.json()["detail"].lower()
+
+
+class TestClearEndpoint:
+    """Minimal test for POST /api/clear."""
+
+    def test_clear_without_admin_key_returns_403(self, client, admin_key):
+        """POST /api/clear without X-Admin-Key should return 403."""
+        with patch("extension_shield.api.main.get_settings") as mock_get_settings:
+            from unittest.mock import MagicMock
+            settings = MagicMock()
+            settings.admin_api_key = admin_key
+            settings.telemetry_admin_key = None
+            mock_get_settings.return_value = settings
+
+            response = client.post("/api/clear")
+            assert response.status_code == 403
+            assert "admin" in response.json()["detail"].lower()
+
+
 class TestTelemetrySummaryEndpoint:
     """Tests for GET /api/telemetry/summary endpoint."""
 
