@@ -353,7 +353,7 @@ const HomePage = () => {
             </div>
             <div className="stat-divider" />
             <div className="stat-item">
-              <span className="stat-value">47+</span>
+              <span className="stat-value">100+</span>
               <span className="stat-label">Security rules</span>
             </div>
             <div className="stat-divider" />
