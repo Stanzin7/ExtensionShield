@@ -17,8 +17,19 @@ import {
   Activity,
   Package,
 } from "lucide-react";
+import SEOHead from "../components/SEOHead";
 import { Button } from "../components/ui/button";
 import "./PrivacyPolicyPage.scss";
+
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "ExtensionShield",
+  "url": "https://extensionshield.com",
+  "logo": "https://extensionshield.com/logo.png",
+  "description": "Chrome extension scanner — safety reports in seconds.",
+  "sameAs": ["https://github.com/Stanzin7/ExtensionShield"]
+};
 
 const SECTION_IDS = {
   intro: "intro",
@@ -49,7 +60,14 @@ const PrivacyPolicyPage = () => {
   const isOpen = useCallback((id) => openSections.has(id), [openSections]);
 
   return (
-    <div className="privacy-policy-page">
+    <>
+      <SEOHead
+        title="Privacy Policy | ExtensionShield"
+        description="ExtensionShield Privacy Policy — Learn how we collect, use, and protect your data."
+        pathname="/privacy-policy"
+        schema={organizationSchema}
+      />
+      <div className="privacy-policy-page">
       <div className="page-container">
         <div className="page-header">
           <Link to="/settings" className="back-link">
@@ -526,6 +544,7 @@ const PrivacyPolicyPage = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

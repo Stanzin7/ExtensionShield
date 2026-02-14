@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import SEOHead from "../../components/SEOHead";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -71,7 +72,14 @@ const ReportsPage = () => {
   };
 
   return (
-    <div className="reports-page">
+    <>
+      <SEOHead
+        title="Reports"
+        description="Extension scan reports."
+        pathname="/reports"
+        noindex
+      />
+      <div className="reports-page">
       {/* Background Effects */}
       <div className="reports-bg-effects">
         <div className="reports-bg-gradient reports-gradient-1" />
@@ -232,6 +240,7 @@ const ReportsPage = () => {
         </footer>
       </div>
     </div>
+    </>
   );
 };
 

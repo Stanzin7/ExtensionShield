@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import SEOHead from "../../components/SEOHead";
 import ExtensionHeaderCard from "../../components/dashboard/ExtensionHeaderCard";
 import QuickSummaryCard from "../../components/dashboard/QuickSummaryCard";
 import ScoreCard from "../../components/dashboard/ScoreCard";
@@ -52,7 +53,14 @@ const ScanResultsDashboardPage = () => {
   }, []);
 
   return (
-    <div className="scan-results-dashboard">
+    <>
+      <SEOHead
+        title="Scan dashboard"
+        description="Extension scan dashboard."
+        pathname="/scan/results/dashboard"
+        noindex
+      />
+      <div className="scan-results-dashboard">
       <div className="background-glow" />
 
       <header className="dashboard-nav">
@@ -114,6 +122,7 @@ const ScanResultsDashboardPage = () => {
         </div>
       </main>
     </div>
+    </>
   );
 };
 

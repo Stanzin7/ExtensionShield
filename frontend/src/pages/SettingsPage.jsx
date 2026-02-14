@@ -6,6 +6,7 @@ import {
   User,
   Info
 } from "lucide-react";
+import SEOHead from "../components/SEOHead";
 import { Button } from "../components/ui/button";
 import "./SettingsPage.scss";
 
@@ -35,7 +36,14 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="page-container settings-page">
+    <>
+      <SEOHead
+        title="Settings"
+        description="Account and scanner settings."
+        pathname="/settings"
+        noindex
+      />
+      <div className="page-container settings-page">
       <div className="page-header">
         <h1 className="page-title">
           <Settings />
@@ -151,6 +159,7 @@ const SettingsPage = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

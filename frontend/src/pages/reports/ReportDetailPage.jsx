@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -20,6 +20,7 @@ import {
   gateIdToLayer,
   extractFindingsByLayer
 } from "../../utils/normalizeScanResult";
+import SEOHead from "../../components/SEOHead";
 import "./ReportDetailPage.scss";
 
 // -----------------------------------------------------------------------------
@@ -583,6 +584,7 @@ const CAPABILITY_MAP = {
 const ReportDetailPage = () => {
   const { reportId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [scanResults, setScanResults] = useState(null);
   const [rawScanData, setRawScanData] = useState(null); // Keep raw data for error display
@@ -708,81 +710,102 @@ const ReportDetailPage = () => {
     });
   };
 
+  const noindexHead = (
+    <SEOHead
+      title="Report"
+      description="Extension scan report."
+      pathname={location.pathname}
+      noindex
+    />
+  );
+
   // Loading state
   if (isLoading) {
     return (
-      <div className="report-detail-page">
-        <div className="report-bg-effects">
-          <div className="report-bg-gradient report-gradient-1" />
-          <div className="report-bg-gradient report-gradient-2" />
-        </div>
-        <div className="report-content">
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Analyzing extension...</p>
+      <>
+        {noindexHead}
+        <div className="report-detail-page">
+          <div className="report-bg-effects">
+            <div className="report-bg-gradient report-gradient-1" />
+            <div className="report-bg-gradient report-gradient-2" />
+          </div>
+          <div className="report-content">
+            <div className="loading-container">
+              <div className="loading-spinner"></div>
+              <p>Analyzing extension...</p>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // If backend report_view_model is present, render the production report UI
   if (uiReportViewModel) {
     return (
-      <ReportViewModelDetail
-        report={uiReportViewModel}
-        rawScanResult={scanResults}
-        extensionId={reportId}
-        onExportPdf={handleExportPDF}
-      />
+      <>
+        {noindexHead}
+        <ReportViewModelDetail
+          report={uiReportViewModel}
+          rawScanResult={scanResults}
+          extensionId={reportId}
+          onExportPdf={handleExportPDF}
+        />
+      </>
     );
   }
 
   // Error state - no data at all
   if (!scanResults && error) {
     return (
-      <div className="report-detail-page">
-        <div className="report-bg-effects">
-          <div className="report-bg-gradient report-gradient-1" />
-          <div className="report-bg-gradient report-gradient-2" />
-        </div>
-        <div className="report-content">
-          <div className="error-container">
-            <div className="error-icon">⚠️</div>
-            <h2>Report Not Found</h2>
-            <p>{error}</p>
-            <Button onClick={() => navigate("/reports")}>Back to Reports</Button>
+      <>
+        {noindexHead}
+        <div className="report-detail-page">
+          <div className="report-bg-effects">
+            <div className="report-bg-gradient report-gradient-1" />
+            <div className="report-bg-gradient report-gradient-2" />
+          </div>
+          <div className="report-content">
+            <div className="error-container">
+              <div className="error-icon">⚠️</div>
+              <h2>Report Not Found</h2>
+              <p>{error}</p>
+              <Button onClick={() => navigate("/reports")}>Back to Reports</Button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Normalization failed - show data unavailable with debug info
   if (scanResults && !reportViewModel) {
     return (
-      <div className="report-detail-page">
-        <div className="report-bg-effects">
-          <div className="report-bg-gradient report-gradient-1" />
-          <div className="report-bg-gradient report-gradient-2" />
-        </div>
-        <div className="report-content">
-          <div className="report-nav">
-            <Link to="/reports" className="back-link">← Back to Reports</Link>
+      <>
+        {noindexHead}
+        <div className="report-detail-page">
+          <div className="report-bg-effects">
+            <div className="report-bg-gradient report-gradient-1" />
+            <div className="report-bg-gradient report-gradient-2" />
           </div>
-          <ReportDataUnavailable 
-            extensionId={reportId}
-            rawData={rawScanData}
-            error={normalizationError}
-          />
-          <div className="error-actions">
-            <Button onClick={() => navigate("/reports")}>Back to Reports</Button>
-            <Button variant="outline" onClick={() => loadReportData(reportId)}>
-              Retry
-            </Button>
+          <div className="report-content">
+            <div className="report-nav">
+              <Link to="/reports" className="back-link">← Back to Reports</Link>
+            </div>
+            <ReportDataUnavailable 
+              extensionId={reportId}
+              rawData={rawScanData}
+              error={normalizationError}
+            />
+            <div className="error-actions">
+              <Button onClick={() => navigate("/reports")}>Back to Reports</Button>
+              <Button variant="outline" onClick={() => loadReportData(reportId)}>
+                Retry
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -804,22 +827,24 @@ const ReportDetailPage = () => {
   ];
 
   return (
-    <div className="report-detail-page">
-      {/* Background Effects */}
-      <div className="report-bg-effects">
-        <div className="report-bg-gradient report-gradient-1" />
-        <div className="report-bg-gradient report-gradient-2" />
-      </div>
+    <>
+      {noindexHead}
+      <div className="report-detail-page">
+        {/* Background Effects */}
+        <div className="report-bg-effects">
+          <div className="report-bg-gradient report-gradient-1" />
+          <div className="report-bg-gradient report-gradient-2" />
+        </div>
 
-      {/* Content */}
-      <div className="report-content">
-        {/* Navigation */}
-        <div className="report-nav">
-          <Link to="/reports" className="back-link">← Back to Reports</Link>
-          <div className="nav-actions">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/reports/${reportId}`)}>
-              Full Analysis
-            </Button>
+        {/* Content */}
+        <div className="report-content">
+          {/* Navigation */}
+          <div className="report-nav">
+            <Link to="/reports" className="back-link">← Back to Reports</Link>
+            <div className="nav-actions">
+              <Button variant="outline" size="sm" onClick={() => navigate(`/reports/${reportId}`)}>
+                Full Analysis
+              </Button>
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               📥 PDF
             </Button>
@@ -1125,6 +1150,7 @@ const ReportDetailPage = () => {
         />
       </div>
     </div>
+    </>
   );
 };
 

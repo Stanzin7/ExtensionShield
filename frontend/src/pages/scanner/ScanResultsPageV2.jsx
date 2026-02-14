@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../components/report";
 import FileViewerModal from "../../components/FileViewerModal";
 import StatusMessage from "../../components/StatusMessage";
+import SEOHead from "../../components/SEOHead";
 import { useScan } from "../../context/ScanContext";
 import realScanService from "../../services/realScanService";
 import { normalizeScanResultSafe, validateEvidenceIntegrity, gateIdToLayer, extractFindingsByLayer } from "../../utils/normalizeScanResult";
@@ -24,6 +25,7 @@ import "./ScanResultsPageV2.scss";
 const ScanResultsPageV2 = () => {
   const { scanId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     scanResults,
     error,
@@ -157,31 +159,45 @@ const ScanResultsPageV2 = () => {
     setShowHeroIcon(true);
   }, [extensionIdForIcon]);
 
+  const noindexHead = (
+    <SEOHead
+      title="Scan results"
+      description="Extension scan results."
+      pathname={location.pathname}
+      noindex
+    />
+  );
+
   // Loading state - smooth shield animation
   if (isLoading || isLoadingRef.current) {
     return (
-      <div className="results-v2">
-        <div className="results-v2-loading">
-          <div className="loading-shield">
-            <span className="loading-shield-icon">🛡️</span>
-            <div className="loading-shield-ring" />
-            <div className="loading-shield-ring-outer" />
-          </div>
-          <h2>Analyzing Extension</h2>
-          <p>Loading security report...</p>
-          <div className="loading-progress-bar">
-            <div className="loading-progress-fill" />
+      <>
+        {noindexHead}
+        <div className="results-v2">
+          <div className="results-v2-loading">
+            <div className="loading-shield">
+              <span className="loading-shield-icon">🛡️</span>
+              <div className="loading-shield-ring" />
+              <div className="loading-shield-ring-outer" />
+            </div>
+            <h2>Analyzing Extension</h2>
+            <p>Loading security report...</p>
+            <div className="loading-progress-bar">
+              <div className="loading-progress-fill" />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // No results
   if (!scanResults && !isLoading && !isLoadingRef.current) {
     return (
-      <div className="results-v2">
-        <nav className="results-v2-nav">
+      <>
+        {noindexHead}
+        <div className="results-v2">
+          <nav className="results-v2-nav">
           <Link to="/scan" className="nav-back">← Back</Link>
         </nav>
         <div className="results-v2-empty">
@@ -203,20 +219,23 @@ const ScanResultsPageV2 = () => {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
   // Normalization failed - show error state
   if (!viewModel && normalizationError) {
     return (
-      <div className="results-v2">
-        <nav className="results-v2-nav">
-          <Link to="/scan" className="nav-back">← Back</Link>
-        </nav>
-        <div className="results-v2-error">
-          <div className="error-icon">⚠️</div>
-          <h2>Report Data Unavailable</h2>
-          <p>{normalizationError}</p>
+      <>
+        {noindexHead}
+        <div className="results-v2">
+          <nav className="results-v2-nav">
+            <Link to="/scan" className="nav-back">← Back</Link>
+          </nav>
+          <div className="results-v2-error">
+            <div className="error-icon">⚠️</div>
+            <h2>Report Data Unavailable</h2>
+            <p>{normalizationError}</p>
           <div className="error-extension-id">
             <span>Extension ID:</span>
             <code>{scanId}</code>
@@ -235,6 +254,7 @@ const ScanResultsPageV2 = () => {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -319,42 +339,49 @@ const ScanResultsPageV2 = () => {
   // Brief transition: scanResults loaded but viewModel not yet set
   if (!viewModel && scanResults && !normalizationError) {
     return (
-      <div className="results-v2">
-        <div className="results-v2-loading">
-          <div className="loading-shield">
-            <span className="loading-shield-icon">🛡️</span>
-            <div className="loading-shield-ring" />
-            <div className="loading-shield-ring-outer" />
-          </div>
-          <h2>Preparing Report</h2>
-          <p>Formatting security analysis...</p>
-          <div className="loading-progress-bar">
-            <div className="loading-progress-fill" />
+      <>
+        {noindexHead}
+        <div className="results-v2">
+          <div className="results-v2-loading">
+            <div className="loading-shield">
+              <span className="loading-shield-icon">🛡️</span>
+              <div className="loading-shield-ring" />
+              <div className="loading-shield-ring-outer" />
+            </div>
+            <h2>Preparing Report</h2>
+            <p>Formatting security analysis...</p>
+            <div className="loading-progress-bar">
+              <div className="loading-progress-fill" />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Normalization failed - show error state
   if (!viewModel && scanResults && normalizationError) {
     return (
-      <div className="results-v2">
-        <nav className="results-v2-nav">
-          <Link to="/scan" className="nav-back">← Back</Link>
-        </nav>
-        <div className="results-v2-error">
-          <div className="error-icon">⚠️</div>
-          <h2>Unable to Display Results</h2>
-          <p>The scan data is available but couldn't be formatted for display.</p>
-          <div className="error-actions">
-            <Button onClick={() => navigate("/scan")}>Back to Scanner</Button>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Retry
-            </Button>
+      <>
+        {noindexHead}
+        <div className="results-v2">
+          <nav className="results-v2-nav">
+            <Link to="/scan" className="nav-back">← Back</Link>
+          </nav>
+          <div className="results-v2-error">
+            <div className="error-icon">⚠️</div>
+            <h2>Unable to Display Results</h2>
+            <p>The scan data is available but couldn't be formatted for display.</p>
+            <div className="error-actions">
+              <Button onClick={() => navigate("/scan")}>Back to Scanner</Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Retry
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -362,7 +389,9 @@ const ScanResultsPageV2 = () => {
   const overallScore = scores?.overall?.score ?? scores?.security?.score ?? 0;
 
   return (
-    <div className="results-v2 results-v2-dashboard">
+    <>
+      {noindexHead}
+      <div className="results-v2 results-v2-dashboard">
       {/* Navigation Bar - Match screenshot: New scan, Share, Save */}
       <nav className="results-v2-nav">
         <Link to="/scan" className="nav-back">
@@ -582,6 +611,7 @@ const ScanResultsPageV2 = () => {
         />
       )}
     </div>
+    </>
   );
 };
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import "./CaseStudiesPage.scss";
 
 const CaseStudiesPage = () => {
@@ -39,11 +39,11 @@ const CaseStudiesPage = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Extension Security Case Studies | ExtensionShield</title>
-        <meta name="description" content="Real-world case studies of malicious Chrome extensions. Learn how Honey, PDF converters, and fake ad blockers deceive millions of users." />
-        <link rel="canonical" href="https://extensionshield.com/research/case-studies" />
-      </Helmet>
+      <SEOHead
+        title="Extension Security Case Studies | ExtensionShield"
+        description="Real-world case studies of malicious Chrome extensions. Learn how Honey, PDF converters, and fake ad blockers deceive millions of users."
+        pathname="/research/case-studies"
+      />
 
       <div className="case-studies-page">
         <div className="case-studies-bg">

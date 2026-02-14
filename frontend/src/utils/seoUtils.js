@@ -21,15 +21,13 @@ export const getCanonicalUrl = (pathname) => {
 };
 
 /**
- * Get Open Graph image URL
+ * Get Open Graph image URL (1200×630 recommended)
  * 
  * @param {string} pathname - Optional pathname for page-specific images
  * @returns {string} OG image URL
  */
 export const getOGImage = (pathname = '/') => {
-  // For now, use the same logo for all pages
-  // Can be customized per page later
-  return `${CANONICAL_DOMAIN}/logo.png`;
+  return `${CANONICAL_DOMAIN}/og.png`;
 };
 
 /**
@@ -57,6 +55,10 @@ export const getPageTitle = (title, includeSiteName = true) => {
  * @param {string} options.image - Custom OG image URL
  * @returns {Object} OG tags object
  */
+/** Recommended OG image dimensions for summary_large_image */
+export const OG_IMAGE_WIDTH = 1200;
+export const OG_IMAGE_HEIGHT = 630;
+
 export const getOGTags = ({ title, description, pathname = '/', type = 'website', image }) => {
   const canonicalUrl = getCanonicalUrl(pathname);
   const ogImage = image || getOGImage(pathname);
@@ -67,6 +69,8 @@ export const getOGTags = ({ title, description, pathname = '/', type = 'website'
     'og:url': canonicalUrl,
     'og:type': type,
     'og:image': ogImage,
+    'og:image:width': String(OG_IMAGE_WIDTH),
+    'og:image:height': String(OG_IMAGE_HEIGHT),
     'og:site_name': 'ExtensionShield',
   };
 };

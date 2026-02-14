@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import RainfallDroplets from "../../components/RainfallDroplets";
 import "./CommunityLandingPage.scss";
 
@@ -36,11 +36,11 @@ function TypewriterTagline() {
 const CommunityLandingPage = () => {
   return (
     <>
-      <Helmet>
-        <title>Community | ExtensionShield</title>
-        <meta name="description" content="Came to scan, stayed for community. Trusted extensions and shared insights from the ExtensionShield community." />
-        <link rel="canonical" href="https://extensionshield.com/community" />
-      </Helmet>
+      <SEOHead
+        title="Community | ExtensionShield"
+        description="Came to scan, stayed for community. Trusted extensions and shared insights from the ExtensionShield community."
+        pathname="/community"
+      />
 
       <div className="community-landing-page">
         {/* Animated background */}

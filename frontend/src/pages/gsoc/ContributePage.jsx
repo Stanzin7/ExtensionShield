@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import "./ContributePage.scss";
 
 const ContributePage = () => {
@@ -8,11 +8,11 @@ const ContributePage = () => {
   
   return (
     <>
-      <Helmet>
-        <title>Everyone Can Contribute | ExtensionShield</title>
-        <meta name="description" content="Help build a safer web. Scan extensions, report threats, help others—every contribution matters, no coding required." />
-        <link rel="canonical" href="https://extensionshield.com/contribute" />
-      </Helmet>
+      <SEOHead
+        title="Everyone Can Contribute | ExtensionShield"
+        description="Help build a safer web. Scan extensions, report threats, help others—every contribution matters, no coding required."
+        pathname="/contribute"
+      />
 
       <div className="contribute-page">
         <div className="contribute-bg">

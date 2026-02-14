@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import { TrendChart, SourcesBox } from "../../components/benchmarks";
 import { getScanResultsRoute } from "../../utils/slug";
 import "./BenchmarksPage.scss";
@@ -92,11 +92,11 @@ const BenchmarksPage = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Benchmarks & How We Score | ExtensionShield</title>
-        <meta name="description" content="Coverage, performance, and governance/privacy signals — transparently documented. ExtensionShield scores beyond security into privacy and compliance signals." />
-        <link rel="canonical" href="https://extensionshield.com/research/benchmarks" />
-      </Helmet>
+      <SEOHead
+        title="Benchmarks & How We Score | ExtensionShield"
+        description="Coverage, performance, and governance/privacy signals — transparently documented. ExtensionShield scores beyond security into privacy and compliance signals."
+        pathname="/research/benchmarks"
+      />
 
       <div className="benchmarks-page">
         <div className="benchmarks-bg">

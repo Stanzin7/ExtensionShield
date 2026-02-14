@@ -1,17 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import RainfallDroplets from "../../components/RainfallDroplets";
 import "./OpenSourcePage.scss";
 
 const OpenSourcePage = () => {
   return (
     <>
-      <Helmet>
-        <title>Open Source | ExtensionShield</title>
-        <meta name="description" content="ExtensionShield Core is open source under the MIT License. The hosted service and enterprise components are proprietary. Explore our GitHub, contribute code, join GSoC, or help improve browser extension security for everyone." />
-        <link rel="canonical" href="https://extensionshield.com/open-source" />
-      </Helmet>
+      <SEOHead
+        title="Open Source | ExtensionShield"
+        description="ExtensionShield Core is open source under the MIT License. The hosted service and enterprise components are proprietary. Explore our GitHub, contribute code, join GSoC, or help improve browser extension security for everyone."
+        pathname="/open-source"
+      />
 
       <div className="open-source-page">
         <div className="open-source-bg">

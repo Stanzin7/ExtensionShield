@@ -1,33 +1,27 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import "./HoneyCaseStudyPage.scss";
+
+const honeyArticleSchema = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Honey Extension Case Study",
+  "description": "Reported analysis of PayPal's Honey extension: alleged affiliate link hijacking and disputed user savings",
+  "author": { "@type": "Organization", "name": "ExtensionShield" },
+  "datePublished": "2024-12-01",
+  "publisher": { "@type": "Organization", "name": "ExtensionShield" }
+};
 
 const HoneyCaseStudyPage = () => {
   return (
     <>
-      <Helmet>
-        <title>Honey Extension Case Study | ExtensionShield</title>
-        <meta name="description" content="In-depth analysis of reported practices by PayPal's Honey extension: alleged affiliate link hijacking, shopping behavior tracking, and disputed user savings." />
-        <link rel="canonical" href="https://extensionshield.com/research/case-studies/honey" />
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Article",
-            "headline": "Honey Extension Case Study",
-            "description": "Reported analysis of PayPal's Honey extension: alleged affiliate link hijacking and disputed user savings",
-            "author": {
-              "@type": "Organization",
-              "name": "ExtensionShield"
-            },
-            "datePublished": "2024-12-01",
-            "publisher": {
-              "@type": "Organization",
-              "name": "ExtensionShield"
-            }
-          })}
-        </script>
-      </Helmet>
+      <SEOHead
+        title="Honey Extension Case Study | ExtensionShield"
+        description="In-depth analysis of reported practices by PayPal's Honey extension: alleged affiliate link hijacking, shopping behavior tracking, and disputed user savings."
+        pathname="/research/case-studies/honey"
+        schema={honeyArticleSchema}
+      />
 
       <div className="honey-case-study-page">
         <div className="honey-bg">

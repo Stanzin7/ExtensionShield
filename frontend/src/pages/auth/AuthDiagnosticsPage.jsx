@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../services/supabaseClient";
 import realScanService from "../../services/realScanService";
+import SEOHead from "../../components/SEOHead";
 import ShieldLogo from "../../components/ShieldLogo";
 import "./AuthDiagnosticsPage.scss";
 
@@ -139,54 +140,69 @@ const AuthDiagnosticsPage = () => {
     return !!headers.Authorization;
   };
 
+  const noindexHead = (
+    <SEOHead title="Auth diagnostics" description="Auth diagnostics." pathname="/auth/diagnostics" noindex />
+  );
+
   // Show loading state while checking admin status
   if (isCheckingAdmin) {
     return (
-      <div className="auth-diagnostics-page">
-        <div className="auth-diagnostics-container">
-          <div className="auth-diagnostics-content">
-            <h1>Loading...</h1>
+      <>
+        {noindexHead}
+        <div className="auth-diagnostics-page">
+          <div className="auth-diagnostics-container">
+            <div className="auth-diagnostics-content">
+              <h1>Loading...</h1>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Hard-disable in production unless user is admin
   if (isProduction && !isAdmin) {
     return (
-      <div className="auth-diagnostics-page">
-        <div className="auth-diagnostics-container">
-          <div className="auth-diagnostics-content">
-            <h1>Access Denied</h1>
-            <p>Diagnostics page is disabled in production.</p>
-            <p>Only administrators can access this page.</p>
+      <>
+        {noindexHead}
+        <div className="auth-diagnostics-page">
+          <div className="auth-diagnostics-container">
+            <div className="auth-diagnostics-content">
+              <h1>Access Denied</h1>
+              <p>Diagnostics page is disabled in production.</p>
+              <p>Only administrators can access this page.</p>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Disable in non-production if debug mode is off
   if (!isProduction && !isDebugMode) {
     return (
-      <div className="auth-diagnostics-page">
-        <div className="auth-diagnostics-container">
-          <div className="auth-diagnostics-content">
-            <h1>Access Denied</h1>
-            <p>Diagnostics page is only available in debug mode.</p>
-            <p>Set VITE_DEBUG_AUTH=true to enable.</p>
+      <>
+        {noindexHead}
+        <div className="auth-diagnostics-page">
+          <div className="auth-diagnostics-container">
+            <div className="auth-diagnostics-content">
+              <h1>Access Denied</h1>
+              <p>Diagnostics page is only available in debug mode.</p>
+              <p>Set VITE_DEBUG_AUTH=true to enable.</p>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="auth-diagnostics-page">
-      <div className="auth-diagnostics-container">
-        <div className="auth-diagnostics-content">
-          <div className="diagnostics-header">
+    <>
+      {noindexHead}
+      <div className="auth-diagnostics-page">
+        <div className="auth-diagnostics-container">
+          <div className="auth-diagnostics-content">
+            <div className="diagnostics-header">
             <ShieldLogo size={48} />
             <h1>Auth Diagnostics</h1>
             <p className="debug-warning">⚠️ Debug Mode Enabled</p>
@@ -310,6 +326,7 @@ const AuthDiagnosticsPage = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

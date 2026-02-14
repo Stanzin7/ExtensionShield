@@ -1,17 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import RiskDial from "../../components/report/RiskDial";
 import "./MethodologyPage.scss";
 
 const MethodologyPage = () => {
   return (
     <>
-      <Helmet>
-        <title>How We Score: ExtensionShield Risk Analysis | ExtensionShield</title>
-        <meta name="description" content="Learn how ExtensionShield analyzes Chrome extensions using three security pipelines: ThreatXtension open-source SAST, privacy analysis, and compliance monitoring." />
-        <link rel="canonical" href="https://extensionshield.com/research/methodology" />
-      </Helmet>
+      <SEOHead
+        title="How We Score: ExtensionShield Risk Analysis | ExtensionShield"
+        description="Learn how ExtensionShield analyzes Chrome extensions using three security pipelines: ThreatXtension open-source SAST, privacy analysis, and compliance monitoring."
+        pathname="/research/methodology"
+      />
 
       <div className="methodology-page">
         <div className="methodology-bg">

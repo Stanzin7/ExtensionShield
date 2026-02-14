@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../services/supabaseClient";
 import { validateReturnTo } from "../../utils/authUtils";
+import SEOHead from "../../components/SEOHead";
 import ShieldLogo from "../../components/ShieldLogo";
 import "./AuthCallbackPage.scss";
 
@@ -214,7 +215,14 @@ const AuthCallbackPage = () => {
   }, [searchParams, navigate]);
 
   return (
-    <div className="auth-callback-page">
+    <>
+      <SEOHead
+        title="Sign-in callback"
+        description="Completing sign-in."
+        pathname="/auth/callback"
+        noindex
+      />
+      <div className="auth-callback-page">
       <div className="auth-callback-container">
         <div className="auth-callback-content">
           <ShieldLogo size={64} />
@@ -257,6 +265,7 @@ const AuthCallbackPage = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

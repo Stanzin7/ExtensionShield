@@ -1,17 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../components/SEOHead";
 import stanImage from "../assets/stanzin.png";
 import "./AboutUsPage.scss";
 
 const AboutUsPage = () => {
   return (
     <>
-      <Helmet>
-        <title>About Us | ExtensionShield</title>
-        <meta name="description" content="Learn about ExtensionShield's founder, Stanzin, and why this project was created to help users understand browser extension security." />
-        <link rel="canonical" href="https://extensionshield.com/about" />
-      </Helmet>
+      <SEOHead
+        title="About Us | ExtensionShield"
+        description="Learn about ExtensionShield's founder, Stanzin, and why this project was created to help users understand browser extension security."
+        pathname="/about"
+      />
 
       <div className="about-us-page">
         <div className="about-us-content">

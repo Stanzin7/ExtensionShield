@@ -2,137 +2,99 @@
 
 /**
  * Sitemap Generator
- * 
- * Generates sitemap.xml from route configuration
+ *
+ * Generates sitemap.xml from the route configuration in src/routes/routes.jsx.
+ * Single source of truth: any route with `seo` and no `:` or `*` in path is included.
+ *
+ * Every <url> includes <lastmod> (YYYY-MM-DD) set to the date the sitemap is generated.
+ * Using one consistent rule for all URLs avoids misleading Google with stale dates.
+ *
  * Run: npm run generate:sitemap
- * 
+ * Build runs this before vite build (see package.json).
+ *
  * Uses VITE_SITE_URL environment variable or defaults to https://extensionshield.com
  */
 
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Site URL from environment or default
 const SITE_URL = process.env.VITE_SITE_URL || 'https://extensionshield.com';
+const ROUTES_PATH = join(__dirname, '../src/routes/routes.jsx');
 
-// Route definitions with SEO metadata
-// NOTE: Keep in sync with src/routes/routes.jsx
-const sitemapRoutes = [
-  {
-    path: '/',
-    priority: 1.0,
-    changefreq: 'weekly'
-  },
-  {
-    path: '/scan',
-    priority: 0.9,
-    changefreq: 'weekly'
-  },
-  {
-    path: '/scan/history',
-    priority: 0.7,
-    changefreq: 'weekly'
-  },
-  {
-    path: '/research',
-    priority: 0.8,
-    changefreq: 'weekly'
-  },
-  {
-    path: '/research/case-studies',
-    priority: 0.8,
-    changefreq: 'weekly'
-  },
-  {
-    path: '/research/case-studies/honey',
-    priority: 0.7,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/research/methodology',
-    priority: 0.7,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/enterprise',
-    priority: 0.8,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/open-source',
-    priority: 0.7,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/gsoc/ideas',
-    priority: 0.7,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/contribute',
-    priority: 0.6,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/gsoc/community',
-    priority: 0.5,
-    changefreq: 'monthly'
-  },
-  {
-    path: '/gsoc/blog',
-    priority: 0.5,
-    changefreq: 'weekly'
-  },
-  {
-    path: '/glossary',
-    priority: 0.7,
-    changefreq: 'monthly'
+/**
+ * Extract sitemap entries from routes.jsx source.
+ * Includes only routes that have `seo` and a static path (no : or *).
+ */
+function extractSitemapRoutesFromSource(source) {
+  const routes = [];
+  // Match route objects: path: "/...", then optional seo block, then optional priority/changefreq
+  const pathRe = /path:\s*["']([^"']+)["']/g;
+  let match;
+  while ((match = pathRe.exec(source)) !== null) {
+    const path = match[1];
+    if (path.includes(':') || path.includes('*')) continue;
+    // Check that this route has seo (look at the segment between this path and the next path: or end of array)
+    const start = match.index;
+    const nextPath = source.indexOf('path:', start + 5);
+    const block = nextPath === -1 ? source.slice(start) : source.slice(start, nextPath);
+    if (!block.includes('seo:')) continue;
+
+    const priorityMatch = block.match(/priority:\s*([\d.]+)/);
+    const changefreqMatch = block.match(/changefreq:\s*["']([^"']+)["']/);
+    routes.push({
+      path,
+      priority: priorityMatch ? parseFloat(priorityMatch[1]) : 0.5,
+      changefreq: changefreqMatch ? changefreqMatch[1] : 'monthly',
+    });
   }
-];
+  return routes;
+}
 
 function generateSitemap() {
-  const urls = sitemapRoutes.map(route => {
-    const loc = `${SITE_URL}${route.path}`;
-    const changefreq = route.changefreq || 'monthly';
-    const priority = route.priority || 0.5;
-    
-    return `  <url>
+  const source = readFileSync(ROUTES_PATH, 'utf-8');
+  const sitemapRoutes = extractSitemapRoutesFromSource(source);
+
+  const lastmod = new Date().toISOString().slice(0, 10);
+  const urls = sitemapRoutes
+    .map((route) => {
+      const loc = `${SITE_URL}${route.path}`;
+      const changefreq = route.changefreq || 'monthly';
+      const priority = route.priority ?? 0.5;
+      return `  <url>
     <loc>${loc}</loc>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>${changefreq}</changefreq>
     <priority>${priority.toFixed(1)}</priority>
   </url>`;
-  }).join('\n');
+    })
+    .join('\n');
 
-  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls}
 </urlset>`;
-
-  return sitemap;
 }
 
 function main() {
   try {
     const sitemap = generateSitemap();
     const outputPath = join(__dirname, '../public/sitemap.xml');
-    
     writeFileSync(outputPath, sitemap, 'utf-8');
-    
-    console.log('✅ Sitemap generated successfully!');
+
+    const source = readFileSync(ROUTES_PATH, 'utf-8');
+    const count = extractSitemapRoutesFromSource(source).length;
+
+    console.log('✅ Sitemap generated from src/routes/routes.jsx');
     console.log(`📍 Location: ${outputPath}`);
     console.log(`🌐 Site URL: ${SITE_URL}`);
-    console.log(`📊 Routes: ${sitemapRoutes.length}`);
-    
-    // Warning about keeping in sync
-    console.log('\n⚠️  Remember to keep scripts/generate-sitemap.js in sync with src/routes/routes.jsx');
-  } catch (error) {
-    console.error('❌ Error generating sitemap:', error.message);
+    console.log(`📊 Routes: ${count}`);
+  } catch (err) {
+    console.error('❌ Error generating sitemap:', err.message);
     process.exit(1);
   }
 }
 
 main();
-

@@ -1,16 +1,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import "./CommunityPage.scss";
 
 const CommunityPage = () => {
   return (
     <>
-      <Helmet>
-        <title>Join the Community | ExtensionShield</title>
-        <meta name="description" content="Join the ExtensionShield community: Discord, GitHub Discussions, mailing lists, and more ways to connect with contributors." />
-        <link rel="canonical" href="https://extensionshield.com/gsoc/community" />
-      </Helmet>
+      <SEOHead
+        title="Join the Community | ExtensionShield"
+        description="Join the ExtensionShield community: Discord, GitHub Discussions, mailing lists, and more ways to connect with contributors."
+        pathname="/gsoc/community"
+      />
 
       <div className="community-page">
         <div className="community-bg">

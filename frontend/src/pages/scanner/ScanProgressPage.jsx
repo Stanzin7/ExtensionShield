@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import RocketGame from "../../components/RocketGame";
 import { useScan } from "../../context/ScanContext";
@@ -7,6 +7,7 @@ import { EXTENSION_ICON_PLACEHOLDER, getExtensionIconUrl } from "../../utils/con
 import realScanService from "../../services/realScanService";
 import { getScanResultsRoute } from "../../utils/slug";
 import ScanHUD from "../../components/ScanHUD";
+import SEOHead from "../../components/SEOHead";
 import { normalizeExtensionId } from "../../utils/extensionId";
 import { logger } from "../../utils/logger";
 import {
@@ -90,6 +91,7 @@ const RocketGameWrapper = ({ scanComplete, onStatsUpdate }) => {
 const ScanProgressPage = () => {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Read scanId from any possible param key (scanId, extensionId, id)
   const rawScanId = params.scanId || params.extensionId || params.id || '';
@@ -449,7 +451,14 @@ const ScanProgressPage = () => {
   const showGameScreen = shouldShowGame;
 
   return (
-    <div className="scan-progress-page">
+    <>
+      <SEOHead
+        title="Scan in progress"
+        description="Extension scan in progress."
+        pathname={location.pathname}
+        noindex
+      />
+      <div className="scan-progress-page">
       {showGameScreen ? (
         <>
           {/* Retro Style Header Overlay */}
@@ -618,6 +627,7 @@ const ScanProgressPage = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

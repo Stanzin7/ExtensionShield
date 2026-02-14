@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import "./GSoCIdeasPage.scss";
 
 const GSoCIdeasPage = () => {
@@ -79,11 +79,11 @@ const GSoCIdeasPage = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Google Summer of Code Ideas | ExtensionShield</title>
-        <meta name="description" content="GSoC project ideas for ExtensionShield: ML detection, browser support, real-time monitoring, policy engines, and more." />
-        <link rel="canonical" href="https://extensionshield.com/gsoc/ideas" />
-      </Helmet>
+      <SEOHead
+        title="Google Summer of Code Ideas | ExtensionShield"
+        description="GSoC project ideas for ExtensionShield: ML detection, browser support, real-time monitoring, policy engines, and more."
+        pathname="/gsoc/ideas"
+      />
 
       <div className="gsoc-ideas-page">
         <div className="gsoc-bg">

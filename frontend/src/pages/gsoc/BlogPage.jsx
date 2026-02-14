@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import SEOHead from "../../components/SEOHead";
 import "./BlogPage.scss";
 
 const BlogPage = () => {
@@ -17,11 +17,11 @@ const BlogPage = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Blog | ExtensionShield</title>
-        <meta name="description" content="ExtensionShield blog: updates, tutorials, security research, and deep dives on browser extension threats." />
-        <link rel="canonical" href="https://extensionshield.com/gsoc/blog" />
-      </Helmet>
+      <SEOHead
+        title="Blog | ExtensionShield"
+        description="ExtensionShield blog: updates, tutorials, security research, and deep dives on browser extension threats."
+        pathname="/gsoc/blog"
+      />
 
       <div className="blog-page">
         <div className="blog-bg">
