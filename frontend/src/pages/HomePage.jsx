@@ -674,49 +674,55 @@ const HomePage = () => {
       {/* Pricing Section */}
       <section className="pricing-section">
         <div className="pricing-header">
-          <h2>Simple, Transparent Pricing</h2>
-          <p>Free during beta. We aim to stay affordable and be here when you need us—always one message away.</p>
+          <h2>Free to scan. We only charge for API services.</h2>
+          <p>Scanning extensions is free for everyone. We charge only when you use our APIs to integrate ExtensionShield into your own apps or workflows.</p>
         </div>
 
         <div className="pricing-grid">
-          {/* Community Plan */}
+          {/* Community Plan — free for consumers */}
           <div className="pricing-card surface-card popular">
             <div className="popular-badge">BETA</div>
             <div className="pricing-card-header">
               <h3>Community</h3>
-              <p>Free during beta — help us test</p>
+              <p>Free for consumers — scan any extension</p>
             </div>
             <div className="pricing-amount">
               <span className="price">$0</span>
-              <span className="credits">Beta Launch</span>
+              <span className="credits">Free to scan</span>
             </div>
             <div className="scan-credit-note">
-              Full analysis runs only when we haven't seen this exact extension version before; repeat scans use cached results (instant).
+              Full analysis runs when we haven't seen this extension version before; repeat scans use cached results (instant).
             </div>
             <ul className="pricing-features">
               <li>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
-                <span>Unlimited cached lookups (always free)</span>
+                <span>Re-view past scans anytime — free</span>
               </li>
               <li>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
-                <span>2 full scans per day per account (new versions only)</span>
+                <span>2 full scans per day per account</span>
               </li>
               <li>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
-                <span>Full security report (not blurred)</span>
+                <span>Full security report</span>
               </li>
               <li>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
-                <span>AI threat analysis + VirusTotal/threat intel</span>
+                <span>Security and privacy checks included</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span>We only charge for API usage</span>
               </li>
             </ul>
             <button className="pricing-btn popular-btn" onClick={() => navigate("/scan")}>Start Free</button>
