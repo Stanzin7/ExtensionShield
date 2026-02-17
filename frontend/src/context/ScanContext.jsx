@@ -6,6 +6,9 @@ import { normalizeExtensionId } from "../utils/extensionId";
 import { getScanResultsRoute } from "../utils/slug";
 import { useAuth } from "./AuthContext";
 
+// User-friendly message for service unavailability (matches backend)
+const SERVICE_UNAVAILABLE_MESSAGE = "ExtensionShield is temporarily unavailable. We're working to restore service and will be back shortly. Please try again in a few minutes.";
+
 const ScanContext = createContext(null);
 
 export const useScan = () => {
@@ -18,7 +21,7 @@ export const useScan = () => {
 
 export const ScanProvider = ({ children }) => {
   const navigate = useNavigate();
-  const { isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, accessToken, openSignInModal } = useAuth();
 
   // Mount guard — prevents setState on unmounted component during long async flows
   const mountedRef = useRef(true);
@@ -108,17 +111,24 @@ export const ScanProvider = ({ children }) => {
         }
 
         if (status.status === "failed") {
-          // Check for API key errors (401) - show user-friendly message
-          if (status.error_code === 401 || status.error?.includes("API key") || status.error?.includes("Invalid API key") || status.error?.includes("Authentication") || status.error?.includes("sk-proj")) {
-            throw new Error("Connection is down try back in a while");
-          }
-          // 503 / connection refused – analysis service unavailable
-          if (status.error_code === 503 || status.error?.includes("Connection refused") || status.error?.includes("Errno 61") || status.error?.includes("LLM service")) {
-            throw new Error("Scan analysis service unavailable. Check your provider configuration.");
-          }
-          // Check for quota errors (403) - token/quota exceeded
-          if (status.error_code === 403 || status.error?.includes("quota") || status.error?.includes("token_quota")) {
-            throw new Error(status.error || "Scan analysis quota exceeded. Check your provider limits or try again later.");
+          // Check for service errors - show user-friendly message
+          if (
+            status.error_code === 401 || 
+            status.error_code === 503 || 
+            status.error_code === 403 ||
+            status.error?.includes("API key") || 
+            status.error?.includes("Invalid API key") || 
+            status.error?.includes("Authentication") || 
+            status.error?.includes("sk-proj") ||
+            status.error?.includes("Connection refused") || 
+            status.error?.includes("Errno 61") || 
+            status.error?.includes("LLM service") ||
+            status.error?.includes("quota") || 
+            status.error?.includes("token_quota") ||
+            status.error?.includes("SERVICE_UNAVAILABLE") ||
+            status.error?.includes("temporarily unavailable")
+          ) {
+            throw new Error(SERVICE_UNAVAILABLE_MESSAGE);
           }
           throw new Error(status.error || "Scan failed on the server.");
         }
@@ -175,7 +185,18 @@ export const ScanProvider = ({ children }) => {
           if (limit?.remaining <= 0) {
             const cached = await realScanService.hasCachedResults(extId);
             if (!cached) {
-              setError("Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.");
+              // If user is not authenticated, prompt them to sign in (anonymous = 1 scan)
+              if (!isAuthenticated) {
+                setError("You've reached your daily scan limit (1 scan). Sign in to get more scans or try again tomorrow.");
+                setScanStage(null);
+                setIsScanning(false);
+                // Open sign-in modal to prompt user to log in
+                if (openSignInModal) {
+                  openSignInModal();
+                }
+                return;
+              }
+              setError("Daily scan limit reached (3 scans per day). Try again tomorrow.");
               setScanStage(null);
               setIsScanning(false);
               return;
@@ -227,23 +248,51 @@ export const ScanProvider = ({ children }) => {
     } catch (err) {
       // Handle different error types with user-friendly messages
       let errorMessage = err.message || "Failed to scan extension.";
+      let shouldPromptLogin = false;
       
-      // Rate limit error (429) - daily scan limit reached
-      if (err.status === 429 || err.message?.includes("Daily scan limit") || err.message?.includes("DAILY_DEEP_SCAN_LIMIT")) {
-        errorMessage = "Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.";
-      } else if (err.message?.includes("API key") || err.message?.includes("Invalid API key") || err.message?.includes("Authentication") || err.message?.includes("401")) {
-        errorMessage = "Connection is down try back in a while";
-      } else if (err.message?.includes("Connection refused") || err.message?.includes("Errno 61") || err.message?.includes("LLM service")) {
-        errorMessage = "Scan analysis service unavailable. Check your provider configuration.";
+      // Check if error response includes requires_login flag (from backend)
+      const requiresLogin = err.detail?.requires_login || err.requires_login;
+      
+      // Rate limit error (429) - daily scan limit reached (use backend message if present)
+      if (err.status === 429 || err.message?.includes("Daily scan limit") || err.message?.includes("DAILY_DEEP_SCAN_LIMIT") || err.message?.includes("daily scan limit")) {
+        if (!isAuthenticated) {
+          errorMessage = err.detail?.message || "You've reached your daily scan limit (1 scan). Sign in to get more scans or try again tomorrow.";
+          shouldPromptLogin = true;
+        } else {
+          errorMessage = err.detail?.message || "Daily scan limit reached (3 scans per day). Try again tomorrow.";
+        }
+      } else if (
+        err.message?.includes("API key") || 
+        err.message?.includes("Invalid API key") || 
+        err.message?.includes("Authentication") || 
+        err.message?.includes("401") ||
+        err.message?.includes("SERVICE_UNAVAILABLE") ||
+        err.message?.includes("temporarily unavailable")
+      ) {
+        errorMessage = SERVICE_UNAVAILABLE_MESSAGE;
+      } else if (
+        err.message?.includes("Connection refused") || 
+        err.message?.includes("Errno 61") || 
+        err.message?.includes("LLM service") ||
+        err.message?.includes("connection error") ||
+        err.message?.includes("network")
+      ) {
+        errorMessage = SERVICE_UNAVAILABLE_MESSAGE;
       } else if (err.message?.includes("quota") || err.message?.includes("token_quota") || err.message?.includes("403")) {
-        errorMessage = err.message || "Scan analysis quota exceeded. Check your provider limits or try again later.";
+        errorMessage = SERVICE_UNAVAILABLE_MESSAGE;
       }
+      
       setError(errorMessage);
       setScanStage(null);
       setIsScanning(false);
+      
+      // Open sign-in modal if user needs to log in
+      if ((shouldPromptLogin || requiresLogin) && !isAuthenticated && openSignInModal) {
+        openSignInModal();
+      }
       // Stay on progress page to show error
     }
-  }, [url, extractExtensionId, navigate, waitForScanCompletion, loadScanHistory, loadDashboardStats]);
+  }, [url, extractExtensionId, navigate, waitForScanCompletion, loadScanHistory, loadDashboardStats, isAuthenticated, openSignInModal]);
 
   // Handle file upload
   // No authentication required - anonymous users can upload with IP-based rate limiting
@@ -263,7 +312,18 @@ export const ScanProvider = ({ children }) => {
         try {
           const limit = await realScanService.getDeepScanLimitStatus();
           if (limit?.remaining <= 0) {
-            setError("Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.");
+            // If user is not authenticated, prompt them to sign in
+            if (!isAuthenticated) {
+              setError("You've reached your daily scan limit (1 scan). Sign in to get more scans or try again tomorrow.");
+              setScanStage(null);
+              setIsScanning(false);
+              // Open sign-in modal to prompt user to log in
+              if (openSignInModal) {
+                openSignInModal();
+              }
+              return;
+            }
+            setError("Daily scan limit reached (3 scans per day). Try again tomorrow.");
             setScanStage(null);
             setIsScanning(false);
             return;
@@ -314,14 +374,38 @@ export const ScanProvider = ({ children }) => {
     } catch (err) {
       // Handle rate limit error (429) with user-friendly message
       let errorMessage = err.message || "Failed to upload and scan file.";
-      if (err.status === 429 || err.message?.includes("Daily scan limit") || err.message?.includes("DAILY_DEEP_SCAN_LIMIT")) {
-        errorMessage = "Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.";
+      let shouldPromptLogin = false;
+      
+      // Check if error response includes requires_login flag (from backend)
+      const requiresLogin = err.detail?.requires_login || err.requires_login;
+      
+      if (err.status === 429 || err.message?.includes("Daily scan limit") || err.message?.includes("DAILY_DEEP_SCAN_LIMIT") || err.message?.includes("daily scan limit")) {
+        if (!isAuthenticated) {
+          errorMessage = err.detail?.message || "You've reached your daily scan limit (1 scan). Sign in to get more scans or try again tomorrow.";
+          shouldPromptLogin = true;
+        } else {
+          errorMessage = err.detail?.message || "Daily scan limit reached (3 scans per day). Try again tomorrow.";
+        }
+      } else if (
+        err.message?.includes("API key") || 
+        err.message?.includes("SERVICE_UNAVAILABLE") ||
+        err.message?.includes("temporarily unavailable") ||
+        err.message?.includes("Connection refused") ||
+        err.message?.includes("connection error")
+      ) {
+        errorMessage = SERVICE_UNAVAILABLE_MESSAGE;
       }
+      
       setError(errorMessage);
       setScanStage(null);
       setIsScanning(false);
+      
+      // Open sign-in modal if user needs to log in
+      if ((shouldPromptLogin || requiresLogin) && !isAuthenticated && openSignInModal) {
+        openSignInModal();
+      }
     }
-  }, [navigate, waitForScanCompletion, loadScanHistory, loadDashboardStats]);
+  }, [navigate, waitForScanCompletion, loadScanHistory, loadDashboardStats, isAuthenticated, openSignInModal]);
 
   // Load scan from history (single API: realScanService.getRealScanResults)
   const loadScanFromHistory = useCallback(async (extId, extensionName) => {

@@ -175,6 +175,72 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
 
 
+# User-friendly error message for service unavailability
+SERVICE_UNAVAILABLE_MESSAGE = "ExtensionShield is temporarily unavailable. We're working to restore service and will be back shortly. Please try again in a few minutes."
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler that catches unhandled exceptions and returns
+    user-friendly error messages instead of exposing internal API details.
+    """
+    error_str = str(exc).lower()
+    
+    # Check for connection/network errors (external API down)
+    if any(keyword in error_str for keyword in [
+        "connection refused", "connection reset", "connection error",
+        "timeout", "network", "errno 61", "errno 111",
+        "name resolution", "dns", "unreachable"
+    ]):
+        logger.error("Service connection error: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": SERVICE_UNAVAILABLE_MESSAGE,
+                "error_code": "SERVICE_UNAVAILABLE"
+            }
+        )
+    
+    # Check for authentication/API key errors (don't expose API key info)
+    if any(keyword in error_str for keyword in [
+        "api key", "api_key", "apikey", "unauthorized", "authentication",
+        "invalid key", "sk-proj", "sk-"
+    ]):
+        logger.error("API authentication error: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": SERVICE_UNAVAILABLE_MESSAGE,
+                "error_code": "SERVICE_UNAVAILABLE"
+            }
+        )
+    
+    # Check for external service errors (VirusTotal, ChromeStats, etc.)
+    if any(keyword in error_str for keyword in [
+        "virustotal", "chromestats", "chrome-stats", "rate limit",
+        "quota exceeded", "too many requests"
+    ]):
+        logger.error("External service error: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": SERVICE_UNAVAILABLE_MESSAGE,
+                "error_code": "SERVICE_UNAVAILABLE"
+            }
+        )
+    
+    # For all other unhandled exceptions, log and return generic message
+    logger.exception("Unhandled exception: %s", exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": SERVICE_UNAVAILABLE_MESSAGE,
+            "error_code": "INTERNAL_ERROR"
+        }
+    )
+
+
 @app.middleware("http")
 async def attach_user_context(request: Request, call_next):
     """
@@ -298,7 +364,8 @@ _health_start_time = datetime.now(timezone.utc)
 # -----------------------------------------------------------------------------
 # Daily deep-scan limit (placeholder, in-memory)
 # -----------------------------------------------------------------------------
-DAILY_DEEP_SCAN_LIMIT = 2
+DAILY_DEEP_SCAN_LIMIT = 3  # authenticated users
+ANONYMOUS_DAILY_DEEP_SCAN_LIMIT = 1  # anonymous (IP-based) users – after 1 scan, prompt login
 # deep_scan_usage[user_id][YYYY-MM-DD] = used_count
 deep_scan_usage: Dict[str, Dict[str, int]] = {}
 
@@ -394,12 +461,14 @@ def _require_admin_key(request: Request) -> None:
         )
 
 
-def _deep_scan_limit_status(user_id: str) -> Dict[str, Any]:
-    """Get deep scan limit status. Returns unlimited in local/dev environments."""
+def _deep_scan_limit_status(rate_limit_key: str) -> Dict[str, Any]:
+    """Get deep scan limit status. Returns unlimited in local/dev environments.
+    Anonymous (IP-based) users get 1 scan per day; authenticated users get 3.
+    """
     settings = get_settings()
     now = datetime.now(timezone.utc)
     day_key = now.strftime("%Y-%m-%d")
-    used = deep_scan_usage.get(user_id, {}).get(day_key, 0)
+    used = deep_scan_usage.get(rate_limit_key, {}).get(day_key, 0)
     
     # In development/local, return unlimited
     if not settings.is_prod():
@@ -411,10 +480,12 @@ def _deep_scan_limit_status(user_id: str) -> Dict[str, Any]:
             "reset_at": (datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)).isoformat(),
         }
     
-    remaining = max(0, DAILY_DEEP_SCAN_LIMIT - used)
+    # Anonymous (IP) = 1 scan/day; authenticated = 3 scans/day
+    limit = ANONYMOUS_DAILY_DEEP_SCAN_LIMIT if rate_limit_key.startswith("ip:") else DAILY_DEEP_SCAN_LIMIT
+    remaining = max(0, limit - used)
     reset_at = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
     return {
-        "limit": DAILY_DEEP_SCAN_LIMIT,
+        "limit": limit,
         "used": used,
         "remaining": remaining,
         "day_key": day_key,
@@ -1083,69 +1154,39 @@ async def run_analysis_workflow(url: str, extension_id: str):
         logger.error("[TIMELINE] workflow_exception → extension_id=%s, error=%s", extension_id, str(e))
         logger.error("[TIMELINE] workflow_exception_traceback → extension_id=%s\n%s", extension_id, traceback.format_exc())
         
-        # Check if this is an OpenAI API key error
+        # Check for errors and provide user-friendly messages
+        # All error messages should be user-friendly and not expose internal API details
         error_str = str(e)
-        error_message = str(e)
-        error_code = None
+        error_code = 503  # Default to service unavailable
         
-        # Check for OpenAI API key errors - detect specific patterns
-        # Note: Both 'sk-' and 'sk-proj-' are valid OpenAI API key formats
-        # 'sk-proj-' is OpenAI's project-based key format (introduced 2024)
-        if "sk-proj-" in error_str and "invalid" in error_str.lower():
-            # This might be an actual API error from OpenAI, not a format issue
-            error_code = 401
-            error_message = (
-                "OpenAI API key error detected. Please verify your API key is valid and has not been revoked. "
-                "Check your key at https://platform.openai.com/api-keys"
-            )
-        elif "invalid_api_key" in error_str or "Incorrect API key" in error_str:
-            error_code = 401
-            error_message = (
-                "Invalid API key provided. The OpenAI API key is incorrect or has been revoked. "
-                "Please check your OPENAI_API_KEY environment variable and ensure it's a valid key from "
-                "https://platform.openai.com/api-keys"
-            )
-        elif "401" in error_str and ("api" in error_str.lower() or "key" in error_str.lower()):
-            error_code = 401
-            error_message = (
-                "API authentication failed. Please verify your OpenAI API key configuration. "
-                "Check your OPENAI_API_KEY environment variable."
-            )
-        elif "AuthenticationError" in error_str or "authentication" in error_str.lower():
-            error_code = 401
-            error_message = "Authentication failed. Please check your API key configuration."
-        elif "connection refused" in error_str.lower() or "errno 61" in error_str.lower():
-            # Connection refused errors (e.g., Ollama not running, wrong LLM provider in chain)
+        # User-friendly message for all service errors
+        # Don't expose internal API details to users
+        error_message = SERVICE_UNAVAILABLE_MESSAGE
+        
+        # Check for specific error types for internal logging (but use friendly message for user)
+        if any(keyword in error_str.lower() for keyword in [
+            "sk-proj-", "invalid_api_key", "incorrect api key", "authentication",
+            "401", "api key", "apikey"
+        ]):
             error_code = 503
-            error_message = (
-                "LLM service connection failed. This usually means: "
-                "1) An LLM provider in your fallback chain is not available (e.g., Ollama not running), "
-                "2) Network connectivity issues, or "
-                "3) The LLM service endpoint is incorrect. "
-                "Please check your LLM_FALLBACK_CHAIN configuration and ensure only available providers are included. "
-                "Default: watsonx,openai"
-            )
-        elif "connection" in error_str.lower() and ("refused" in error_str.lower() or "timeout" in error_str.lower()):
+            logger.error("[WORKFLOW] API authentication error: %s", error_str)
+        elif any(keyword in error_str.lower() for keyword in [
+            "connection refused", "errno 61", "errno 111", "timeout", "connection error"
+        ]):
             error_code = 503
-            error_message = (
-                "LLM service connection error. Please verify your LLM provider configuration. "
-                "Check LLM_FALLBACK_CHAIN in your environment variables."
-            )
-        elif "token_quota_reached" in error_str.lower() or ("403" in error_str and "quota" in error_str.lower()):
-            # WatsonX quota exceeded
-            error_code = 403
-            error_message = (
-                "WatsonX token quota has been reached. Your monthly token limit has been exceeded. "
-                "Options: 1) Wait for quota reset, 2) Upgrade your WatsonX plan, or "
-                "3) Add OpenAI as fallback by setting LLM_FALLBACK_CHAIN=watsonx,openai in your .env file."
-            )
-        elif "403" in error_str and ("forbidden" in error_str.lower() or "quota" in error_str.lower()):
-            # Generic 403/quota error
-            error_code = 403
-            error_message = (
-                "LLM service quota exceeded. Your API quota has been reached. "
-                "Please check your LLM provider account limits or add a fallback provider."
-            )
+            logger.error("[WORKFLOW] Connection error: %s", error_str)
+        elif any(keyword in error_str.lower() for keyword in [
+            "token_quota_reached", "quota", "403", "rate limit"
+        ]):
+            error_code = 503
+            logger.error("[WORKFLOW] Quota/rate limit error: %s", error_str)
+        elif any(keyword in error_str.lower() for keyword in [
+            "virustotal", "chromestats", "chrome-stats"
+        ]):
+            error_code = 503
+            logger.error("[WORKFLOW] External service error: %s", error_str)
+        else:
+            logger.error("[WORKFLOW] Unknown error: %s", error_str)
         
         scan_results[extension_id] = {
             "extension_id": extension_id,
@@ -2167,14 +2208,19 @@ async def trigger_scan(scan_request: ScanRequest, background_tasks: BackgroundTa
     
     # Enforce daily deep-scan limit - skip in development
     # Uses rate_limit_key (user_id for authenticated users, IP for anonymous)
+    is_anonymous = rate_limit_key.startswith("ip:")
     if settings.is_prod():
         limit_status = _deep_scan_limit_status(rate_limit_key)
         if limit_status["remaining"] <= 0:
+            limit_num = limit_status.get("limit", 1)
+            scans_word = "scan" if limit_num == 1 else "scans"
             raise HTTPException(
                 status_code=429,
                 detail={
                     "error_code": "DAILY_DEEP_SCAN_LIMIT",
-                    "message": "Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.",
+                    "message": f"You've reached your daily scan limit ({limit_num} {scans_word}). Sign in to get more scans or try again tomorrow.",
+                    "is_anonymous": is_anonymous,
+                    "requires_login": is_anonymous,
                     **limit_status,
                 },
             )
@@ -2264,14 +2310,19 @@ async def upload_and_scan(
     rate_limit_key = _get_rate_limit_key(request)
 
     # Enforce daily deep-scan limit (uploads are always deep scans) - skip in development
+    is_anonymous = rate_limit_key.startswith("ip:")
     if settings.is_prod():
         limit_status = _deep_scan_limit_status(rate_limit_key)
         if limit_status["remaining"] <= 0:
+            limit_num = limit_status.get("limit", 1)
+            scans_word = "scan" if limit_num == 1 else "scans"
             raise HTTPException(
                 status_code=429,
                 detail={
                     "error_code": "DAILY_DEEP_SCAN_LIMIT",
-                    "message": "Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.",
+                    "message": f"You've reached your daily scan limit ({limit_num} {scans_word}). Sign in to get more scans or try again tomorrow.",
+                    "is_anonymous": is_anonymous,
+                    "requires_login": is_anonymous,
                     **limit_status,
                 },
             )

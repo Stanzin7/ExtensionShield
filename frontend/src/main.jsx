@@ -5,6 +5,11 @@ import App from "./App.jsx";
 import { initConfigValidation } from "./utils/configValidator";
 import "./index.css";
 
+// Fallback: ensure Google tag config runs if inline script was blocked (e.g. CSP after CDN minify)
+if (typeof window !== "undefined" && window.gtag) {
+  window.gtag("config", "AW-17954318055");
+}
+
 // Validate configuration on app boot
 initConfigValidation();
 

@@ -399,7 +399,7 @@ const ScannerPage = () => {
 
   const deepScanLimitReached = deepScanLimit && deepScanLimit.remaining <= 0;
   const scanDisabledDueToLimit = Boolean(deepScanLimitReached && !cachedAvailable);
-  const scanDisabledTooltip = "Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.";
+  const scanDisabledTooltip = "Daily scan limit reached (1 scan for guests). Sign in to get more scans or try again tomorrow.";
 
   const handleSort = useCallback((key) => {
     setSortConfig((prev) => {
@@ -619,7 +619,7 @@ const ScannerPage = () => {
 
           {scanDisabledDueToLimit && (
             <div className="deep-scan-limit-banner">
-              Daily scan limit reached (2 scans per day). Sign in or try again tomorrow.
+              Daily scan limit reached (1 scan for guests). Sign in to get more scans or try again tomorrow.
             </div>
           )}
 

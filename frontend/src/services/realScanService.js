@@ -1,6 +1,9 @@
 import { getScanResultsUrl } from "../utils/constants";
 import { fetchJson, buildFetchError } from "./requestHelpers";
 
+// User-friendly message for service unavailability
+const SERVICE_UNAVAILABLE_MESSAGE = "ExtensionShield is temporarily unavailable. We're working to restore service and will be back shortly. Please try again in a few minutes.";
+
 class RealScanService {
   constructor() {
     // Use environment variable for API URL, default to empty string for same-origin (production)
@@ -187,51 +190,63 @@ class RealScanService {
       const data = body || {};
 
       if (response.ok) {
+        // Check for service errors and return user-friendly message
         if (
           data.error &&
           (data.error_code === 401 ||
+            data.error_code === 503 ||
             data.error?.includes("API key") ||
-            data.error?.includes("Invalid API key"))
+            data.error?.includes("Invalid API key") ||
+            data.error?.includes("SERVICE_UNAVAILABLE") ||
+            data.error?.includes("temporarily unavailable"))
         ) {
           return {
             scanned: false,
             status: "failed",
-            error: "Connection is down try back in a while",
-            error_code: 401,
+            error: SERVICE_UNAVAILABLE_MESSAGE,
+            error_code: 503,
           };
         }
         return data;
       }
 
-      if (response.status === 401) {
+      // Handle service unavailability errors
+      if (response.status === 401 || response.status === 503) {
         return {
           scanned: false,
           status: "failed",
-          error: "Connection is down try back in a while",
-          error_code: 401,
+          error: SERVICE_UNAVAILABLE_MESSAGE,
+          error_code: 503,
         };
       }
 
       return { scanned: false };
     } catch (error) {
+      // All network/connection errors should show user-friendly message
       if (
         error?.message?.includes("fetch") ||
-        error?.message?.includes("network")
-      ) {
-        throw new Error(
-          "Backend server unavailable. Please make sure the API server is running (make api)."
-        );
-      }
-      if (
-        error?.status === 401 ||
-        error?.message?.includes("401") ||
-        error?.message?.includes("API key")
+        error?.message?.includes("network") ||
+        error?.message?.includes("Failed to fetch")
       ) {
         return {
           scanned: false,
           status: "failed",
-          error: "Connection is down try back in a while",
-          error_code: 401,
+          error: SERVICE_UNAVAILABLE_MESSAGE,
+          error_code: 503,
+        };
+      }
+      if (
+        error?.status === 401 ||
+        error?.status === 503 ||
+        error?.message?.includes("401") ||
+        error?.message?.includes("API key") ||
+        error?.message?.includes("SERVICE_UNAVAILABLE")
+      ) {
+        return {
+          scanned: false,
+          status: "failed",
+          error: SERVICE_UNAVAILABLE_MESSAGE,
+          error_code: 503,
         };
       }
       return {
