@@ -514,29 +514,29 @@
     font-weight: 500;
   }
 
-  // Default colors (will be overridden by inline styles for score-based coloring) – higher contrast
+  // Default colors (will be overridden by inline styles for score-based coloring) – white text on colored bg
   &.risk-low {
     background: var(--risk-good-bg, rgba(16, 185, 129, 0.14));
     border-color: var(--risk-good-border);
-    color: var(--risk-good);
+    color: #fff;
   }
 
   &.risk-medium, &.risk-moderate {
     background: rgba(245, 158, 11, 0.18);
     border-color: rgba(245, 158, 11, 0.5);
-    color: #b45309;
+    color: #fff;
   }
 
   &.risk-high {
     background: rgba(239, 68, 68, 0.16);
     border-color: var(--risk-bad-border);
-    color: #dc2626;
+    color: #fff;
   }
 
   &.risk-unknown {
     background: rgba(107, 114, 128, 0.08);
     border-color: rgba(107, 114, 128, 0.3);
-    color: var(--risk-neutral);
+    color: #fff;
   }
 }
 
@@ -602,37 +602,41 @@
   &.signal-ok {
     background: var(--risk-good-bg, rgba(16, 185, 129, 0.18));
     border-color: var(--risk-good-border);
-    color: #059669;
+    color: #fff;
 
     .signal-value {
-      border-color: rgba(5, 150, 105, 0.55);
+      border-color: rgba(255, 255, 255, 0.5);
     }
   }
 
   &.signal-warn {
     background: rgba(245, 158, 11, 0.22);
     border-color: rgba(245, 158, 11, 0.6);
-    color: #b45309;
+    color: #fff;
 
     .signal-value {
-      border-color: rgba(180, 83, 9, 0.6);
+      border-color: rgba(255, 255, 255, 0.5);
     }
   }
 
   &.signal-high {
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.55);
-    color: #dc2626;
+    color: #fff;
 
     .signal-value {
-      border-color: rgba(220, 38, 38, 0.6);
+      border-color: rgba(255, 255, 255, 0.5);
     }
   }
 
   &.signal-unknown {
     background: rgba(148, 163, 184, 0.12);
     border-color: rgba(148, 163, 184, 0.28);
-    color: var(--theme-text-muted);
+    color: #fff;
+
+    .signal-value {
+      border-color: rgba(255, 255, 255, 0.4);
+    }
   }
 
   &:hover {
@@ -1599,30 +1603,30 @@
     opacity: 1;
   }
 
-  /* Signal chips in table – stronger colors and borders (not muted) */
+  /* Signal chips in table – white text on colored bg */
   .signals-container .signal-chip {
     &.signal-ok {
       background: var(--risk-good-bg);
       border-color: var(--risk-good-border);
-      color: #047857;
+      color: #fff;
     }
 
     &.signal-warn {
       background: var(--risk-warn-bg);
       border-color: var(--risk-warn-border);
-      color: #b45309;
+      color: #fff;
     }
 
     &.signal-high {
       background: var(--risk-bad-bg);
       border-color: var(--risk-bad-border);
-      color: #b91c1c;
+      color: #fff;
     }
 
     &.signal-unknown {
       background: var(--atlas-bg-secondary);
       border-color: var(--atlas-border);
-      color: var(--atlas-text-secondary);
+      color: #fff;
     }
   }
 
