@@ -1,5 +1,5 @@
 /**
- * UploadCtaPill – Micro-CTA under the hero bullet: "Building an extension? [Upload CRX/ZIP (Pro)] to scan a private build."
+ * UploadCtaPill – Micro-CTA under the hero bullet: "Building an extension? [Upload CRX/ZIP] to scan a private build."
  * Click: logged out → sign-in modal then redirect to /scan/upload; logged in not Pro → upgrade modal then redirect; Pro → go to /scan/upload.
  */
 import React, { useCallback } from "react";
@@ -58,10 +58,10 @@ export default function UploadCtaPill({ className = "" }) {
         className="upload-cta-pill__btn"
         onClick={handlePillClick}
         onKeyDown={handleKeyDown}
-        aria-label="Upload CRX/ZIP (Pro) to scan a private build"
-        title="Upload CRX or ZIP to scan a private build (Pro)"
+        aria-label="Upload CRX/ZIP to scan a private build"
+        title="Upload CRX or ZIP to scan a private build"
       >
-        Upload CRX/ZIP (Pro)
+        Upload CRX/ZIP
       </button>{" "}
       to scan a private build.
     </p>
