@@ -118,7 +118,7 @@ const signInWithMagicLink = async (email) => {
 
 /** Message shown after magic link email is sent */
 export const MAGIC_LINK_SENT_MESSAGE =
-  "Check your email — we sent you a sign-in link. Click the link to sign in (check spam if you don't see it).";
+  "We sent you a sign-in link. Click it in the email to continue.";
 
 const signInWithEmail = async (email, password) => {
   checkSupabaseConfig();

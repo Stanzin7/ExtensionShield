@@ -128,8 +128,7 @@ const SignInModal = () => {
               </svg>
             </div>
             <h3 className="magic-link-success-title">Check your email</h3>
-            <p className="magic-link-success-text">{authSuccessMessage}</p>
-            <p className="magic-link-success-hint">You can close this window — click the link in the email to sign in.</p>
+            <p className="magic-link-success-text">Check spam if you don’t see it.</p>
           </div>
         ) : (
           <form className="email-form email-form--magic" onSubmit={handleMagicLinkSubmit}>
