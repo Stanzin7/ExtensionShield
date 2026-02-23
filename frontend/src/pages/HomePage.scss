@@ -560,9 +560,13 @@
 }
 
 .stat-value {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--atlas-text-primary);
+
+  .stat-item:first-child & {
+    color: var(--atlas-accent);
+  }
   
   &.counter {
     font-variant-numeric: tabular-nums;

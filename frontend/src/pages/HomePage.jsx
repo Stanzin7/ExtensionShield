@@ -246,11 +246,11 @@ const HomePage = () => {
             transition={{ duration: 0.5, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="stat-item">
-              <span className="stat-value beta">
-                <span className="beta-dot" />
-                BETA
+              <span className="stat-value live">
+                <span className="live-dot" aria-hidden="true" />
+                FREE
               </span>
-              <span className="stat-label">Try free</span>
+              <span className="stat-label">PUBLIC SCANS</span>
             </div>
             <div className="stat-divider" />
             <div className="stat-item">

@@ -37,12 +37,11 @@ export default function DevOpenCoreSection({ reducedMotion = false }) {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             >
               <h2 id="dev-open-core-heading" className="dev-open-core-title">
-                <span className="dev-open-core-title-line">Free for users.</span>
-                <span className="dev-open-core-title-line dev-open-core-title-line--main">Pro for developers.</span>
+                <span className="dev-open-core-title-line dev-open-core-title-line--main">Ship safer extensions.</span>
+                <span className="dev-open-core-title-line">Private builds are Pro.</span>
               </h2>
               <p className="dev-open-core-subhead">
-                Upload a private CRX/ZIP build (Pro) before release.
-                We audit your files, flag vulnerabilities and risky patterns, and suggest fixes — with evidence.
+                For developers and teams. Upload a private CRX/ZIP build before release for an evidence-backed security audit + fix suggestions.
               </p>
               <p className="dev-open-core-how-calc">
                 How we calculate: Security {SCORE_WEIGHTS.security}% · Privacy {SCORE_WEIGHTS.privacy}% · Governance {SCORE_WEIGHTS.compliance}%.{" "}
