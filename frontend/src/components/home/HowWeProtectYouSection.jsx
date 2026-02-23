@@ -141,13 +141,10 @@ export default function HowWeProtectYouSection() {
             transition={{ duration: 0.5, ease }}
           >
             <h2 id="how-protect-title" className="how-protect-title">
-              How we keep you safe
+              Why a &ldquo;safe&rdquo; extension can turn risky
             </h2>
-            <p className="how-protect-subhead">
-              Extensions can go bad after you install them. We watch for that.
-            </p>
             <p className="how-protect-body">
-              Every time an extension updates, we check if anything risky changed. If something looks wrong, we let you know before it can hurt you.
+              Most incidents happen after an update. We flag risky changes before release (Pro) and can monitor updates for teams (Enterprise).
             </p>
           </motion.div>
 
