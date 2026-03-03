@@ -66,45 +66,16 @@ from extension_shield.utils.json_encoder import (
 )
 
 
-# Pydantic models for request/response
-class ScanRequest(BaseModel):
-    """Request model for triggering a scan."""
-
-    url: str
-
-
-class ScanStatusResponse(BaseModel):
-    """Response model for scan status."""
-
-    scanned: bool
-    status: Optional[str] = None
-    extension_id: Optional[str] = None
-    error: Optional[str] = None
-    error_code: Optional[int] = None
-
-
-class FileContentResponse(BaseModel):
-    """Response model for file content."""
-
-    content: str
-    file_path: str
-
-
-class FileListResponse(BaseModel):
-    """Response model for file list."""
-
-    files: list[str]
-
-class PageViewEvent(BaseModel):
-    """Request model for privacy-first pageview telemetry (no PII)."""
-
-    path: str
-
-
-class CustomTelemetryEvent(BaseModel):
-    """Request model for custom frontend events (e.g. CTA clicks). No PII."""
-
-    event: str
+# Request/response models and in-memory state live in shared.py to avoid
+# circular imports when route modules are split out.
+from extension_shield.api.shared import (  # noqa: E402
+    ScanRequest,
+    ScanStatusResponse,
+    FileContentResponse,
+    FileListResponse,
+    PageViewEvent,
+    CustomTelemetryEvent,
+)
 
 
 # Sentry: enable only in prod when SENTRY_DSN is set; never capture request bodies or auth headers
@@ -359,13 +330,14 @@ app.add_middleware(CSPMiddleware, is_dev=_is_dev)
 # Trust X-Forwarded-Proto / X-Forwarded-For from Railway/Cloudflare so request.url.scheme is correct
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# Storage for scan results (in-memory cache + database persistence)
-scan_results: Dict[str, Dict[str, Any]] = {}
-scan_status: Dict[str, str] = {}
-# extension_id -> authenticated user_id (Supabase `sub`) at scan trigger time
-scan_user_ids: Dict[str, Optional[str]] = {}
-# extension_id -> 'upload' for private build uploads; None/webstore for public scans
-scan_source: Dict[str, Optional[str]] = {}
+# In-memory state lives in shared.py; import references here so existing
+# code in this file (and tests) can continue using module-level names.
+from extension_shield.api.shared import (  # noqa: E402
+    scan_results,
+    scan_status,
+    scan_user_ids,
+    scan_source,
+)
 
 # For /health uptime (no filesystem or internal config in response)
 _health_start_time = datetime.now(timezone.utc)
@@ -1348,494 +1320,14 @@ def get_extracted_files(extracted_path: Optional[str]) -> list[str]:
     return files
 
 
-def _calculate_permission_alignment_penalty(
-    manifest: Dict,
-    permissions_details: Dict,
-    permissions_analysis: Dict,
-    analysis_results: Dict
-) -> int:
-    """
-    Calculate penalty based on permission-purpose alignment.
-    
-    This is the CONTEXT-AWARE mathematical model that differentiates:
-    - Vimium: Needs <all_urls> for keyboard navigation → LEGITIMATE (low penalty)
-    - Honey: Had permissions but used them covertly → ABUSIVE (high penalty)
-    - Visa extension: Screenshot without consent → ABUSIVE (high penalty)
-    
-    The model evaluates:
-    1. TRANSPARENCY: Is sensitive behavior disclosed in name/description?
-    2. JUSTIFICATION: Do permissions match stated purpose?
-    3. CONSENT: Are there popup/notification patterns in code?
-    4. COVERT BEHAVIOR: Silent data collection without user awareness?
-    
-    Formula:
-        penalty = base_risk × (1 - transparency_score) × covert_multiplier
-    
-    Returns:
-        int: Penalty points (0-20)
-    """
-    penalty = 0
-    
-    # Extract extension metadata
-    name = manifest.get("name", "").lower()
-    description = manifest.get("description", "").lower()
-    permissions = list(permissions_details.keys()) if permissions_details else []
-    
-    # === STEP 1: Identify Sensitive Permission Combinations ===
-    
-    # High-risk permission groups that require justification
-    has_all_urls = any(
-        p in permissions or p in str(permissions_analysis.get("host_permissions_analysis", ""))
-        for p in ["<all_urls>", "*://*/*"]
-    )
-    has_cookies = "cookies" in permissions
-    has_web_request = any(p in permissions for p in ["webRequest", "webRequestBlocking"])
-    has_history = "history" in permissions
-    has_clipboard = any(p in permissions for p in ["clipboardRead", "clipboardWrite"])
-    has_tabs = "tabs" in permissions
-    has_screenshot = any(p in permissions for p in ["desktopCapture", "tabCapture"])
-    
-    # Check for screenshot libraries (from screenshot_capture_analysis)
-    screenshot_analysis = permissions_analysis.get("screenshot_capture_analysis", {})
-    has_screenshot_lib = screenshot_analysis.get("detected", False) if isinstance(screenshot_analysis, dict) else False
-    
-    # === STEP 2: Check Transparency (Is behavior disclosed?) ===
-    
-    # Keywords that indicate transparent disclosure of sensitive features
-    transparency_keywords = {
-        "all_urls": ["browser", "navigation", "keyboard", "shortcut", "accessibility", "reader", "dark mode", "style"],
-        "cookies": ["login", "session", "authentication", "sync", "password", "manager"],
-        "webRequest": ["block", "filter", "ad", "privacy", "tracker", "vpn", "proxy"],
-        "history": ["history", "bookmark", "search", "session", "backup"],
-        "clipboard": ["clipboard", "copy", "paste", "text", "snippet"],
-        "screenshot": ["screenshot", "capture", "image", "pdf", "print", "screen"],
-    }
-    
-    transparency_score = 1.0  # 1.0 = fully transparent, 0.0 = opaque
-    
-    # Check if high-risk permissions are justified by description
-    if has_all_urls:
-        all_urls_justified = any(kw in name or kw in description for kw in transparency_keywords["all_urls"])
-        if not all_urls_justified:
-            transparency_score *= 0.5  # 50% reduction if not disclosed
-    
-    if has_cookies:
-        cookies_justified = any(kw in name or kw in description for kw in transparency_keywords["cookies"])
-        if not cookies_justified:
-            transparency_score *= 0.7
-    
-    if has_web_request:
-        web_request_justified = any(kw in name or kw in description for kw in transparency_keywords["webRequest"])
-        if not web_request_justified:
-            transparency_score *= 0.6
-    
-    if has_screenshot or has_screenshot_lib:
-        screenshot_justified = any(kw in name or kw in description for kw in transparency_keywords["screenshot"])
-        if not screenshot_justified:
-            transparency_score *= 0.3  # Screenshot without disclosure = very suspicious
-    
-    # === STEP 3: Check for Covert Behavior Patterns ===
-    
-    covert_multiplier = 1.0
-    
-    # Pattern 1: Data Collection + Network (can exfiltrate)
-    # This is the Honey pattern: collect data silently and send to server
-    js_analysis = analysis_results.get("javascript_analysis", {})
-    has_third_party_api = False
-    if js_analysis and isinstance(js_analysis, dict):
-        sast_findings = js_analysis.get("sast_findings", {})
-        for findings_list in sast_findings.values():
-            for finding in findings_list:
-                check_id = finding.get("check_id", "")
-                if "third_party" in check_id.lower() or "external_api" in check_id.lower():
-                    has_third_party_api = True
-                    break
-    
-    # Covert data collection pattern: sensitive permission + network + no disclosure
-    if has_third_party_api:
-        if has_cookies or has_history or has_clipboard:
-            covert_multiplier = 2.0  # Double penalty for data exfiltration capability
-        if has_screenshot or has_screenshot_lib:
-            covert_multiplier = 2.5  # Higher penalty for screenshot exfiltration
-    
-    # Pattern 2: Silent operation (no popup/notification keywords)
-    # Legitimate extensions often mention "popup", "toolbar", "notification"
-    ui_keywords = ["popup", "toolbar", "icon", "badge", "notification", "alert", "confirm", "dialog"]
-    has_ui_indication = any(kw in description for kw in ui_keywords)
-    
-    if not has_ui_indication and (has_screenshot or has_screenshot_lib):
-        # Screenshot capability with no UI indication = likely covert
-        covert_multiplier *= 1.5
-    
-    # === STEP 4: Check Extension Category Alignment ===
-    
-    # Some categories naturally need broad permissions
-    legitimate_broad_permission_categories = [
-        # Productivity tools that legitimately need all-site access
-        ("vimium", "keyboard"),
-        ("surfingkeys", "keyboard"),
-        ("dark reader", "dark mode"),
-        ("stylus", "style"),
-        ("ublock", "ad blocker"),
-        ("adblock", "ad blocker"),
-        ("privacy badger", "privacy"),
-        ("https everywhere", "https"),
-        ("grammarly", "grammar"),
-        ("lastpass", "password"),
-        ("bitwarden", "password"),
-        ("1password", "password"),
-    ]
-    
-    is_legitimate_broad_tool = any(
-        cat_name in name or cat_keyword in name
-        for cat_name, cat_keyword in legitimate_broad_permission_categories
-    )
-    
-    if is_legitimate_broad_tool:
-        # Reduce penalty for known legitimate tool patterns
-        covert_multiplier *= 0.3
-    
-    # === STEP 5: Calculate Final Penalty ===
-    
-    # Base risk from sensitive permission combinations
-    base_risk = 0
-    
-    if has_all_urls and has_cookies:
-        base_risk += 8  # Can track across all sites
-    elif has_all_urls:
-        base_risk += 4  # Broad access but no cookie tracking
-    
-    if has_web_request and has_cookies:
-        base_risk += 6  # Can intercept and modify requests with tracking
-    
-    if (has_screenshot or has_screenshot_lib) and has_third_party_api:
-        base_risk += 10  # Screenshot + network = exfiltration
-    
-    if has_history and has_third_party_api:
-        base_risk += 5  # Browsing history exfiltration
-    
-    if has_clipboard and has_third_party_api:
-        base_risk += 7  # Clipboard data exfiltration
-    
-    # Apply transparency and covert modifiers
-    # Formula: penalty = base_risk × (2 - transparency_score) × covert_multiplier
-    # When transparency = 1.0 (fully transparent): multiplier = 1.0
-    # When transparency = 0.0 (opaque): multiplier = 2.0
-    transparency_multiplier = 2.0 - transparency_score
-    
-    penalty = int(base_risk * transparency_multiplier * covert_multiplier)
-    
-    # Cap at 20 points
-    return min(20, penalty)
-
-
-def calculate_security_score(state: WorkflowState) -> int:
-    """
-    Calculate overall security score using weighted multi-factor analysis.
-
-    Scoring Components (risk points deducted from 100):
-    - SAST Findings (40 pts max): Critical code vulnerabilities
-    - Permissions Risk (30 pts max): Unreasonable/excessive permissions
-    - Webstore Trust (20 pts max): User ratings, install count, developer reputation
-    - Manifest Quality (10 pts max): Proper metadata, CSP, update URL
-
-    Returns:
-        int: Security score from 0 (dangerous) to 100 (secure)
-    """
-    analysis_results = state.get("analysis_results", {}) or {}
-    manifest = state.get("manifest_data", {}) or {}
-
-    # Component 1: SAST Analysis (40 points max risk)
-    sast_score = 0  # Start at 0 risk
-    javascript_analysis = analysis_results.get("javascript_analysis", {})
-    if javascript_analysis and isinstance(javascript_analysis, dict):
-        sast_findings = javascript_analysis.get("sast_findings", {})
-        for findings_list in sast_findings.values():
-            for finding in findings_list:
-                check_id = finding.get("check_id", "")
-                # Exclude third-party API findings from SAST risk (counted separately)
-                if "third_party" in check_id.lower() or "external_api" in check_id.lower():
-                    continue
-                severity = finding.get("extra", {}).get("severity", "INFO").upper()
-                if severity in ("CRITICAL", "HIGH"):
-                    sast_score += 8  # Add risk points
-                elif severity in ("ERROR", "MEDIUM"):
-                    sast_score += 4
-                elif severity == "WARNING":
-                    sast_score += 1
-    sast_score = min(40, sast_score)  # Cap at 40
-
-    # Component 2: Permissions Analysis (30 points max risk)
-    permissions_score = 0  # Start at 0 risk
-    permissions_analysis = analysis_results.get("permissions_analysis", {}) or {}
-    permissions_details = (
-        permissions_analysis.get("permissions_details")
-        if isinstance(permissions_analysis, dict)
-        else None
-    )
-    # Ensure permissions_details is a dict, not None
-    if not isinstance(permissions_details, dict):
-        permissions_details = {}
-
-    _ = len(permissions_details)  # total_permissions - kept for potential future use
-    unreasonable_count = 0
-    high_risk_perms = 0
-
-    for _, perm_analysis in permissions_details.items():
-        is_reasonable = perm_analysis.get("is_reasonable", True)
-        risk = perm_analysis.get("risk_level", "").lower()
-
-        if not is_reasonable:
-            unreasonable_count += 1
-            if risk == "high":
-                high_risk_perms += 1
-                permissions_score += 5  # Add risk points
-            elif risk == "medium":
-                permissions_score += 2
-            else:
-                permissions_score += 1
-
-    permissions_score = min(30, permissions_score)  # Cap at 30
-
-    # Component 3: Webstore Trust Score (20 points max risk)
-    webstore_score = 0  # Start at 0 risk
-    _ = analysis_results.get("webstore_analysis", {})  # webstore_analysis - for future use
-    metadata = state.get("extension_metadata", {}) or {}
-
-    # Check user ratings (low rating = higher risk)
-    rating = metadata.get("rating")
-    if rating:
-        try:
-            rating_val = float(rating)
-            if rating_val >= 4.5:
-                webstore_score += 0  # Excellent - no risk
-            elif rating_val >= 4.0:
-                webstore_score += 2  # Good - slight risk
-            elif rating_val >= 3.0:
-                webstore_score += 5  # Average - moderate risk
-            else:
-                webstore_score += 10  # Poor - high risk
-        except (ValueError, TypeError):
-            webstore_score += 3  # No valid rating - some risk
-    else:
-        webstore_score += 3  # No rating data
-
-    # Check install count (low adoption = higher risk)
-    users = metadata.get("users", "0")
-    try:
-        user_count = int(users.replace(",", "").replace("+", ""))
-        if user_count >= 1000000:
-            webstore_score += 0  # Very popular - trusted
-        elif user_count >= 100000:
-            webstore_score += 2  # Popular - low risk
-        elif user_count >= 10000:
-            webstore_score += 5  # Moderate - some risk
-        else:
-            webstore_score += 8  # Low adoption - higher risk
-    except (ValueError, TypeError):
-        webstore_score += 5  # Unknown user count
-
-    webstore_score = min(20, webstore_score)  # Cap at 20
-
-    # Component 4: Manifest Quality (10 points max risk)
-    manifest_score = 0  # Start at 0 risk
-
-    # Check for proper metadata (missing = risk)
-    if not manifest.get("name") or manifest.get("name", "").startswith("__MSG_"):
-        manifest_score += 3  # Missing/placeholder name = risk
-    if not manifest.get("description") or manifest.get("description", "").startswith("__MSG_"):
-        manifest_score += 2  # Missing/placeholder description = risk
-
-    # Check for Content Security Policy (missing = risk)
-    if not manifest.get("content_security_policy"):
-        manifest_score += 2
-
-    # Check for update URL (missing = risk)
-    if not manifest.get("update_url"):
-        manifest_score += 1
-
-    manifest_score = min(10, manifest_score)  # Cap at 10
-
-    # Component 5: Third-Party API Calls Detection (+1 point if detected, only once)
-    third_party_api_score = 0
-    if javascript_analysis and isinstance(javascript_analysis, dict):
-        sast_findings = javascript_analysis.get("sast_findings", {})
-        # Check for third-party API rule in SAST findings
-        # Rule ID: banking.third_party.external_api_calls
-        third_party_detected = False
-        for findings_list in sast_findings.values():
-            for finding in findings_list:
-                check_id = finding.get("check_id", "")
-                if check_id and (
-                    "banking.third_party.external_api_calls" in check_id
-                    or "third_party" in check_id.lower()
-                    or "external_api" in check_id.lower()
-                ):
-                    third_party_detected = True
-                    break
-            if third_party_detected:
-                break
-        if third_party_detected:
-            third_party_api_score = 1  # Add only once, not per finding
-
-    # Component 6: Screenshot Capture Detection (context-aware: 0-15 pts)
-    # Different from binary +1: considers consent, transparency, and purpose alignment
-    screenshot_score = 0
-    if permissions_analysis and isinstance(permissions_analysis, dict):
-        screenshot_analysis = permissions_analysis.get("screenshot_capture_analysis", {})
-        if isinstance(screenshot_analysis, dict) and screenshot_analysis.get("detected", False):
-            # Base detection score
-            screenshot_score = 3
-            
-            # Context modifiers: Check if screenshot is justified by purpose
-            extension_name = manifest.get("name", "").lower()
-            extension_desc = manifest.get("description", "").lower()
-            
-            # Legitimate screenshot tools get reduced penalty
-            screenshot_keywords = ["screenshot", "capture", "snap", "screen", "image", "pdf", "print"]
-            is_screenshot_tool = any(kw in extension_name or kw in extension_desc for kw in screenshot_keywords)
-            
-            if is_screenshot_tool:
-                screenshot_score = 1  # Expected behavior for screenshot tools
-            else:
-                # Check for covert behavior indicators (no consent patterns)
-                # If extension has screenshot + network + no popup indication = higher risk
-                has_network = any(
-                    perm in permissions_details
-                    for perm in ["webRequest", "webRequestBlocking", "<all_urls>"]
-                )
-                if has_network:
-                    screenshot_score = 10  # Can capture and exfiltrate
-                
-                # Check for clipboard/download (can save screenshots)
-                has_storage = any(
-                    perm in permissions_details
-                    for perm in ["clipboardWrite", "downloads"]
-                )
-                if has_storage and has_network:
-                    screenshot_score = 15  # Full exfiltration capability
-
-    # Component 7: VirusTotal Analysis (0-50 pts)
-    # Critical: This was MISSING from scoring!
-    virustotal_score = 0
-    virustotal_analysis = analysis_results.get("virustotal_analysis", {})
-    if virustotal_analysis and isinstance(virustotal_analysis, dict):
-        if virustotal_analysis.get("enabled"):
-            total_malicious = virustotal_analysis.get("total_malicious", 0)
-            total_suspicious = virustotal_analysis.get("total_suspicious", 0)
-            
-            if total_malicious > 0:
-                # Consensus-based scoring (not binary)
-                if total_malicious >= 10:
-                    virustotal_score = 50  # Strong malware consensus
-                elif total_malicious >= 5:
-                    virustotal_score = 40  # Multiple detections
-                elif total_malicious >= 2:
-                    virustotal_score = 30  # Some detections
-                else:
-                    virustotal_score = 15  # Single detection (could be false positive)
-            elif total_suspicious > 0:
-                virustotal_score = min(20, total_suspicious * 5)
-
-    # Component 8: Entropy/Obfuscation Analysis (0-30 pts)
-    # Critical: This was MISSING from scoring!
-    entropy_score = 0
-    entropy_analysis = analysis_results.get("entropy_analysis", {})
-    if entropy_analysis and isinstance(entropy_analysis, dict):
-        obfuscated_files = entropy_analysis.get("obfuscated_files", 0)
-        suspicious_files = entropy_analysis.get("suspicious_files", 0)
-        
-        # Context-aware: Check if obfuscation is legitimate minification
-        # Large popular extensions often use minified code
-        user_count = 0
-        try:
-            users = state.get("extension_metadata", {}).get("users", "0")
-            user_count = int(str(users).replace(",", "").replace("+", ""))
-        except (ValueError, TypeError):
-            pass
-        
-        # Popular extensions (>100K users) get reduced obfuscation penalty
-        # (likely using legitimate minification/bundlers)
-        popularity_modifier = 0.5 if user_count >= 100000 else 1.0
-        
-        if obfuscated_files > 0:
-            base_obfuscation_risk = min(20, obfuscated_files * 8)
-            entropy_score += int(base_obfuscation_risk * popularity_modifier)
-        
-        if suspicious_files > 0:
-            entropy_score += min(10, suspicious_files * 4)
-        
-        entropy_score = min(30, entropy_score)
-
-    # Component 9: ChromeStats Behavioral Analysis (0-28 pts)
-    # Critical: This was MISSING from scoring!
-    chromestats_score = 0
-    chromestats_analysis = analysis_results.get("chromestats_analysis", {})
-    if chromestats_analysis and isinstance(chromestats_analysis, dict):
-        if chromestats_analysis.get("enabled") and not chromestats_analysis.get("error"):
-            chromestats_score = min(28, chromestats_analysis.get("total_risk_score", 0))
-
-    # Component 10: Permission-Purpose Alignment (Context-Aware Model)
-    # This addresses the Vimium vs Honey problem:
-    # - Vimium needs <all_urls> for keyboard navigation = LEGITIMATE
-    # - Honey had permissions but used them covertly = ABUSIVE
-    alignment_penalty = 0
-    alignment_penalty = _calculate_permission_alignment_penalty(
-        manifest=manifest,
-        permissions_details=permissions_details,
-        permissions_analysis=permissions_analysis,
-        analysis_results=analysis_results
-    )
-
-    # Calculate final weighted score (risk points)
-    # NEW TOTAL MAX: 40 + 30 + 20 + 10 + 1 + 15 + 50 + 30 + 28 + 20 = 244 pts
-    final_score = (
-        sast_score              # 40 max
-        + permissions_score     # 30 max
-        + webstore_score        # 20 max
-        + manifest_score        # 10 max
-        + third_party_api_score # 1 max
-        + screenshot_score      # 15 max (was 1)
-        + virustotal_score      # 50 max (NEW)
-        + entropy_score         # 30 max (NEW)
-        + chromestats_score     # 28 max (NEW)
-        + alignment_penalty     # 20 max (NEW - context-aware)
-    )
-
-    # Invert to security score: 100 = secure, 0 = risky
-    return max(0, min(100, 100 - final_score))
-
-
-def count_total_findings(state: WorkflowState) -> int:
-    """Count total security findings including unreasonable permissions."""
-    analysis_results = state.get("analysis_results", {}) or {}
-
-    # Count SAST findings
-    javascript_analysis = analysis_results.get("javascript_analysis", {})
-    total = 0
-    if javascript_analysis:
-        sast_findings = javascript_analysis.get("sast_findings", {})
-        for findings_list in sast_findings.values():
-            if findings_list is not None:
-                total += len(findings_list)
-
-    # Count unreasonable permissions as findings
-    permissions_analysis = analysis_results.get("permissions_analysis", {}) or {}
-    permissions_details = (
-        permissions_analysis.get("permissions_details")
-        if isinstance(permissions_analysis, dict)
-        else None
-    )
-    # Ensure permissions_details is a dict, not None
-    if not isinstance(permissions_details, dict):
-        permissions_details = {}
-
-    for _, perm_analysis in permissions_details.items():
-        is_reasonable = perm_analysis.get("is_reasonable", True)
-        if not is_reasonable:
-            total += 1
-
-    return total
+# Legacy scoring functions moved to scoring_legacy.py.
+# Re-exported here for backward compatibility with tests and callers.
+from extension_shield.api.scoring_legacy import (  # noqa: E402
+    calculate_security_score,
+    determine_overall_risk,
+    count_total_findings,
+    calculate_total_risk_score,
+)
 
 
 def _coerce_int(value: Any) -> Optional[int]:
@@ -1911,19 +1403,10 @@ def _build_scoring_v2_for_payload(payload: Dict[str, Any], extension_id: str) ->
 def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract risk and signals mapping from scan results payload.
-    
-    Returns mapping:
-    {
-        "risk": overall_safety_score,
-        "signals": {
-            "security": security_score,
-            "privacy": privacy_score,
-            "gov": governance_score
-        },
-        "total_findings": deduplicated_count
-    }
+
+    Returns:
+        {"risk": int, "signals": {"security": int, "privacy": int, "gov": int}, "total_findings": int}
     """
-    # Prefer top-level scoring_v2, then summary.scoring_v2, then governance_bundle.scoring_v2
     scoring_v2 = payload.get("scoring_v2")
     if not isinstance(scoring_v2, dict) or not scoring_v2:
         summary = payload.get("summary")
@@ -1941,14 +1424,12 @@ def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(candidate, dict) and candidate:
             scoring_v2 = candidate
 
-    # If still missing, dynamically rebuild scoring_v2 from available analysis data.
     if not isinstance(scoring_v2, dict) or not scoring_v2:
         extension_id = str(payload.get("extension_id") or "unknown")
         scoring_v2 = _build_scoring_v2_for_payload(payload, extension_id=extension_id)
         if scoring_v2:
             payload["scoring_v2"] = scoring_v2
 
-    # Overall safety score
     overall_score = (
         _coerce_int((scoring_v2 or {}).get("overall_score"))
         or _coerce_int(payload.get("overall_security_score"))
@@ -1956,7 +1437,6 @@ def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
         or 0
     )
 
-    # Layer signal scores
     security_score = _coerce_int((scoring_v2 or {}).get("security_score"))
     if security_score is None and isinstance((scoring_v2 or {}).get("security_layer"), dict):
         security_score = _coerce_int((scoring_v2 or {}).get("security_layer", {}).get("score"))
@@ -1975,10 +1455,9 @@ def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
     if governance_score is None:
         governance_score = _coerce_int(payload.get("governance_score"))
 
-    # Combined, deduplicated findings count across layers (prefer scoring_v2 factors + triggered gates)
     total_findings = 0
     if isinstance(scoring_v2, dict) and scoring_v2:
-        combined_keys = set()
+        combined_keys: set = set()
         for layer_key in ("security_layer", "privacy_layer", "governance_layer"):
             layer_obj = scoring_v2.get(layer_key)
             if not isinstance(layer_obj, dict):
@@ -2014,7 +1493,6 @@ def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
         if combined_keys:
             total_findings = len(combined_keys)
 
-    # Fallbacks for findings count
     if total_findings == 0:
         facts = payload.get("governance_bundle", {}).get("facts", {})
         if isinstance(facts, dict):
@@ -2038,13 +1516,12 @@ def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
     if total_findings == 0:
         total_findings = _coerce_int(payload.get("total_findings")) or 0
 
-    # Last resort manual SAST dedupe
     if total_findings == 0:
         sast_results = payload.get("sast_results", {})
         if isinstance(sast_results, dict):
             sast_findings = sast_results.get("sast_findings", {})
             if isinstance(sast_findings, dict):
-                seen = set()
+                seen: set = set()
                 for file_path, findings_list in sast_findings.items():
                     if not isinstance(findings_list, list):
                         continue
@@ -2079,10 +1556,7 @@ def _extract_risk_and_signals(payload: Dict[str, Any]) -> Dict[str, Any]:
 def calculate_risk_distribution(state: WorkflowState) -> Dict[str, int]:
     """Calculate distribution of risk levels."""
     distribution = {"high": 0, "medium": 0, "low": 0}
-
     analysis_results = state.get("analysis_results", {}) or {}
-
-    # Count SAST findings
     javascript_analysis = analysis_results.get("javascript_analysis", {})
     js_analysis = []
     if javascript_analysis and isinstance(javascript_analysis, dict):
@@ -2102,70 +1576,28 @@ def calculate_risk_distribution(state: WorkflowState) -> Dict[str, int]:
         else:
             distribution["low"] += 1
 
-    # Count unreasonable permissions as findings
     permissions_analysis = analysis_results.get("permissions_analysis", {}) or {}
     permissions_details = (
         permissions_analysis.get("permissions_details")
         if isinstance(permissions_analysis, dict)
         else None
     )
-    # Ensure permissions_details is a dict, not None
     if not isinstance(permissions_details, dict):
         permissions_details = {}
-
     for _, perm_analysis in permissions_details.items():
         is_reasonable = perm_analysis.get("is_reasonable", True)
         risk = perm_analysis.get("risk_level", "").lower()
-
         if not is_reasonable:
-            # Classify unreasonable permissions by explicit risk_level or default to medium
             if risk == "high":
                 distribution["high"] += 1
             elif risk == "low":
                 distribution["low"] += 1
             else:
-                # Default unreasonable permissions to medium risk
                 distribution["medium"] += 1
-
     return distribution
 
 
-def determine_overall_risk(state: WorkflowState) -> str:
-    """Determine overall risk level."""
-    score = calculate_security_score(state)
-
-    if score < 30:
-        return "high"
-    if score < 70:
-        return "medium"
-    return "low"
-
-
-def calculate_total_risk_score(state: WorkflowState) -> int:
-    """Calculate total risk score."""
-    analysis_results = state.get("analysis_results", {}) or {}
-    javascript_analysis = analysis_results.get("javascript_analysis", {})
-
-    js_analysis = []
-    if javascript_analysis and isinstance(javascript_analysis, dict):
-        sast_findings = javascript_analysis.get("sast_findings", {})
-        for findings_list in sast_findings.values():
-            js_analysis.extend(findings_list)
-    elif isinstance(javascript_analysis, list):
-        js_analysis = javascript_analysis
-
-    total_score = 0
-    # map severity to score if risk_score not present
-    severity_scores = {"CRITICAL": 10, "HIGH": 8, "ERROR": 5, "MEDIUM": 5, "WARNING": 1, "INFO": 0}
-
-    for finding in js_analysis:
-        severity = finding.get("extra", {}).get("severity", "INFO")
-        total_score += severity_scores.get(severity, 0)
-
-    return total_score
-
-
-# API Endpoints
+# ── API Endpoints ───────────────────────────────────────────────────────
 
 
 def _no_frontend_html() -> str:
