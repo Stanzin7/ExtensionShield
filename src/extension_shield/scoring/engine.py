@@ -267,23 +267,24 @@ class ScoringEngine:
             if g.triggered and g.reasons:
                 gate_reasons_list.extend(g.reasons[:2])
         
-        # Layer objects must reflect adjusted scores for API/export consistency
+        # Rebuild LayerScore objects so .score and .risk stay consistent.
+        # risk = 1 - score/100  (the inverse relationship defined by the formula)
         security_layer = LayerScore(
             layer_name="security",
             score=security_score,
-            risk=security_layer.risk,
+            risk=round(1.0 - security_score / 100.0, 4),
             factors=security_layer.factors,
         )
         privacy_layer = LayerScore(
             layer_name="privacy",
             score=privacy_score,
-            risk=privacy_layer.risk,
+            risk=round(1.0 - privacy_score / 100.0, 4),
             factors=privacy_layer.factors,
         )
         governance_layer = LayerScore(
             layer_name="governance",
             score=governance_score,
-            risk=governance_layer.risk,
+            risk=round(1.0 - governance_score / 100.0, 4),
             factors=governance_layer.factors,
         )
         
@@ -533,8 +534,7 @@ class ScoringEngine:
                 if ecosystem_hit:
                     tos_flags.append("travel_docs_third_party_processor_risk")
         except Exception:
-            # Never break scoring due to auxiliary compliance heuristics
-            pass
+            logger.debug("Travel-docs ToS heuristic failed", exc_info=True)
         
         tos_severity = min(1.0, tos_severity)
         

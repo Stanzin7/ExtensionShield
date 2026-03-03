@@ -11,10 +11,13 @@ Key Principles:
 4. Popularity affects CONFIDENCE, not severity (popular extensions may use legitimate minification)
 """
 
+import logging
 import math
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+logger = logging.getLogger(__name__)
 
 from extension_shield.governance.signal_pack import (
     ChromeStatsSignalPack,
@@ -634,7 +637,7 @@ def normalize_maintenance_health(stats: WebstoreStatsSignalPack) -> FactorScore:
             for fmt in ["%Y-%m-%d", "%B %d, %Y", "%d %B %Y", "%m/%d/%Y"]:
                 try:
                     last_update = datetime.strptime(stats.last_updated, fmt)
-                    days_since_update = (datetime.utcnow() - last_update).days
+                    days_since_update = (datetime.now(timezone.utc) - last_update.replace(tzinfo=timezone.utc)).days
                     break
                 except ValueError:
                     continue
@@ -652,7 +655,7 @@ def normalize_maintenance_health(stats: WebstoreStatsSignalPack) -> FactorScore:
                 else:
                     severity = 0.1  # Recently maintained
         except Exception:
-            pass  # Date parsing failed
+            logger.debug("Failed to parse last_updated date: %s", stats.last_updated)
     
     # Confidence based on data availability
     confidence = 0.9 if days_since_update is not None else 0.3

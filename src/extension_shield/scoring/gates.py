@@ -19,10 +19,13 @@ Gate Priority Order:
 5. SENSITIVE_EXFIL  - Sensitive permissions + network exfil + no disclosure → WARN
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from extension_shield.governance.signal_pack import (
     NetworkSignalPack,
@@ -574,6 +577,7 @@ class HardGates:
             if network and getattr(network, "enabled", False):
                 network_domains = list(getattr(network, "domains", []) or [])
         except Exception:
+            logger.debug("Failed to extract network domains for TOS gate", exc_info=True)
             network_domains = []
 
         visa_ecosystem_hits = list(
@@ -595,6 +599,7 @@ class HardGates:
                     f"{getattr(f, 'check_id', '')} {getattr(f, 'message', '')} {getattr(f, 'code_snippet', '')}"
                 )
             except Exception:
+                logger.debug("Skipping malformed SAST finding in TOS gate")
                 continue
         joined = "\n".join(all_findings_text).lower()
 

@@ -13,7 +13,7 @@ simplified summaries for end-user display.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from extension_shield.scoring.gates import GateResult, get_hard_gate_summary
@@ -310,7 +310,7 @@ class ExplanationBuilder:
             triggered_gates=triggered_gates,
             scoring_version=self.scoring_version,
             weights_version=self.weights_version,
-            computed_at=datetime.utcnow().isoformat(),
+            computed_at=datetime.now(timezone.utc).isoformat(),
             overall_confidence=round(overall_confidence, 3),
             summary=summary,
         )

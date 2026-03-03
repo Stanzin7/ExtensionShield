@@ -5,7 +5,7 @@ Pydantic models for the V2 scoring architecture with normalized [0,1] severities
 and confidences. All scores are explainable with factor contributions and evidence.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -321,7 +321,7 @@ class ScoringResult(BaseModel):
         description="Overall confidence in scoring result (layer-weighted average of confidences)"
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp when this result was created"
     )
     scoring_version: str = Field(
@@ -372,7 +372,7 @@ class ScoringResult(BaseModel):
         return self.decision == Decision.NEEDS_REVIEW
     
     @classmethod
-    def compute(
+    def assemble(
         cls,
         scan_id: str,
         extension_id: str,
@@ -380,11 +380,17 @@ class ScoringResult(BaseModel):
         privacy_layer: LayerScore,
         governance_layer: LayerScore,
         layer_weights: Dict[str, float],
+        decision: "Decision",
+        reasons: List[str],
         hard_gates_triggered: Optional[List[str]] = None,
     ) -> "ScoringResult":
         """
-        Compute final scoring result from layer scores.
-        
+        Assemble a ScoringResult from pre-computed layers and a decision.
+
+        Decision logic is centralized in ``ScoringEngine._determine_decision``;
+        this method only aggregates layer scores and attaches the decision that
+        was already computed by the engine.
+
         Args:
             scan_id: Unique scan identifier
             extension_id: Chrome extension ID
@@ -392,57 +398,31 @@ class ScoringResult(BaseModel):
             privacy_layer: Computed privacy layer score
             governance_layer: Computed governance layer score
             layer_weights: Weights for each layer (should sum to 1.0)
-            hard_gates_triggered: Any hard gates that force BLOCK
-            
+            decision: Pre-computed Decision from the engine
+            reasons: Pre-computed decision reasons from the engine
+            hard_gates_triggered: Any hard gates that triggered
+
         Returns:
-            Complete ScoringResult with decision and explanation
+            Complete ScoringResult
         """
         hard_gates = hard_gates_triggered or []
-        
-        # Calculate weighted overall score
+
         sec_weight = layer_weights.get("security", 0.5)
         priv_weight = layer_weights.get("privacy", 0.3)
         gov_weight = layer_weights.get("governance", 0.2)
-        
+
         overall_score = int(
             security_layer.score * sec_weight +
             privacy_layer.score * priv_weight +
             governance_layer.score * gov_weight
         )
-        
-        # Calculate overall confidence (layer-weighted average of layer confidences)
+
         overall_confidence = (
             security_layer.confidence * sec_weight +
             privacy_layer.confidence * priv_weight +
             governance_layer.confidence * gov_weight
         )
-        
-        # Determine decision
-        decision = Decision.ALLOW
-        reasons: List[str] = []
-        
-        # Hard gates override everything
-        if hard_gates:
-            decision = Decision.BLOCK
-            reasons = [f"Hard gate triggered: {gate}" for gate in hard_gates]
-        elif overall_score < 30:
-            decision = Decision.BLOCK
-            reasons.append(f"Overall score {overall_score}/100 below BLOCK threshold (30)")
-        elif overall_score < 75:
-            decision = Decision.NEEDS_REVIEW
-            reasons.append(f"Overall score {overall_score}/100 below ALLOW threshold (75)")
-        else:
-            reasons.append(f"Overall score {overall_score}/100 - extension passes all checks")
-        
-        # Add layer-specific concerns
-        if security_layer.score < 50:
-            reasons.append(f"Security concerns: score {security_layer.score}/100")
-        if privacy_layer.score < 50:
-            reasons.append(f"Privacy concerns: score {privacy_layer.score}/100")
-        if governance_layer.score < 50:
-            reasons.append(f"Governance concerns: score {governance_layer.score}/100")
-        
-        # Build explanation
+
         explanation = cls._build_explanation(
             decision=decision,
             overall_score=overall_score,
@@ -451,7 +431,7 @@ class ScoringResult(BaseModel):
             governance_layer=governance_layer,
             hard_gates=hard_gates,
         )
-        
+
         return cls(
             scan_id=scan_id,
             extension_id=extension_id,
