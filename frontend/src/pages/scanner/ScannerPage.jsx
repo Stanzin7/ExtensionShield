@@ -188,6 +188,7 @@ const ScannerPage = () => {
   // Search autocomplete — queries /api/recent?search= for matching extensions
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
   const autocompleteTimerRef = useRef(null);
 
   const handleAutocomplete = useCallback((query) => {
@@ -196,8 +197,13 @@ const ScannerPage = () => {
     // Skip autocomplete for URLs and extension IDs (32-char lowercase)
     if (!q || q.length < 2 || /^https?:\/\//.test(q) || /^[a-z]{32}$/i.test(q)) {
       setAutocompleteSuggestions([]);
+      setAutocompleteLoading(false);
       return;
     }
+
+    // Show dropdown immediately with loading state so it feels instant
+    setAutocompleteLoading(true);
+    setAutocompleteSuggestions([]);
 
     clearTimeout(autocompleteTimerRef.current);
     autocompleteTimerRef.current = setTimeout(async () => {
@@ -207,8 +213,10 @@ const ScannerPage = () => {
         setAutocompleteIndex(0);
       } catch {
         setAutocompleteSuggestions([]);
+      } finally {
+        setAutocompleteLoading(false);
       }
-    }, 250);
+    }, 80);
   }, []);
 
   const handleSelectSuggestion = useCallback((scan) => {
@@ -590,6 +598,11 @@ const ScannerPage = () => {
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
+                    if (autocompleteSuggestions.length > 0 && autocompleteIndex >= 0 && autocompleteSuggestions[autocompleteIndex]) {
+                      e.preventDefault();
+                      handleSelectSuggestion(autocompleteSuggestions[autocompleteIndex]);
+                      return;
+                    }
                     setAutocompleteSuggestions([]);
                     handleScanClick();
                   }
@@ -604,18 +617,23 @@ const ScannerPage = () => {
                   }
                 }}
                 onFocus={() => { if (url.trim().length >= 2) handleAutocomplete(url); }}
-                onBlur={() => { setTimeout(() => setAutocompleteSuggestions([]), 150); }}
-                aria-label="Extension name or Chrome Web Store URL"
+                onBlur={() => { setTimeout(() => { setAutocompleteSuggestions([]); setAutocompleteLoading(false); }, 150); }}
+                aria-label="Search extension name or paste Store URL"
                 autoComplete="off"
                 disabled={isScanning}
                 role="combobox"
-                aria-expanded={autocompleteSuggestions.length > 0}
+                aria-expanded={autocompleteSuggestions.length > 0 || autocompleteLoading}
                 aria-autocomplete="list"
                 aria-controls="scanner-autocomplete-list"
               />
-              {autocompleteSuggestions.length > 0 && (
+              {(autocompleteSuggestions.length > 0 || autocompleteLoading) && (
                 <ul className="scanner-autocomplete" id="scanner-autocomplete-list" role="listbox">
-                  {autocompleteSuggestions.map((s, i) => (
+                  {autocompleteLoading && autocompleteSuggestions.length === 0 ? (
+                    <li className="scanner-autocomplete-item scanner-autocomplete-loading" role="status">
+                      <span className="autocomplete-name">Searching...</span>
+                    </li>
+                  ) : (
+                    autocompleteSuggestions.map((s, i) => (
                     <li
                       key={s.extension_id}
                       role="option"
@@ -636,7 +654,8 @@ const ScannerPage = () => {
                       />
                       <span className="autocomplete-name">{s.extension_name || s.extension_id}</span>
                     </li>
-                  ))}
+                  ))
+                  )}
                 </ul>
               )}
               <button

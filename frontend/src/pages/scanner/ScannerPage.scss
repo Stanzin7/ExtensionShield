@@ -32,6 +32,7 @@
 
 /* ============================================================================
    MAIN CONTENT - Similar to hero layout (tagline, headline, input, features)
+   Stack above extensions table so dropdown is never hidden behind it.
    ============================================================================ */
 .scanner-content {
   position: relative;
@@ -41,7 +42,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  z-index: 1;
+  z-index: 10;
 }
 
 .scanner-header {
@@ -68,13 +69,16 @@
   }
 }
 
-/* Scanner search */
+/* Scanner search — establish stacking context so dropdown stays above table */
 .scanner-search {
+  position: relative;
   width: 100%;
   margin-bottom: 0.5rem;
+  z-index: 1;
 }
 
 .scanner-search-container {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -84,7 +88,7 @@
   border-radius: 16px;
   padding: 0.5rem;
   transition: all 0.3s ease;
-  position: relative;
+  z-index: 2;
 
   &:focus-within {
     border-color: var(--theme-accent);
@@ -150,6 +154,11 @@
 
   &:hover, &.active {
     background: rgba(255,255,255,.06);
+  }
+
+  &.scanner-autocomplete-loading {
+    cursor: default;
+    color: var(--theme-text-muted, #94a3b8);
   }
 
   .autocomplete-icon {

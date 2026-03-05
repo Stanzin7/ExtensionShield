@@ -36,14 +36,18 @@ const HomePage = () => {
   // Autocomplete — same as /scan: logo + name only, no scoring
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
   const autocompleteTimerRef = useRef(null);
 
   const handleAutocomplete = useCallback((query) => {
     const q = (query || "").trim();
     if (!q || q.length < 2 || /^https?:\/\//.test(q) || /^[a-z]{32}$/i.test(q)) {
       setAutocompleteSuggestions([]);
+      setAutocompleteLoading(false);
       return;
     }
+    setAutocompleteLoading(true);
+    setAutocompleteSuggestions([]);
     clearTimeout(autocompleteTimerRef.current);
     autocompleteTimerRef.current = setTimeout(async () => {
       try {
@@ -52,8 +56,10 @@ const HomePage = () => {
         setAutocompleteIndex(0);
       } catch {
         setAutocompleteSuggestions([]);
+      } finally {
+        setAutocompleteLoading(false);
       }
-    }, 250);
+    }, 80);
   }, []);
 
   const handleSelectSuggestion = useCallback((scan) => {
@@ -306,17 +312,22 @@ const HomePage = () => {
                         }
                       }}
                       onFocus={() => { if (scanInput.trim().length >= 2) handleAutocomplete(scanInput); }}
-                      onBlur={() => { setTimeout(() => setAutocompleteSuggestions([]), 150); }}
+                      onBlur={() => { setTimeout(() => { setAutocompleteSuggestions([]); setAutocompleteLoading(false); }, 150); }}
                       aria-label="Search extension name or paste Store URL"
                       autoComplete="off"
                       role="combobox"
-                      aria-expanded={autocompleteSuggestions.length > 0}
+                      aria-expanded={autocompleteSuggestions.length > 0 || autocompleteLoading}
                       aria-autocomplete="list"
                       aria-controls="hero-autocomplete-list"
                     />
-                    {autocompleteSuggestions.length > 0 && (
+                    {(autocompleteSuggestions.length > 0 || autocompleteLoading) && (
                       <ul className="hero-autocomplete" id="hero-autocomplete-list" role="listbox">
-                        {autocompleteSuggestions.map((s, i) => (
+                        {autocompleteLoading && autocompleteSuggestions.length === 0 ? (
+                          <li className="hero-autocomplete-item hero-autocomplete-loading" role="status">
+                            <span className="hero-autocomplete-name">Searching...</span>
+                          </li>
+                        ) : (
+                          autocompleteSuggestions.map((s, i) => (
                           <li
                             key={s.extension_id}
                             role="option"
@@ -337,7 +348,8 @@ const HomePage = () => {
                             />
                             <span className="hero-autocomplete-name">{s.extension_name || s.extension_id}</span>
                           </li>
-                        ))}
+                        ))
+                        )}
                       </ul>
                     )}
                     <motion.button

@@ -600,6 +600,11 @@
     background: rgba(255, 255, 255, 0.06);
   }
 
+  &.hero-autocomplete-loading {
+    cursor: default;
+    color: var(--extensionshield-text-muted);
+  }
+
   .hero-autocomplete-icon {
     width: 20px;
     height: 20px;
