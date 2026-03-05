@@ -4,13 +4,15 @@ import { motion } from "framer-motion";
 import { ArrowRight, Download } from "lucide-react";
 import { useScan } from "../context/ScanContext";
 import { useAuth } from "../context/AuthContext";
+import databaseService from "../services/databaseService";
 import SEOHead from "../components/SEOHead";
 import { HeroOrbitalCarousel } from "../components/hero";
 import DemoModal from "../components/DemoModal";
 import UploadModal from "../components/UploadModal";
 import DevOpenCoreSection from "../components/home/DevOpenCoreSection";
 import HowWeProtectYouSection from "../components/home/HowWeProtectYouSection";
-import { CHROME_EXTENSION_STORE_URL } from "../utils/constants";
+import { CHROME_EXTENSION_STORE_URL, EXTENSION_ICON_PLACEHOLDER, getExtensionIconUrl } from "../utils/constants";
+import { getScanResultsRoute } from "../utils/slug";
 import "./HomePage.scss";
 
 const HomePage = () => {
@@ -30,6 +32,35 @@ const HomePage = () => {
   const demoTriggerRef = useRef(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [heroAudience, setHeroAudience] = useState("users"); // "users" | "developers"
+
+  // Autocomplete — same as /scan: logo + name only, no scoring
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
+  const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const autocompleteTimerRef = useRef(null);
+
+  const handleAutocomplete = useCallback((query) => {
+    const q = (query || "").trim();
+    if (!q || q.length < 2 || /^https?:\/\//.test(q) || /^[a-z]{32}$/i.test(q)) {
+      setAutocompleteSuggestions([]);
+      return;
+    }
+    clearTimeout(autocompleteTimerRef.current);
+    autocompleteTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await databaseService.getRecentScans(6, q);
+        setAutocompleteSuggestions(results || []);
+        setAutocompleteIndex(0);
+      } catch {
+        setAutocompleteSuggestions([]);
+      }
+    }, 250);
+  }, []);
+
+  const handleSelectSuggestion = useCallback((scan) => {
+    setAutocompleteSuggestions([]);
+    const route = getScanResultsRoute(scan.extension_id, scan.extension_name);
+    navigate(route);
+  }, [navigate]);
 
   // Animate display count from current to target (incremental counter effect)
   useEffect(() => {
@@ -236,7 +267,7 @@ const HomePage = () => {
                   <span>Step-by-step guide</span>
                 </button>
                 <div className="hero-search">
-                  <div className="search-container">
+                  <div className="search-container hero-search-container">
                     <span className="search-icon search-icon-chrome" aria-hidden="true">
                       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="chrome-logo">
                         <path d="M12 12L22 12A10 10 0 0 1 7 3.34L12 12Z" fill="#4285F4" />
@@ -249,13 +280,66 @@ const HomePage = () => {
                     <input
                       type="text"
                       id="hero-scan-input"
-                      placeholder="Paste Chrome Web Store URL or Extension ID"
+                      placeholder="Search extension name or paste Store URL"
                       value={scanInput}
-                      onChange={(e) => setScanInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleScan()}
-                      aria-label="Chrome Web Store URL or Extension ID"
-                      autoComplete="url"
+                      onChange={(e) => {
+                        setScanInput(e.target.value);
+                        handleAutocomplete(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (autocompleteSuggestions.length > 0 && autocompleteIndex >= 0 && autocompleteSuggestions[autocompleteIndex]) {
+                            handleSelectSuggestion(autocompleteSuggestions[autocompleteIndex]);
+                            return;
+                          }
+                          handleScan();
+                          return;
+                        }
+                        if (e.key === "Escape") setAutocompleteSuggestions([]);
+                        if (e.key === "ArrowDown" && autocompleteSuggestions.length > 0) {
+                          e.preventDefault();
+                          setAutocompleteIndex((i) => Math.min(i + 1, autocompleteSuggestions.length - 1));
+                        }
+                        if (e.key === "ArrowUp" && autocompleteSuggestions.length > 0) {
+                          e.preventDefault();
+                          setAutocompleteIndex((i) => Math.max(i - 1, 0));
+                        }
+                      }}
+                      onFocus={() => { if (scanInput.trim().length >= 2) handleAutocomplete(scanInput); }}
+                      onBlur={() => { setTimeout(() => setAutocompleteSuggestions([]), 150); }}
+                      aria-label="Search extension name or paste Store URL"
+                      autoComplete="off"
+                      role="combobox"
+                      aria-expanded={autocompleteSuggestions.length > 0}
+                      aria-autocomplete="list"
+                      aria-controls="hero-autocomplete-list"
                     />
+                    {autocompleteSuggestions.length > 0 && (
+                      <ul className="hero-autocomplete" id="hero-autocomplete-list" role="listbox">
+                        {autocompleteSuggestions.map((s, i) => (
+                          <li
+                            key={s.extension_id}
+                            role="option"
+                            aria-selected={i === autocompleteIndex}
+                            className={`hero-autocomplete-item${i === autocompleteIndex ? " active" : ""}`}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectSuggestion(s);
+                            }}
+                          >
+                            <img
+                              src={getExtensionIconUrl(s.extension_id)}
+                              alt=""
+                              className="hero-autocomplete-icon"
+                              width="20"
+                              height="20"
+                              onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }}
+                            />
+                            <span className="hero-autocomplete-name">{s.extension_name || s.extension_id}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     <motion.button
                       type="button"
                       className="search-btn search-btn-icon"

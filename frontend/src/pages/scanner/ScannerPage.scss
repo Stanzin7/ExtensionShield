@@ -122,13 +122,13 @@
   }
 }
 
-/* Autocomplete dropdown — mirrors Google's suggest pattern */
+/* Autocomplete dropdown — above table and other content */
 .scanner-autocomplete {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: 1100;
   list-style: none;
   margin: 0;
   padding: 6px 0;
@@ -168,18 +168,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .autocomplete-score {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 6px;
-    flex-shrink: 0;
-
-    &.safe { color: #059669; background: rgba(5,150,105,.12); }
-    &.review { color: #d97706; background: rgba(217,119,6,.12); }
-    &.risk { color: #dc2626; background: rgba(220,38,38,.12); }
   }
 }
 

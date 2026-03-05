@@ -635,11 +635,6 @@ const ScannerPage = () => {
                         onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }}
                       />
                       <span className="autocomplete-name">{s.extension_name || s.extension_id}</span>
-                      {s.risk_and_signals?.risk != null && (
-                        <span className={`autocomplete-score ${s.risk_and_signals.risk >= 75 ? "safe" : s.risk_and_signals.risk >= 50 ? "review" : "risk"}`}>
-                          {s.risk_and_signals.risk}
-                        </span>
-                      )}
                     </li>
                   ))}
                 </ul>
