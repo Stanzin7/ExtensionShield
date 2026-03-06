@@ -173,8 +173,8 @@ export const footerConfig = {
       links: [
         { label: "Privacy Policy", path: "/privacy-policy" },
         { label: "Community", path: "/community" },
-        { label: "Discord", href: "https://discord.gg/5PFWBGp4", external: true },
-        { label: "GitHub", href: "https://github.com/Stanzin7/ExtensionScanner", external: true }
+        { label: "Discord", href: "https://discord.gg/mgR4skWB", external: true },
+        { label: "GitHub", href: "https://github.com/Stanzin7/ExtensionShield", external: true }
       ]
     }
   ]

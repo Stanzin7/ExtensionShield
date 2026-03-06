@@ -81,7 +81,7 @@ const AboutUsPage = () => {
               </svg>
             </Link>
             <a 
-              href="https://github.com/Stanzin7/ExtensionScanner" 
+              href="https://github.com/Stanzin7/ExtensionShield" 
               target="_blank" 
               rel="noopener noreferrer"
               className="link-button"

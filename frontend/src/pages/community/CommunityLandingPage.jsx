@@ -10,9 +10,9 @@ import "./CommunityLandingPage.scss";
  * Hero: headline, subtext, CTA; right = spotlight carousel. Row of connect icons (GitHub, Discord, Issues, Blog).
  */
 const COMMUNITY_LINKS = [
-  { href: "https://github.com/Stanzin7/ExtensionScanner/discussions", external: true, label: "GitHub Discussions", icon: "github" },
-  { href: "https://discord.gg/5PFWBGp4", external: true, label: "Discord", icon: "discord" },
-  { href: "https://github.com/Stanzin7/ExtensionScanner/issues", external: true, label: "Issues", icon: "issues" },
+  { href: "https://github.com/Stanzin7/ExtensionShield/discussions", external: true, label: "GitHub Discussions", icon: "github" },
+  { href: "https://discord.gg/mgR4skWB", external: true, label: "Discord", icon: "discord" },
+  { href: "https://github.com/Stanzin7/ExtensionShield/issues", external: true, label: "Issues", icon: "issues" },
   { to: "/blog", external: false, label: "Blog", icon: "blog" },
 ];
 

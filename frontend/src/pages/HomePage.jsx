@@ -135,7 +135,7 @@ const HomePage = () => {
     "logo": "https://extensionshield.com/logo.png",
     "description": "Chrome extension scanner — safety reports in seconds.",
     "sameAs": [
-      "https://github.com/Stanzin7/ExtensionScanner"
+      "https://github.com/Stanzin7/ExtensionShield"
     ]
   };
 
