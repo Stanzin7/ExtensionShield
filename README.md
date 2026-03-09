@@ -5,15 +5,13 @@
   # ExtensionShield
 </div>
 
-**Chrome Extension Security Scanner & Governance Platform**
+**Free Chrome Extension Security Scanner — Risk Score, Malware Check, VirusTotal**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [Security](docs/SECURITY.md) · [Get Started](docs/GET_STARTED.md) · [Contribute](docs/CONTRIBUTING.md)
 
 ---
 
-ExtensionShield scans Chrome extensions (from the Web Store or CRX/ZIP uploads), runs security and privacy analysis, and produces risk scores
-and summary reports. The **core** (scanner, CLI, local analysis) is **MIT-licensed** and works without any cloud. Optional **cloud** features
-(auth, history, team monitoring, community queue) are available via [ExtensionShield Cloud](https://extensionshield.com).
+ExtensionShield is a **free, open-source** Chrome extension security scanner. Scan any extension by Web Store URL or CRX/ZIP upload—get a risk score, permissions analysis, malware check (VirusTotal), and SAST findings in under 60 seconds. No install required. The **core** (scanner, CLI, local analysis) is **MIT-licensed**. [ExtensionShield Cloud](https://extensionshield.com) adds auth, history, team monitoring, and enterprise governance.
 
 - **Security**: [SECURITY.md](docs/SECURITY.md) — Reporting vulnerabilities, secrets policy  
 - **Open-core**: [OPEN_CORE_BOUNDARIES.md](docs/OPEN_CORE_BOUNDARIES.md) — What's OSS vs Cloud and how it's enforced  

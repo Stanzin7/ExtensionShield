@@ -193,7 +193,6 @@ const HomePage = () => {
         pathname="/"
         ogType="website"
         schema={[organizationSchema, softwareAppSchema, faqSchema]}
-        keywords="free extension scanner, free extension audit, Chrome extension scanner, Chrome extension security, extension security audit, developer extension audit, scan Chrome extension"
       />
       
       <div className="home-page">
