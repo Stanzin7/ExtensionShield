@@ -70,6 +70,18 @@ from extension_shield.utils.json_encoder import (
 )
 
 
+def _sanitize_error_for_client(msg: Optional[str]) -> Optional[str]:
+    """Remove references to third-party services from error messages shown to users."""
+    if not msg or not isinstance(msg, str):
+        return msg
+    msg = msg.replace("Google CRX", "primary download")
+    msg = msg.replace("ChromeStats", "fallback")
+    # Normalize the common download failure message (handles legacy or substituted text)
+    if "Both primary download and fallback" in msg and "failed" in msg:
+        msg = "Extension download returned no file. All download sources failed."
+    return msg
+
+
 # Request/response models and in-memory state live in shared.py to avoid
 # circular imports when route modules are split out.
 from extension_shield.api.shared import (  # noqa: E402
@@ -1554,7 +1566,7 @@ async def run_analysis_workflow(url: str, extension_id: str):
                 "extension_name": extension_id,
                 "url": url,
                 "status": "failed",
-                "error": final_state.get("error", "Unknown error"),
+                "error": _sanitize_error_for_client(final_state.get("error", "Unknown error")) or "Unknown error",
                 "metadata": {},
                 "manifest": {},
                 "overall_security_score": 0,
@@ -2487,10 +2499,10 @@ async def get_scan_status(extension_id: str) -> ScanStatusResponse:
         # Ensure error is a string or None, not a complex object
         if error_val is not None:
             if isinstance(error_val, str):
-                error = error_val
+                error = _sanitize_error_for_client(error_val) or error_val
             else:
                 # Convert to string if it's not already
-                error = str(error_val)
+                error = _sanitize_error_for_client(str(error_val)) or str(error_val)
     except Exception as e:
         # If there's any issue accessing error (e.g., circular reference), set to None
         logger.warning(f"[get_scan_status] Failed to extract error for {extension_id}: {e}")
@@ -2559,17 +2571,28 @@ async def get_scan_results(identifier: str, http_request: Request):
                 requester_id = getattr(getattr(http_request, "state", None), "user_id", None)
                 if not requester_id or payload.get("user_id") != requester_id:
                     raise HTTPException(status_code=404, detail="Scan results not found")
-            # Upgrade legacy payload and ensure consumer_insights
-            payload = upgrade_legacy_payload(payload, extension_id)
-            payload = ensure_consumer_insights(payload)
-            refresh_result = _refresh_scan_payload_with_store_metadata(payload, extension_id)
-            payload = refresh_result.get("payload") or payload
-            ensure_description_in_meta(payload)
-            ensure_name_in_payload(payload)
-            # Add risk and signals mapping
-            payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+            try:
+                payload = upgrade_legacy_payload(payload, extension_id)
+                payload = ensure_consumer_insights(payload)
+                refresh_result = _refresh_scan_payload_with_store_metadata(payload, extension_id)
+                payload = refresh_result.get("payload") or payload
+                ensure_description_in_meta(payload)
+                ensure_name_in_payload(payload)
+                payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+            except Exception as e:
+                logger.warning("[get_scan_results] Memory path post-processing failed for %s: %s", extension_id, e)
+                try:
+                    payload["risk_and_signals"] = payload.get("risk_and_signals") or _extract_risk_and_signals(payload)
+                except Exception:
+                    payload["risk_and_signals"] = {
+                        "risk": payload.get("overall_security_score") or 0,
+                        "signals": {"security": None, "privacy": None, "gov": None},
+                        "total_findings": payload.get("total_findings") or 0,
+                    }
             scan_results[extension_id] = payload
             log_scan_results_return_shape("memory", payload)
+            if payload.get("error"):
+                payload["error"] = _sanitize_error_for_client(payload["error"]) or payload["error"]
             return payload
 
     # Try loading from database (accepts extension_id or slug)
@@ -2588,20 +2611,39 @@ async def get_scan_results(identifier: str, http_request: Request):
         # Track if we need to upgrade (legacy payload without scoring_v2/report_view_model)
         had_scoring_v2 = bool(formatted_results.get("scoring_v2"))
         had_report_view_model = bool(formatted_results.get("report_view_model"))
-        
-        # Upgrade legacy payload and ensure consumer_insights
-        payload = upgrade_legacy_payload(formatted_results, extension_id)
-        payload = ensure_consumer_insights(payload)
-        refresh_result = _refresh_scan_payload_with_store_metadata(payload, extension_id)
-        payload = refresh_result.get("payload") or payload
-        ensure_description_in_meta(payload)
-        ensure_name_in_payload(payload)
-        # Add risk and signals mapping
-        payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+
+        try:
+            # Upgrade legacy payload and ensure consumer_insights (use DB data only; no external calls required)
+            payload = upgrade_legacy_payload(formatted_results, extension_id)
+            payload = ensure_consumer_insights(payload)
+            refresh_result = _refresh_scan_payload_with_store_metadata(payload, extension_id)
+            payload = refresh_result.get("payload") or payload
+            ensure_description_in_meta(payload)
+            ensure_name_in_payload(payload)
+            payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+        except Exception as e:
+            # Return DB payload even when upgrade/refresh fails (e.g. VirusTotal or store down)
+            logger.warning(
+                "[get_scan_results] Post-DB processing failed for %s, returning hydrated DB payload: %s",
+                identifier,
+                e,
+            )
+            payload = dict(formatted_results)
+            ensure_description_in_meta(payload)
+            ensure_name_in_payload(payload)
+            try:
+                payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+            except Exception as sig_err:
+                logger.warning("[get_scan_results] _extract_risk_and_signals failed: %s", sig_err)
+                payload["risk_and_signals"] = {
+                    "risk": formatted_results.get("overall_security_score") or 0,
+                    "signals": {"security": None, "privacy": None, "gov": None},
+                    "total_findings": formatted_results.get("total_findings") or 0,
+                }
+
         scan_results[extension_id] = payload  # Cache in memory
-        
+
         # Persist upgraded payload back to database (background, non-blocking)
-        # Only if we actually computed new scoring_v2 or report_view_model
         now_has_scoring_v2 = bool(payload.get("scoring_v2"))
         now_has_report_view_model = bool(payload.get("report_view_model"))
         if (now_has_scoring_v2 and not had_scoring_v2) or (now_has_report_view_model and not had_report_view_model):
@@ -2614,8 +2656,10 @@ async def get_scan_results(identifier: str, http_request: Request):
                 logger.debug("[get_scan_results] Persisted upgraded payload to DB for %s", extension_id)
             except Exception as persist_err:
                 logger.debug("[get_scan_results] Failed to persist upgraded payload: %s", persist_err)
-        
+
         log_scan_results_return_shape("db", payload)
+        if payload.get("error"):
+            payload["error"] = _sanitize_error_for_client(payload["error"]) or payload["error"]
         return payload
     else:
         logger.debug("[get_scan_results] Database row does NOT exist for identifier=%s", identifier)
@@ -2637,15 +2681,26 @@ async def get_scan_results(identifier: str, http_request: Request):
                 requester_id = getattr(getattr(http_request, "state", None), "user_id", None)
                 if not requester_id or payload.get("user_id") != requester_id:
                     raise HTTPException(status_code=404, detail="Scan results not found")
-            # Upgrade legacy payload and ensure consumer_insights
-            payload = upgrade_legacy_payload(payload, extension_id)
-            payload = ensure_consumer_insights(payload)
-            ensure_description_in_meta(payload)
-            ensure_name_in_payload(payload)
-            # Add risk and signals mapping
-            payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+            try:
+                payload = upgrade_legacy_payload(payload, extension_id)
+                payload = ensure_consumer_insights(payload)
+                ensure_description_in_meta(payload)
+                ensure_name_in_payload(payload)
+                payload["risk_and_signals"] = _extract_risk_and_signals(payload)
+            except Exception as e:
+                logger.warning("[get_scan_results] File path post-processing failed for %s: %s", extension_id, e)
+                try:
+                    payload["risk_and_signals"] = payload.get("risk_and_signals") or _extract_risk_and_signals(payload)
+                except Exception:
+                    payload["risk_and_signals"] = {
+                        "risk": payload.get("overall_security_score") or 0,
+                        "signals": {"security": None, "privacy": None, "gov": None},
+                        "total_findings": payload.get("total_findings") or 0,
+                    }
             scan_results[extension_id] = payload  # Cache in memory
             log_scan_results_return_shape("file", payload)
+            if payload.get("error"):
+                payload["error"] = _sanitize_error_for_client(payload["error"]) or payload["error"]
             return payload
         except json.JSONDecodeError as e:
             logger.error("[get_scan_results] JSON file is corrupted for %s: %s", extension_id, str(e))
@@ -2771,7 +2826,7 @@ async def generate_pdf_report(extension_id: str) -> Response:
         pdf_bytes = report_generator.generate_pdf(results)
 
         # Get extension name for filename
-        extension_name = results.get("extension_name", results.get("metadata", {}).get("title", extension_id))
+        extension_name = results.get("extension_name") or (results.get("metadata") or {}).get("title", extension_id)
         safe_name = "".join(c for c in extension_name if c.isalnum() or c in " -_")[:50]
         filename = f"Project_Atlas_Report_{safe_name}.pdf"
 

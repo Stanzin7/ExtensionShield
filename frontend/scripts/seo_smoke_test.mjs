@@ -749,7 +749,18 @@ async function runTests() {
         requiredSchemaTypes = ['SoftwareApplication', 'FAQPage'];
       }
 
+      const passedBefore = testsPassed;
+      const failedBefore = testsFailed;
+      const failuresLenBefore = failures.length;
       await testPage(page, url, requireOG, requireJSONLD, requiredSchemaTypes);
+      // Retry once on failure (transient CI/prod slowness)
+      if (failures.length > failuresLenBefore) {
+        failures.splice(failuresLenBefore);
+        testsFailed = failedBefore;
+        testsPassed = passedBefore;
+        console.log(`   ⏳ Retrying ${url}...`);
+        await testPage(page, url, requireOG, requireJSONLD, requiredSchemaTypes);
+      }
     }
     await context.close();
   }

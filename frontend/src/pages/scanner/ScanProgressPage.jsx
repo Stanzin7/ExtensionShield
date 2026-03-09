@@ -6,6 +6,7 @@ import { EXTENSION_ICON_PLACEHOLDER, getExtensionIconUrl } from "../../utils/con
 import realScanService from "../../services/realScanService";
 import { getScanResultsRoute } from "../../utils/slug";
 import SEOHead from "../../components/SEOHead";
+import ShieldLogo from "../../components/ShieldLogo";
 import { normalizeExtensionId } from "../../utils/extensionId";
 import { logger } from "../../utils/logger";
 import "./ScanProgressPage.scss";
@@ -356,6 +357,19 @@ const ScanProgressPage = () => {
       <div className="scan-progress-page">
       {showLoadingScreen ? (
         <>
+          {/* Hero: shield with green rings, title, stage – no Scan ID */}
+          <div className="scan-progress-hero">
+            <div className="scan-progress-shield-wrap">
+              <div className="scan-progress-shield-ring scan-progress-shield-ring-outer" />
+              <div className="scan-progress-shield-ring scan-progress-shield-ring-inner" />
+              <ShieldLogo size={80} className="scan-progress-shield-logo" />
+            </div>
+            <p className="scan-progress-hero-brand">EXTENSIONSHIELD SCANNER</p>
+            <h1 className="scan-progress-hero-title">Scan in progress</h1>
+            <p className="scan-progress-hero-stage">
+              {scanStage ? getStageLabel(scanStage) : "Report generation in progress"}
+            </p>
+          </div>
           {/* Minimal centered: icon, name, progress bar, status */}
           <div className="scan-progress-center">
             <div className="scan-progress-minimal-card">
@@ -428,9 +442,6 @@ const ScanProgressPage = () => {
               />
               <div className="extension-header-text">
                 <h1 className="progress-title">Scan Status</h1>
-                <p className="progress-subtitle">
-                  Extension ID: <code>{scanId}</code>
-                </p>
               </div>
             </div>
           </div>
@@ -458,8 +469,6 @@ const ScanProgressPage = () => {
               <div className="no-scan-icon">🔍</div>
               <h2>No Active Scan</h2>
               <p>
-                There's no active scan for extension ID: <code>{scanId}</code>
-                <br />
                 The scan may have completed, or you can start a new scan.
               </p>
               <div className="no-scan-actions">
