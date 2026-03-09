@@ -53,6 +53,9 @@ jobs:
           SEO_SKIP_ROBOTS_TXT: "1"
           # Exclude /glossary until prod page hydrates within timeout (re-enable when fixed)
           TEST_PAGES: "/,/scan,/enterprise,/research/methodology,/research/case-studies"
+          # Slightly higher timeouts in CI for cold Playwright and network
+          SEO_HEAD_WAIT_MS: "60000"
+          SEO_PAGE_TIMEOUT_MS: "60000"
         continue-on-error: false
 
       - name: Comment PR on failure
