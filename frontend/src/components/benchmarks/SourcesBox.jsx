@@ -2,7 +2,7 @@ import React from "react";
 
 const SourcesBox = ({ sources }) => {
   return (
-    <div className="sources-box">
+    <div className="sources-box surface-card">
       <h4 className="sources-box__title">Data Sources</h4>
       <div className="sources-box__list">
         {sources.map((source, index) => (
