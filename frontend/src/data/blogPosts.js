@@ -4,6 +4,31 @@
  */
 export const blogPosts = [
   {
+    slug: "chrome-extension-ownership-transfer-risk",
+    title: "Chrome Extensions Turned Malicious After Ownership Transfer — What Every User Needs to Know",
+    description: "Real 2026 cases of Chrome extensions turning malicious after ownership transfer: how attackers hijack trusted extensions, inject code, and steal your data — and how to stay safe with a chrome extension security scanner.",
+    date: "2026-03",
+    category: "Security",
+    sections: [
+      {
+        heading: "The new threat: buying your way in",
+        body: "A disturbing new attack pattern emerged in early 2026: threat actors are purchasing trusted Chrome extensions from their original developers, then silently pushing malicious updates to the existing user base. Because users already trust and have installed the extension, they receive the malicious update automatically — with no warning. Two confirmed cases were reported by The Hacker News in March 2026: QuickLens – Search Screen with Google Lens (7,000 users) and ShotBird – Scrolling Screenshots & Editor (800 users). In both cases, the extensions were listed for sale on extension marketplaces shortly after launch, then acquired by attackers who injected harmful payloads. This is a chrome extension supply chain attack hiding in plain sight."
+      },
+      {
+        heading: "How the malicious code works — and why it's hard to detect",
+        body: "What makes these ownership-transfer attacks especially dangerous is their stealth. In the QuickLens case, security researcher John Tuckner of Annex Security found that the malicious code never appeared in the extension's source files. Instead, the extension polled an external command-and-control (C2) server every five minutes to receive JavaScript payloads, stored them in local browser storage, and executed them on every page load by loading a hidden 1×1 pixel GIF. The extension also stripped security headers like X-Frame-Options from HTTP responses, bypassing Content Security Policy (CSP) protections and allowing injected scripts to make cross-domain requests. ShotBird took a different approach: it displayed a fake Google Chrome update prompt. Clicking it opened a ClickFix-style page that launched a PowerShell command, downloading malware named 'googleupdate.exe' — which then hooked all input fields on every page to steal passwords, card numbers, PINs, and session tokens. Static chrome extension security scanners that only read the source files at install time cannot catch runtime-delivered payloads like these."
+      },
+      {
+        heading: "Why even 'Featured' extensions can be compromised",
+        body: "ShotBird received Chrome Web Store's 'Featured' badge in January 2025 — a trust signal many users rely on. Yet it was still transferred to a malicious actor and weaponised. Palette Creator, with over 100,000 users, was also found communicating with known malicious infrastructure from a campaign called RedDirection. The Chrome Web Store badge system and review process cannot protect you after an extension changes hands. This means the best defence is scanning extensions regularly — not just at install time — and re-scanning after updates. Tools like ExtensionShield provide a chrome extension risk score, detect obfuscated code, flag suspicious network domains, and alert you to permission changes introduced in updates, helping you catch extension hijacking via update before it impacts you."
+      },
+      {
+        heading: "How to protect yourself and your organisation",
+        body: "First, use a chrome extension security scanner like ExtensionShield to check any extension before installing — paste the Chrome Web Store URL and get a full risk report in under 60 seconds, covering permissions, SAST, VirusTotal signals, and governance. Second, re-scan extensions after major updates, especially if you notice behaviour changes. Third, reduce extension sprawl: every extension is a potential attack surface. Enterprises should enforce a browser extension allowlist policy and use extension compliance monitoring to detect ownership changes and policy violations at scale. Fourth, disable automatic extension updates for business-critical browser profiles, or use policies that gate updates through an internal review process. The 2026 ownership-transfer wave is a reminder that trusting an extension once is not enough — continuous monitoring is now essential."
+      }
+    ]
+  },
+  {
     slug: "how-to-check-chrome-extension-permissions",
     title: "How to Check Chrome Extension Permissions Safely",
     description: "Learn how to check chrome extension permissions safely before installing. What to look for, which permissions are risky, and how ExtensionShield helps you audit extension security.",

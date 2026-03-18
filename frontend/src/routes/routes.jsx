@@ -352,8 +352,8 @@ export const routes = [
     path: "/blog",
     element: <BlogIndexPage />,
     seo: {
-      title: "Chrome Extension Security Blog | How to Audit & Check Extension Safety",
-      description: "How to check chrome extension permissions safely, detect malicious chrome extensions, and audit a chrome extension before installing. Extension security research and guides.",
+      title: "Chrome Extension Security Blog | Threats, Audits & Safety Guides | ExtensionShield",
+      description: "Latest chrome extension security threats, malicious extension cases, ownership transfer attacks, and step-by-step guides to audit and check chrome extension safety. Research and news.",
       canonical: "/blog"
     },
     priority: 0.75,
@@ -395,6 +395,17 @@ export const routes = [
     },
     priority: 0.6,
     changefreq: "monthly"
+  },
+  {
+    path: "/blog/chrome-extension-ownership-transfer-risk",
+    element: <BlogPostPage />,
+    seo: {
+      title: "Chrome Extensions Turned Malicious After Ownership Transfer | ExtensionShield",
+      description: "Real 2026 cases of Chrome extensions turning malicious after ownership transfer: how QuickLens and ShotBird were hijacked to steal data, inject code, and compromise users — and how to stay safe.",
+      canonical: "/blog/chrome-extension-ownership-transfer-risk"
+    },
+    priority: 0.8,
+    changefreq: "weekly"
   },
 
   // ============ ENTERPRISE ROUTES ============
