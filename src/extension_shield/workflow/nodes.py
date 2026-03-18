@@ -14,9 +14,11 @@ from extension_shield.core.extension_downloader import ExtensionDownloader
 from extension_shield.core.manifest_parser import ManifestParser
 from extension_shield.core.extension_analyzer import ExtensionAnalyzer
 from extension_shield.core.summary_generator import SummaryGenerator
+from extension_shield.core.impact_analyzer import ImpactAnalyzer
+from extension_shield.core.privacy_compliance_analyzer import PrivacyComplianceAnalyzer
 from extension_shield.utils.extension import (
     extract_extension_crx,
-    cleanup_extension_dir,
+    resolve_extension_root,
     cleanup_downloaded_crx,
     is_chrome_extension_store_url,
     is_local_extension_crx_file,
@@ -29,6 +31,8 @@ from extension_shield.workflow.node_types import (
     MANIFEST_PARSER_NODE,
     EXTENSION_ANALYZER_NODE,
     SUMMARY_GENERATION_NODE,
+    IMPACT_ANALYSIS_NODE,
+    PRIVACY_COMPLIANCE_NODE,
     GOVERNANCE_NODE,
     CLEANUP_NODE,
 )
@@ -179,9 +183,32 @@ def chromestats_downloader_node(state: WorkflowState) -> Command:
     )
 
 
+def _try_chromestats_fallback(extension_id: str):
+    """
+    Fallback: download extension when primary download fails.
+    Returns (file_path, metadata) or (None, None).
+    """
+    try:
+        downloader = ChromeStatsDownloader()
+        if not downloader.enabled:
+            logger.warning("Fallback download unavailable (CHROMESTATS_API_KEY not set)")
+            return None, None
+        logger.info("Attempting fallback download for %s", extension_id)
+        file_path, metadata = downloader.download_extension(
+            extension_id=extension_id, file_format="ZIP"
+        )
+        if file_path:
+            logger.info("Fallback download succeeded: %s", file_path)
+        return file_path, metadata
+    except Exception as fallback_exc:
+        logger.warning("Fallback download failed: %s", fallback_exc)
+        return None, None
+
+
 def extension_downloader_node(state: WorkflowState) -> Command:
     """
     Node that performs the Chrome extension downloading or extraction operation.
+    Falls back to alternate download when primary download fails (e.g. on cloud servers).
 
     Args:
         state (PipelineState): The current state of the workflow.
@@ -194,25 +221,54 @@ def extension_downloader_node(state: WorkflowState) -> Command:
         raise ValueError("No Chrome extension path provided in the workflow state.")
 
     downloaded_crx_path = None  # Track downloaded files for cleanup
+    metadata_update = {}
 
     try:
         if is_local_extension_crx_file(chrome_extension_path):
-            # User-provided file - don't set downloaded_crx_path (don't delete)
             logger.info("Processing local extension file: %s", chrome_extension_path)
             extension_dir = extract_extension_crx(chrome_extension_path)
             if not extension_dir:
                 raise RuntimeError("Failed to extract extension file.")
         else:
-            # Tool download - set downloaded_crx_path for cleanup
+            # Try Google CRX download first
             downloader = ExtensionDownloader()
             extension_info = downloader.download_extension(extension_url=chrome_extension_path)
-            if not extension_info or "file_path" not in extension_info:
-                raise RuntimeError("Extension download returned no file.")
 
-            downloaded_crx_path = extension_info["file_path"]  # Store for cleanup
-            extension_dir = extract_extension_crx(downloaded_crx_path)
-            if not extension_dir:
-                raise RuntimeError("Failed to extract CRX file.")
+            if not extension_info or "file_path" not in extension_info:
+                # Primary download failed — try fallback
+                from extension_shield.utils.extension import extract_extension_id_by_url
+                ext_id = extract_extension_id_by_url(chrome_extension_path)
+                if ext_id:
+                    logger.warning(
+                        "Primary download failed for %s, trying fallback", ext_id
+                    )
+                    fallback_path, fallback_meta = _try_chromestats_fallback(ext_id)
+                    if fallback_path:
+                        downloaded_crx_path = fallback_path
+                        extension_dir = extract_extension_crx(fallback_path)
+                        if not extension_dir:
+                            raise RuntimeError("Failed to extract extension package.")
+                        # Only set metadata if not already populated by extension_metadata_node
+                        existing_meta = state.get("extension_metadata")
+                        if fallback_meta and not existing_meta:
+                            metadata_update["extension_metadata"] = fallback_meta
+                        elif fallback_meta and existing_meta:
+                            # Merge: keep existing Web Store metadata, add fallback extras
+                            merged = dict(existing_meta)
+                            merged["chrome_stats"] = fallback_meta
+                            metadata_update["extension_metadata"] = merged
+                    else:
+                        raise RuntimeError(
+                            "Extension download returned no file. "
+                            "All download sources failed."
+                        )
+                else:
+                    raise RuntimeError("Extension download returned no file.")
+            else:
+                downloaded_crx_path = extension_info["file_path"]
+                extension_dir = extract_extension_crx(downloaded_crx_path)
+                if not extension_dir:
+                    raise RuntimeError("Failed to extract extension file.")
 
     except Exception as exc:
         logger.exception("Extension download/extract failed")
@@ -226,12 +282,15 @@ def extension_downloader_node(state: WorkflowState) -> Command:
             },
         )
 
+    update = {
+        "extension_dir": extension_dir,
+        "downloaded_crx_path": downloaded_crx_path,
+    }
+    update.update(metadata_update)
+
     return Command(
         goto=MANIFEST_PARSER_NODE,
-        update={
-            "extension_dir": extension_dir,
-            "downloaded_crx_path": downloaded_crx_path,
-        },
+        update=update,
     )
 
 
@@ -248,6 +307,12 @@ def manifest_parser_node(state: WorkflowState) -> Command:
     extension_dir = state.get("extension_dir")
     if not extension_dir:
         raise ValueError("No extension directory provided in the workflow state.")
+
+    # Resolve to the dir that actually contains manifest.json (handles zips with
+    # a top-level folder, e.g. when zipping from Chrome's Extensions folder).
+    resolved = resolve_extension_root(extension_dir)
+    if resolved:
+        extension_dir = resolved
 
     try:
         logger.info("Parsing manifest in extension directory: %s", extension_dir)
@@ -268,7 +333,7 @@ def manifest_parser_node(state: WorkflowState) -> Command:
 
     return Command(
         goto=EXTENSION_ANALYZER_NODE,
-        update={"manifest_data": manifest_data},
+        update={"manifest_data": manifest_data, "extension_dir": extension_dir},
     )
 
 
@@ -297,14 +362,26 @@ def extension_analyzer_node(state: WorkflowState) -> Command:
         analysis_results = analyzer.analyze()
 
     except Exception as exc:
-        logger.exception("Extension analysis failed")
-        return Command(
-            goto=CLEANUP_NODE,
-            update={
-                "status": WorkflowStatus.FAILED.value,
-                "error": str(exc),
-            },
-        )
+        error_str = str(exc).lower()
+        # Check if this is a rate limit error - continue with empty results instead of failing
+        if "429" in str(exc) or "rate_limit" in error_str or "rate limit" in error_str:
+            logger.warning("Extension analysis hit rate limit, continuing with partial results: %s", exc)
+            analysis_results = {
+                "permissions_analysis": None,
+                "permissions_details": None,
+                "sast_analysis": None,
+                "webstore_analysis": None,
+                "error": f"Rate limit reached: {str(exc)[:200]}",
+            }
+        else:
+            logger.exception("Extension analysis failed")
+            return Command(
+                goto=CLEANUP_NODE,
+                update={
+                    "status": WorkflowStatus.FAILED.value,
+                    "error": str(exc),
+                },
+            )
 
     return Command(
         goto=SUMMARY_GENERATION_NODE,
@@ -324,6 +401,9 @@ def summary_generation_node(state: WorkflowState) -> Command:
     """
     analysis_results = state.get("analysis_results")
     manifest = state.get("manifest_data")
+    metadata = state.get("extension_metadata")
+    scan_id = state.get("workflow_id")
+    extension_id = state.get("extension_id") or scan_id
 
     if not analysis_results:
         logger.warning("No analysis results available for summary generation")
@@ -335,21 +415,125 @@ def summary_generation_node(state: WorkflowState) -> Command:
     try:
         logger.info("Generating executive summary")
         generator = SummaryGenerator()
-        executive_summary = generator.generate(analysis_results=analysis_results, manifest=manifest)
-
+        executive_summary = generator.generate(
+            analysis_results=analysis_results,
+            manifest=manifest,
+            metadata=metadata,
+            scan_id=scan_id,
+            extension_id=extension_id,
+        )
     except Exception as exc:
-        logger.exception("Summary generation failed")
+        # LLM failures are non-fatal - generators return None and callers use fallbacks
+        # Only log as warning to avoid noisy stack traces
+        from extension_shield.llm.clients.fallback import LLMFallbackError
+        if isinstance(exc, LLMFallbackError):
+            logger.warning("LLM providers failed for summary generation, using fallback: %s", exc)
+        else:
+            logger.warning("Summary generation failed, using fallback: %s", exc)
+        executive_summary = None
+
+    return Command(
+        goto=IMPACT_ANALYSIS_NODE,
+        update={"executive_summary": executive_summary},
+    )
+
+
+def impact_analysis_node(state: WorkflowState) -> Command:
+    """
+    Node that generates impact analysis buckets from capabilities and scope.
+
+    Args:
+        state (WorkflowState): The current state of the workflow.
+
+    Returns:
+        Command: A command indicating the next step in the workflow.
+    """
+    analysis_results = state.get("analysis_results") or {}
+    manifest = state.get("manifest_data") or {}
+    scan_id = state.get("workflow_id")
+    extension_id = state.get("extension_id") or scan_id
+
+    if not manifest:
+        logger.warning("No manifest data available for impact analysis")
         return Command(
             goto=GOVERNANCE_NODE,
-            update={
-                "executive_summary": None,
-                "error": str(exc),
-            },
+            update={"analysis_results": analysis_results},
         )
+
+    try:
+        logger.info("Generating impact analysis")
+        analyzer = ImpactAnalyzer()
+        impact_analysis = analyzer.generate(
+            analysis_results=analysis_results,
+            manifest=manifest,
+            extension_id=extension_id,
+        )
+    except Exception as exc:
+        # LLM failures are non-fatal - generators return None and callers use fallbacks
+        # Only log as warning to avoid noisy stack traces
+        from extension_shield.llm.clients.fallback import LLMFallbackError
+        if isinstance(exc, LLMFallbackError):
+            logger.warning("LLM providers failed for impact analysis, using fallback: %s", exc)
+        else:
+            logger.warning("Impact analysis failed, using fallback: %s", exc)
+        impact_analysis = None
+
+    updated_results = dict(analysis_results)
+    updated_results["impact_analysis"] = impact_analysis
+
+    return Command(
+        goto=PRIVACY_COMPLIANCE_NODE,
+        update={
+            "analysis_results": updated_results,
+            "impact_analysis": impact_analysis,
+        },
+    )
+
+
+def privacy_compliance_node(state: WorkflowState) -> Command:
+    """
+    Node that generates privacy + compliance snapshot for UI tiles.
+    """
+    analysis_results = state.get("analysis_results") or {}
+    manifest = state.get("manifest_data") or {}
+    metadata = state.get("extension_metadata") or {}
+    extension_dir = state.get("extension_dir")
+
+    if not manifest:
+        logger.warning("No manifest data available for privacy compliance")
+        return Command(
+            goto=GOVERNANCE_NODE,
+            update={"analysis_results": analysis_results},
+        )
+
+    try:
+        logger.info("Generating privacy + compliance snapshot")
+        analyzer = PrivacyComplianceAnalyzer()
+        privacy_compliance = analyzer.generate(
+            analysis_results=analysis_results,
+            manifest=manifest,
+            extension_dir=extension_dir,
+            webstore_metadata=metadata or {},
+        )
+    except Exception as exc:
+        # LLM failures are non-fatal - analyzer returns fallback result
+        # Only log as warning to avoid noisy stack traces
+        from extension_shield.llm.clients.fallback import LLMFallbackError
+        if isinstance(exc, LLMFallbackError):
+            logger.warning("LLM providers failed for privacy compliance, using fallback: %s", exc)
+        else:
+            logger.warning("Privacy compliance analysis failed, using fallback: %s", exc)
+        privacy_compliance = None
+
+    updated_results = dict(analysis_results)
+    updated_results["privacy_compliance"] = privacy_compliance
 
     return Command(
         goto=GOVERNANCE_NODE,
-        update={"executive_summary": executive_summary},
+        update={
+            "analysis_results": updated_results,
+            "privacy_compliance": privacy_compliance,
+        },
     )
 
 

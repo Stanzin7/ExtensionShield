@@ -1,0 +1,10 @@
+# Origin-only rules. Cloudflare Managed robots.txt prepends Content-Signal + AI crawler
+# disallows; do not duplicate that block here or the live file will show it twice.
+
+User-agent: *
+Allow: /
+Disallow: /settings
+Disallow: /reports
+
+# Sitemap
+Sitemap: https://extensionshield.com/sitemap.xml

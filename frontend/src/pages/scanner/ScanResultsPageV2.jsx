@@ -1,26 +1,80 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { 
-  RiskGauge, 
-  ScoreCard, 
-  StatsPanel, 
-  FactorBreakdown 
-} from "../../components/dashboard";
+import {
+  DonutScore,
+  ResultsSidebarTile,
+  EvidenceDrawer,
+  SummaryPanel,
+  LayerModal,
+  ResultFeedback,
+} from "../../components/report";
 import FileViewerModal from "../../components/FileViewerModal";
 import StatusMessage from "../../components/StatusMessage";
+import SEOHead from "../../components/SEOHead";
+import ScanActivityIndicator from "../../components/ScanActivityIndicator";
 import { useScan } from "../../context/ScanContext";
 import realScanService from "../../services/realScanService";
+import { normalizeScanResultSafe, validateEvidenceIntegrity, gateIdToLayer, extractFindingsByLayer } from "../../utils/normalizeScanResult";
+import { getExtensionIconUrl, EXTENSION_ICON_PLACEHOLDER } from "../../utils/constants";
+import { normalizeExtensionId, isUUID } from "../../utils/extensionId";
+import { generateSlug } from "../../utils/slug";
 import "./ScanResultsPageV2.scss";
+
+/** True if text is an unresolved Chrome i18n placeholder (e.g. __MSG_appDesc__). */
+function isI18nPlaceholder(text) {
+  return typeof text === "string" && /^__MSG_[A-Za-z0-9@_]+__$/.test(text.trim());
+}
+
+/** Short overview: first 250 chars at word boundary, truncate the rest. No LLM, no cost. */
+function shortOverview(text) {
+  if (!text || typeof text !== "string") return "";
+  if (isI18nPlaceholder(text)) return "";
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  const maxLen = 250;
+  if (trimmed.length <= maxLen) return trimmed;
+  const cut = trimmed.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(" ");
+  const end = lastSpace > maxLen * 0.6 ? lastSpace : maxLen;
+  return cut.slice(0, end).trim() + "…";
+}
+
+/** Get displayable description: hide __MSG_* placeholders, prefer resolved manifest text. */
+function getDisplayDescription(scanResults) {
+  // Try multiple sources for description, in order of preference:
+  // 1. metadata.description (Chrome Web Store scraped)
+  // 2. manifest.description (from manifest.json, may be i18n placeholder)
+  // 3. report_view_model.meta.description (injected by backend for legacy Supabase rows)
+  // 4. summary.summary (LLM executive summary)
+  // 5. report_view_model.scorecard.one_liner (LLM one-liner as last resort)
+  // 6. summary.one_liner
+  const candidates = [
+    scanResults?.metadata?.description,
+    scanResults?.manifest?.description,
+    scanResults?.report_view_model?.meta?.description,
+    scanResults?.summary?.summary,
+    scanResults?.report_view_model?.scorecard?.one_liner,
+    scanResults?.summary?.one_liner,
+  ];
+  
+  for (const raw of candidates) {
+    if (raw && typeof raw === "string" && !isI18nPlaceholder(raw) && raw.trim()) {
+      return raw;
+    }
+  }
+  return null;
+}
 
 /**
  * ScanResultsPageV2 - Redesigned results dashboard
- * Clean, Robinhood-inspired UI with visual risk indicators
+ * Uses ReportViewModel from normalizeScanResultSafe() - NO fake data
  */
 const ScanResultsPageV2 = () => {
   const { scanId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     scanResults,
     error,
@@ -29,24 +83,142 @@ const ScanResultsPageV2 = () => {
     currentExtensionId,
   } = useScan();
 
+  const hasCachedResultsForThisScan = (() => {
+    if (!scanResults || !scanId) return false;
+    if (currentExtensionId === scanId) return true;
+    if (scanResults.extension_id === scanId) return true;
+    if (normalizeExtensionId(scanResults.extension_id || "") === scanId) return true;
+    // Slug-based matching: compare against stored slug or regenerated slug from name
+    if (scanResults.slug === scanId) return true;
+    const derivedSlug = generateSlug(scanResults.extension_name || scanResults.metadata?.title || "");
+    if (derivedSlug && derivedSlug === scanId) return true;
+    // After fetch, currentExtensionId is set to the resolved extension_id
+    if (currentExtensionId && currentExtensionId === scanResults.extension_id) return true;
+    return false;
+  })();
+
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [rawData, setRawData] = useState(null);
+  const [viewModel, setViewModel] = useState(null);
+  const [normalizationError, setNormalizationError] = useState(null);
+  const [showHeroIcon, setShowHeroIcon] = useState(true);
   const [fileViewerModal, setFileViewerModal] = useState({
     isOpen: false,
     file: null,
   });
+  
+  // Evidence drawer state
+  const [evidenceDrawer, setEvidenceDrawer] = useState({
+    open: false,
+    evidenceIds: [],
+  });
 
-  // Load results if not already in context
+  // Layer modal state
+  const [layerModal, setLayerModal] = useState({
+    open: false,
+    layer: null, // 'security' | 'privacy' | 'governance'
+  });
+
+  // Track which scanId we've loaded to prevent double loading
+  const loadedScanIdRef = useRef(null);
+  const isLoadingRef = useRef(false);
+
+  // Responsive donut size for small screens
+  const [donutSize, setDonutSize] = useState(300);
+  const [publisherDetailsOpen, setPublisherDetailsOpen] = useState(false);
+  const publisherDetailsRef = useRef(null);
+
   useEffect(() => {
+    if (!publisherDetailsOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setPublisherDetailsOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [publisherDetailsOpen]);
+
+  useEffect(() => {
+    const updateSize = () => setDonutSize(window.innerWidth <= 480 ? 220 : window.innerWidth <= 768 ? 260 : 300);
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  // Clear stale local state when scanId changes. If we already have this scan's
+  // results in context (e.g. just completed scan), use them immediately so we don't show loading.
+  useEffect(() => {
+    if (loadedScanIdRef.current !== scanId) {
+      if (hasCachedResultsForThisScan) {
+        loadedScanIdRef.current = scanId;
+        setRawData(scanResults);
+        const vm = normalizeScanResultSafe(scanResults);
+        setViewModel(vm);
+        setNormalizationError(vm ? null : "Failed to normalize scan result data");
+        return;
+      }
+      loadedScanIdRef.current = null;
+      isLoadingRef.current = false;
+      setViewModel(null);
+      setRawData(null);
+      setNormalizationError(null);
+      setShowHeroIcon(true);
+    }
+  }, [scanId, hasCachedResultsForThisScan, scanResults]);
+
+  // Load results - use context when already available (e.g. after completing scan), else fetch.
+  // Only re-run when scanId changes; loadResultsById is now stable (no deps) and
+  // hasCachedResultsForThisScan is checked inside the effect but must NOT be a dependency
+  // because it changes when scanResults arrives, which would re-trigger fetching.
+  useEffect(() => {
+    let cancelled = false;
+
     const loadResults = async () => {
-      if (!scanResults || currentExtensionId !== scanId) {
-        setIsLoading(true);
-        await loadResultsById(scanId);
-        setIsLoading(false);
+      if (isLoadingRef.current || loadedScanIdRef.current === scanId) {
+        return;
+      }
+      // Already have this scan's results in context (e.g. just finished scan, then "View results")
+      if (hasCachedResultsForThisScan) {
+        loadedScanIdRef.current = scanId;
+        return;
+      }
+
+      isLoadingRef.current = true;
+      setIsLoading(true);
+
+      try {
+        const data = await loadResultsById(scanId);
+        if (!cancelled) {
+          loadedScanIdRef.current = scanId;
+        }
+      } finally {
+        if (!cancelled) {
+          isLoadingRef.current = false;
+          setIsLoading(false);
+        }
       }
     };
+
     loadResults();
-  }, [scanId, scanResults, currentExtensionId, loadResultsById]);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanId]);
+
+  // Normalize scan results when they change
+  useEffect(() => {
+    if (scanResults) {
+      setRawData(scanResults);
+      const vm = normalizeScanResultSafe(scanResults);
+      setViewModel(vm);
+      
+      if (!vm) {
+        setNormalizationError("Failed to normalize scan result data");
+      } else {
+        setNormalizationError(null);
+        validateEvidenceIntegrity(vm);
+      }
+    }
+  }, [scanResults]);
 
   const handleViewFile = (file) => {
     setFileViewerModal({ isOpen: true, file });
@@ -56,320 +228,663 @@ const ScanResultsPageV2 = () => {
     return await realScanService.getFileContent(extensionId, filePath);
   };
 
-  // Extract scoring v2 data if available
-  const scoringV2 = scanResults?.scoringV2 || scanResults?.scoring_v2 || null;
-  
-  // Compute scores (use v2 if available, fallback to legacy)
-  const overallScore = scoringV2?.overall_score ?? scanResults?.securityScore ?? 0;
-  const securityScore = scoringV2?.security_score ?? scanResults?.securityScore ?? 0;
-  const privacyScore = scoringV2?.privacy_score ?? 70; // Default if not available
-  const governanceScore = scoringV2?.governance_score ?? 80; // Default if not available
-  const decision = scoringV2?.decision ?? (overallScore >= 60 ? 'ALLOW' : overallScore >= 30 ? 'NEEDS_REVIEW' : 'BLOCK');
-
-  // Extract factors for breakdown
-  const securityFactors = scoringV2?.security_layer?.factors || [
-    { name: 'SAST', severity: 0.2, weight: 0.3, confidence: 0.9 },
-    { name: 'VirusTotal', severity: 0.0, weight: 0.15, confidence: 1.0 },
-    { name: 'Obfuscation', severity: 0.1, weight: 0.15, confidence: 0.8 },
-    { name: 'Manifest', severity: 0.15, weight: 0.1, confidence: 0.9 },
-    { name: 'ChromeStats', severity: 0.1, weight: 0.1, confidence: 0.6 },
-    { name: 'Webstore', severity: 0.05, weight: 0.1, confidence: 0.8 },
-    { name: 'Maintenance', severity: 0.0, weight: 0.1, confidence: 0.9 },
-  ];
-
-  const privacyFactors = scoringV2?.privacy_layer?.factors || [
-    { name: 'PermissionsBaseline', severity: 0.3, weight: 0.25, confidence: 0.7 },
-    { name: 'PermissionCombos', severity: 0.2, weight: 0.25, confidence: 0.8 },
-    { name: 'NetworkExfil', severity: 0.1, weight: 0.35, confidence: 0.6 },
-    { name: 'CaptureSignals', severity: 0.0, weight: 0.15, confidence: 0.9 },
-  ];
-
-  const governanceFactors = scoringV2?.governance_layer?.factors || [
-    { name: 'ToSViolations', severity: 0.1, weight: 0.5, confidence: 0.7 },
-    { name: 'Consistency', severity: 0.2, weight: 0.3, confidence: 0.8 },
-    { name: 'DisclosureAlignment', severity: 0.1, weight: 0.2, confidence: 0.7 },
-  ];
-
-  // Key findings for quick view
-  const getKeyFindings = () => {
-    const findings = [];
-    
-    if (scanResults?.virustotalAnalysis?.total_malicious > 0) {
-      findings.push({
-        type: 'critical',
-        icon: '🚨',
-        title: 'Malware Detected',
-        description: `${scanResults.virustotalAnalysis.total_malicious} antivirus engines flagged this extension`
-      });
+  const openEvidenceDrawer = (evidenceIds) => {
+    if (evidenceIds && evidenceIds.length > 0) {
+      setEvidenceDrawer({ open: true, evidenceIds });
     }
-    
-    if (scanResults?.entropyAnalysis?.obfuscated_files > 0) {
-      findings.push({
-        type: 'warning',
-        icon: '⚠️',
-        title: 'Obfuscated Code',
-        description: `${scanResults.entropyAnalysis.obfuscated_files} files contain obfuscated code`
-      });
-    }
-    
-    const highRiskPerms = (scanResults?.permissions || []).filter(p => p.risk === 'HIGH');
-    if (highRiskPerms.length > 0) {
-      findings.push({
-        type: 'warning',
-        icon: '🔑',
-        title: 'High-Risk Permissions',
-        description: `${highRiskPerms.length} permissions require elevated access`
-      });
-    }
-    
-    if (findings.length === 0) {
-      findings.push({
-        type: 'success',
-        icon: '✓',
-        title: 'No Critical Issues',
-        description: 'Extension passed all major security checks'
-      });
-    }
-    
-    return findings;
   };
 
-  // Loading state
-  if (isLoading) {
+  const closeEvidenceDrawer = () => {
+    setEvidenceDrawer({ open: false, evidenceIds: [] });
+  };
+
+  const openLayerModal = (layer) => {
+    setLayerModal({ open: true, layer });
+  };
+
+  const closeLayerModal = () => {
+    setLayerModal({ open: false, layer: null });
+  };
+
+  const extensionIdForIcon = viewModel?.meta?.extensionId || scanId;
+  const heroIconUrl = extensionIdForIcon ? getExtensionIconUrl(extensionIdForIcon) : null;
+
+  const isPrivateScan = scanId && isUUID(scanId);
+
+  // Reset icon visibility when viewing a different extension
+  useEffect(() => {
+    setShowHeroIcon(true);
+  }, [extensionIdForIcon]);
+
+  const genericNoindexHead = (
+    <SEOHead
+      title="Scan results"
+      description="Extension scan results."
+      pathname={location.pathname}
+      noindex
+    />
+  );
+
+  // Loading state - smooth shield animation
+  if (isLoading || isLoadingRef.current) {
     return (
-      <div className="results-v2">
-        <div className="results-v2-loading">
-          <div className="loading-pulse" />
-          <h2>Analyzing Extension</h2>
-          <p>Running security scans...</p>
-          <code>{scanId}</code>
+      <>
+        {genericNoindexHead}
+        <div className="results-v2">
+          <div className="results-v2-loading">
+            <ScanActivityIndicator
+              title="Scan in progress"
+              messages={[
+                "Security report loading in progress",
+                "Evidence hydration in progress",
+                "Dashboard preparation in progress",
+              ]}
+              meta="Preparing your results view"
+            />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
-  // No results
-  if (!scanResults && !isLoading) {
+  // No results (404 or not scanned yet)
+  if (!scanResults && !isLoading && !isLoadingRef.current) {
+    const isUploadScan = scanId && isUUID(scanId);
     return (
-      <div className="results-v2">
+      <>
+        {genericNoindexHead}
+        <div className="results-v2">
+          <nav className="results-v2-nav">
+          <Link to="/scan" className="nav-back">← Back</Link>
+        </nav>
         <div className="results-v2-empty">
           <div className="empty-icon">📋</div>
-          <h2>No Results Found</h2>
-          <p>This extension hasn't been scanned yet.</p>
+          <h2>Scan results not found</h2>
+          <p>
+            {isUploadScan
+              ? "If you just uploaded a ZIP/CRX, the scan may still be running. Check progress below or try again in a moment."
+              : "This extension hasn't been scanned yet or the scan is still in progress."}
+          </p>
+          {error && (
+            <div className="empty-error" style={{ marginTop: '1rem', color: 'var(--risk-bad)' }}>
+              {error}
+            </div>
+          )}
           <div className="empty-actions">
-            <Button onClick={() => navigate("/scanner")} variant="default">
+            {isUploadScan && (
+              <Button onClick={() => navigate(`/scan/progress/${scanId}`)} variant="default">
+                Check scan progress
+              </Button>
+            )}
+            <Button onClick={() => navigate("/scan")} variant={isUploadScan ? "outline" : "default"} style={isUploadScan ? { marginLeft: '0.5rem' } : undefined}>
               Start Scan
+            </Button>
+            {!isUploadScan && scanId && (
+              <Button onClick={() => navigate(`/scan/progress/${scanId}`)} variant="outline" style={{ marginLeft: '0.5rem' }}>
+                Check Progress
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+      </>
+    );
+  }
+
+  // Normalization failed - show error state
+  if (!viewModel && normalizationError) {
+    return (
+      <>
+        {genericNoindexHead}
+        <div className="results-v2">
+          <nav className="results-v2-nav">
+            <Link to="/scan" className="nav-back">← Back</Link>
+          </nav>
+          <div className="results-v2-error">
+            <div className="error-icon">⚠️</div>
+            <h2>Report Data Unavailable</h2>
+            <p>{normalizationError}</p>
+          <div className="error-extension-id">
+            <span>Extension ID:</span>
+            <code>{scanId}</code>
+          </div>
+          {process.env.NODE_ENV === 'development' && rawData && (
+            <details className="error-raw-data">
+              <summary>Raw Data (Dev Only)</summary>
+              <pre>{JSON.stringify(rawData, null, 2)}</pre>
+            </details>
+          )}
+          <div className="error-actions">
+            <Button onClick={() => navigate("/scan")}>Back to Scanner</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Retry
             </Button>
           </div>
         </div>
       </div>
+      </>
     );
   }
 
-  return (
-    <div className="results-v2">
-      {/* Navigation Bar */}
-      <nav className="results-v2-nav">
-        <Link to="/scanner" className="nav-back">
-          ← Back
-        </Link>
-        <div className="nav-actions">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const baseURL = import.meta.env.VITE_API_URL || "";
-              window.open(`${baseURL}/api/scan/report/${scanId}`, '_blank');
-            }}
-          >
-            Export PDF
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => navigate("/scanner")}
-          >
-            New Scan
-          </Button>
-        </div>
-      </nav>
+  // Extract data from viewModel - provide safe defaults
+  const { meta, scores, factorsByLayer, keyFindings, permissions, evidenceIndex } = viewModel || {
+    meta: {},
+    scores: {},
+    factorsByLayer: {},
+    keyFindings: [],
+    permissions: {},
+    evidenceIndex: {}
+  };
 
-      {/* Hero Section */}
-      <header className="results-v2-hero">
-        <div className="hero-content">
-          <div className="hero-info">
-            {scanResults?.icon && (
-              <img 
-                src={scanResults.icon} 
-                alt="" 
-                className="hero-icon"
-                onError={(e) => e.target.style.display = 'none'}
-              />
-            )}
-            <div className="hero-text">
-              <h1 className="hero-title">{scanResults?.name || "Extension"}</h1>
-              <div className="hero-meta">
-                <code className="hero-id">{scanId}</code>
-                {scanResults?.version && (
-                  <Badge variant="outline">v{scanResults.version}</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="hero-gauge">
-            <RiskGauge 
-              score={overallScore} 
-              size={180}
-              label="Overall Score"
-              decision={decision}
+  // Extract all findings by layer from raw scan results (includes SAST, factors, gates, etc.)
+  const findingsByLayer = extractFindingsByLayer(scanResults);
+  
+  // Combine keyFindings with extracted findings, deduplicating by title
+  const allSecurityFindings = [
+    ...(keyFindings?.filter(f => f.layer === 'security') || []),
+    ...findingsByLayer.security,
+  ];
+  const allPrivacyFindings = [
+    ...(keyFindings?.filter(f => f.layer === 'privacy') || []),
+    ...findingsByLayer.privacy,
+  ];
+  const allGovernanceFindings = [
+    ...(keyFindings?.filter(f => f.layer === 'governance') || []),
+    ...findingsByLayer.governance,
+  ];
+
+  // Deduplicate findings by title
+  const dedupeFindings = (findings) => {
+    const seen = new Set();
+    return findings.filter(f => {
+      const key = f.title?.toLowerCase() || '';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  // Chrome Web Store URL: use meta.storeUrl if available, else build from extension ID
+  const extensionIdForStore = viewModel?.meta?.extensionId || scanId;
+  const chromeStoreUrl =
+    viewModel?.meta?.storeUrl ||
+    (extensionIdForStore
+      ? `https://chromewebstore.google.com/detail/_/${extensionIdForStore}`
+      : null);
+
+  // Top 3 findings for Quick Summary preview (one line each)
+  const topThreeFindings = [
+    ...dedupeFindings(allSecurityFindings),
+    ...dedupeFindings(allPrivacyFindings),
+    ...dedupeFindings(allGovernanceFindings),
+  ]
+    .slice(0, 3)
+    .map(f => ({ title: f.title, summary: f.summary }));
+
+  // Use factorsByLayer: issue count = factors with severity >= 0.4 (same as LayerModal)
+  const getIssueCount = (layerFactors) =>
+    (layerFactors || []).filter((f) => (f.severity ?? 0) >= 0.4).length;
+
+  const securityIssueCount = getIssueCount(factorsByLayer?.security);
+  const privacyIssueCount = getIssueCount(factorsByLayer?.privacy);
+  const governanceIssueCount = getIssueCount(factorsByLayer?.governance);
+  const totalFindingsCount = securityIssueCount + privacyIssueCount + governanceIssueCount;
+
+  // Brief transition: scanResults loaded but viewModel not yet set
+  if (!viewModel && scanResults && !normalizationError) {
+    return (
+      <>
+        {genericNoindexHead}
+        <div className="results-v2">
+          <div className="results-v2-loading">
+            <ScanActivityIndicator
+              title="Scan in progress"
+              messages={[
+                "Report formatting in progress",
+                "Evidence rendering in progress",
+                "Results preparation in progress",
+              ]}
+              meta="Preparing your results view"
             />
           </div>
         </div>
-      </header>
+      </>
+    );
+  }
+
+  // Normalization failed - show error state
+  if (!viewModel && scanResults && normalizationError) {
+    return (
+      <>
+        {genericNoindexHead}
+        <div className="results-v2">
+          <nav className="results-v2-nav">
+            <Link to="/scan" className="nav-back">← Back</Link>
+          </nav>
+          <div className="results-v2-error">
+            <div className="error-icon">⚠️</div>
+            <h2>Unable to Display Results</h2>
+            <p>The scan data is available but couldn't be formatted for display.</p>
+            <div className="error-actions">
+              <Button onClick={() => navigate("/scan")}>Back to Scanner</Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const overallBand = scores?.overall?.band || scores?.security?.band || 'NA';
+  const overallScore = scores?.overall?.score ?? scores?.security?.score ?? 0;
+
+  const extensionName = meta?.name || null;
+  const extensionSchema =
+    !isPrivateScan &&
+    extensionName &&
+    typeof overallScore === "number"
+      ? {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: extensionName,
+          applicationCategory: "BrowserExtension",
+          operatingSystem: "Chrome",
+          ...(scanResults?.manifest?.version && { softwareVersion: scanResults.manifest.version }),
+        }
+      : null;
+
+  const resultsSEOHead = isPrivateScan ? (
+    genericNoindexHead
+  ) : (
+    <SEOHead
+      title={
+        extensionName
+          ? `${extensionName} — Risk Score ${overallScore} Security Report | ExtensionShield`
+          : "Scan results"
+      }
+      description={
+        extensionName
+          ? `Risk score, permissions, network indicators, and Security/Privacy/Governance findings for ${extensionName}.`
+          : "Extension scan results."
+      }
+      pathname={location.pathname}
+      schema={extensionSchema ? [extensionSchema] : undefined}
+    />
+  );
+
+  return (
+    <>
+      {resultsSEOHead}
+      <div className="results-v2 results-v2-dashboard">
+      {/* Navigation Bar - Match screenshot: New scan, Share, Save */}
+      <nav className="results-v2-nav">
+        <Link to="/scan" className="nav-back">
+          ← Back
+        </Link>
+      </nav>
 
       {/* Status Messages */}
       {error && (
-        <StatusMessage
-          type="error"
-          message={error}
-          onDismiss={() => setError("")}
-        />
+        <StatusMessage type="error" message={error} onDismiss={() => setError("")} />
       )}
 
-      {/* Main Content */}
-      <main className="results-v2-main">
-        {/* Score Cards Row */}
-        <section className="scores-section">
-          <ScoreCard 
-            title="Security"
-            score={securityScore}
-            icon="🛡️"
-            weight={0.5}
-            accentColor="#3B82F6"
-            factors={securityFactors}
-          />
-          <ScoreCard 
-            title="Privacy"
-            score={privacyScore}
-            icon="🔒"
-            weight={0.3}
-            accentColor="#8B5CF6"
-            factors={privacyFactors}
-          />
-          <ScoreCard 
-            title="Governance"
-            score={governanceScore}
-            icon="📋"
-            weight={0.2}
-            accentColor="#10B981"
-            factors={governanceFactors}
-          />
-        </section>
+      {/* Partial Report Banner - when scan failed but partial data (scoring_v2, report_view_model) is available */}
+      {scanResults?.status === "failed" && scanResults?.scoring_v2 && (() => {
+        const err = scanResults.error || "Some analysis steps failed";
+        const isDownloadFail = typeof err === "string" && err.includes("download") && (err.includes("failed") || err.includes("sources failed") || err.includes("returned no file"));
+        const bannerMessage = isDownloadFail
+          ? "Partial report: We couldn't download the extension package. Scores and limited findings below are based on available data (e.g. store listing)."
+          : `Partial report: ${err}. Scores and limited findings below are based on available data (e.g. manifest, webstore).`;
+        return (
+          <StatusMessage type="info" message={bannerMessage} />
+        );
+      })()}
 
-        {/* Key Findings */}
-        <section className="findings-section">
-          <h2 className="section-title">Key Findings</h2>
-          <div className="findings-grid">
-            {getKeyFindings().map((finding, idx) => (
-              <div 
-                key={idx} 
-                className={`finding-card finding-card--${finding.type}`}
-              >
-                <span className="finding-icon">{finding.icon}</span>
-                <div className="finding-content">
-                  <h3 className="finding-title">{finding.title}</h3>
-                  <p className="finding-description">{finding.description}</p>
+      {/* Main 2-column Layout: Left (Extension + Quick Summary) | Right (Score + Tiles) */}
+      <main className="results-v2-main">
+        <div className="results-v2-grid">
+          {/* Left Column: Extension Card + Quick Summary with Top 3 findings */}
+          <div className="results-v2-left">
+            {/* Extension Details Card - Score donut inside, to the right */}
+            <div className={`extension-card${publisherDetailsOpen ? " extension-card--popover-open" : ""}`}>
+              <ResultFeedback scanId={scanId} />
+              <div className="extension-card-inner">
+                <div className="extension-card-left">
+                  <div className="extension-card-header">
+                    {showHeroIcon && heroIconUrl && (
+                      <img
+                        src={heroIconUrl}
+                        alt=""
+                        className="extension-card-icon"
+                        loading="lazy"
+                        onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }}
+                      />
+                    )}
+                    <h1 className="extension-card-title">{meta?.name || "Extension Analysis"}</h1>
+                  </div>
+                  <div className="extension-card-details">
+                    <span className="ext-detail">
+                      {showHeroIcon && heroIconUrl && (
+                        <img src={heroIconUrl} alt="" className="ext-detail-icon" onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }} />
+                      )}
+                      {meta?.name || "Extension"}
+                    </span>
+                    {meta?.users && (
+                      <>
+                        <span className="ext-divider" />
+                        <span className="ext-detail">
+                          <span className="ext-detail-icon">👥</span>
+                          {meta.users.toLocaleString()} users
+                        </span>
+                      </>
+                    )}
+                    {meta?.rating != null && (
+                      <>
+                        <span className="ext-divider" />
+                        <span className="ext-detail">
+                          <span className="ext-detail-icon">⭐</span>
+                          {meta.rating.toFixed(1)} rating
+                        </span>
+                      </>
+                    )}
+                    {meta?.scanTimestamp && (
+                      <>
+                        <span className="ext-divider" />
+                        <span className="ext-detail ext-detail-muted">
+                          <span className="ext-detail-icon">📅</span>
+                          Last scanned {new Date(meta.scanTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </>
+                    )}
+                    {viewModel?.publisherDisclosures?.last_updated_iso && (
+                      <>
+                        <span className="ext-divider" />
+                        <span className="ext-detail ext-detail-muted">
+                          <span className="ext-detail-icon">↻</span>
+                          Updated {viewModel.publisherDisclosures.last_updated_iso}
+                        </span>
+                      </>
+                    )}
+                    {viewModel?.publisherDisclosures?.user_count != null && meta?.users == null && (
+                      <>
+                        <span className="ext-divider" />
+                        <span className="ext-detail ext-detail-muted">
+                          <span className="ext-detail-icon">👥</span>
+                          {viewModel.publisherDisclosures.user_count >= 1000
+                            ? `${(viewModel.publisherDisclosures.user_count / 1000).toFixed(0)}k users`
+                            : `${viewModel.publisherDisclosures.user_count} users`}
+                        </span>
+                      </>
+                    )}
+                    {viewModel?.publisherDisclosures?.rating_count != null && meta?.ratingCount == null && (
+                      <>
+                        <span className="ext-divider" />
+                        <span className="ext-detail ext-detail-muted">
+                          <span className="ext-detail-icon">⭐</span>
+                          {viewModel.publisherDisclosures.rating_count.toLocaleString()} ratings
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {getDisplayDescription(scanResults) && (
+                    <p className="extension-card-description">
+                      {shortOverview(getDisplayDescription(scanResults))}
+                      {chromeStoreUrl && (
+                        <>
+                          {" "}
+                          <a
+                            href={chromeStoreUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="description-webstore-link"
+                          >
+                            Web Store
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {(chromeStoreUrl || viewModel?.publisherDisclosures) && (() => {
+                    const pd = viewModel?.publisherDisclosures;
+                    const traderLabel = pd?.trader_status === "TRADER" ? "Trader" : pd?.trader_status === "NON_TRADER" ? "Non-trader" : "Unknown";
+                    const traderDescription = pd?.trader_status === "TRADER" 
+                      ? "This developer is registered as a trader in the EU. Consumer rights apply to purchases from this developer."
+                      : pd?.trader_status === "NON_TRADER"
+                      ? "This developer has not identified itself as a trader. Consumer rights may not apply to contracts with this developer."
+                      : "Trader status unknown. Unable to determine if consumer rights apply.";
+                    const getHost = (url) => {
+                      try { return new URL(url).host; } catch { return url; }
+                    };
+                    const linkChips = [
+                      pd?.developer_website_url && { key: "website", href: pd.developer_website_url, label: "Website", icon: "↗" },
+                      pd?.support_email && { key: "support", href: `mailto:${pd.support_email}`, label: "Support", icon: "✉" },
+                      pd?.privacy_policy_url && { key: "privacy", href: pd.privacy_policy_url, label: "Privacy", icon: "🔒" },
+                    ].filter(Boolean);
+                    const allChips = pd ? [{ key: "trader", label: traderLabel, icon: "◉", title: traderDescription, link: false }, ...linkChips] : [];
+                    return (
+                      <div className="publisher-disclosures">
+                        <div className="publisher-disclosures-header">
+                          <span className="publisher-disclosures-label">Publisher</span>
+                          {pd && <button
+                            type="button"
+                            className="publisher-info-icon"
+                            onClick={() => setPublisherDetailsOpen((o) => !o)}
+                            aria-expanded={publisherDetailsOpen}
+                            aria-haspopup="dialog"
+                            title="About this publisher"
+                            ref={publisherDetailsRef}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="16" x2="12" y2="12" />
+                              <line x1="12" y1="8" x2="12.01" y2="8" />
+                            </svg>
+                          </button>}
+                          {pd && publisherDetailsOpen && (
+                            <>
+                              <div
+                                className="publisher-details-backdrop"
+                                role="presentation"
+                                onClick={() => setPublisherDetailsOpen(false)}
+                                onKeyDown={(e) => e.key === "Escape" && setPublisherDetailsOpen(false)}
+                              />
+                              <div className="publisher-info-popover" role="dialog" aria-label="Publisher information">
+                                <p>
+                                  <span className="publisher-info-label">Trader status:</span>
+                                  <span className="publisher-info-value">{traderLabel}</span>
+                                </p>
+                                <p className="publisher-info-description">{traderDescription}</p>
+                                {pd.privacy_policy_url && (
+                                  <p>
+                                    <span className="publisher-info-label">Privacy:</span>
+                                    <a href={pd.privacy_policy_url} target="_blank" rel="noopener noreferrer">{getHost(pd.privacy_policy_url)}</a>
+                                  </p>
+                                )}
+                                <p className="publisher-info-note">
+                                  Information from Chrome Web Store disclosures. Not a security guarantee.
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {(allChips.length > 0 || chromeStoreUrl) && (
+                        <div className="publisher-disclosures-chips">
+                          {allChips.map((c) =>
+                            c.link !== false ? (
+                              <a
+                                key={c.key}
+                                href={c.href}
+                                target={c.key !== "support" ? "_blank" : undefined}
+                                rel={c.key !== "support" ? "noopener noreferrer" : undefined}
+                                className="publisher-chip publisher-chip-link"
+                              >
+                                <span className="publisher-chip-icon" aria-hidden>{c.icon}</span>
+                                <span>{c.label}</span>
+                              </a>
+                            ) : (
+                              <span
+                                key={c.key}
+                                className="publisher-chip"
+                                title={c.title}
+                              >
+                                <span className="publisher-chip-icon" aria-hidden>{c.icon}</span>
+                                <span>{c.label}</span>
+                              </span>
+                            )
+                          )}
+                          {chromeStoreUrl && (
+                            <a
+                              href={chromeStoreUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="publisher-chip publisher-chip-link"
+                              aria-label="View in Chrome Web Store"
+                              title="View in Chrome Web Store"
+                            >
+                              <svg className="publisher-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                              </svg>
+                              <span>Web Store</span>
+                            </a>
+                          )}
+                        </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div className="extension-card-score">
+                  <DonutScore
+                    score={overallScore}
+                    band={overallBand}
+                    size={donutSize}
+                  />
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Two Column Layout */}
-        <div className="results-v2-grid">
-          {/* Left Column - Stats & Details */}
-          <div className="results-v2-col">
-            <StatsPanel 
-              userCount={scanResults?.userCount}
-              rating={scanResults?.rating}
-              reviewCount={scanResults?.reviewCount}
-              version={scanResults?.version}
-              lastUpdated={scanResults?.lastUpdated}
-              developer={scanResults?.developer}
-              category={scanResults?.category}
-            />
-            
-            {/* Permissions Summary */}
-            <div className="permissions-panel">
-              <h3 className="panel-title">Permissions</h3>
-              <div className="permissions-list">
-                {(scanResults?.permissions || []).slice(0, 6).map((perm, idx) => (
-                  <div key={idx} className="permission-item">
-                    <span className="permission-name">{perm.name}</span>
-                    <Badge 
-                      variant={perm.risk === 'HIGH' ? 'destructive' : perm.risk === 'MEDIUM' ? 'secondary' : 'outline'}
-                      className="permission-risk"
-                    >
-                      {perm.risk}
-                    </Badge>
-                  </div>
-                ))}
-                {(scanResults?.permissions?.length || 0) > 6 && (
-                  <div className="permissions-more">
-                    +{scanResults.permissions.length - 6} more permissions
-                  </div>
-                )}
-              </div>
             </div>
+
+            {/* Quick Summary + Top 3 findings */}
+            <SummaryPanel
+              scores={scores}
+              factorsByLayer={factorsByLayer}
+              rawScanResult={scanResults}
+              keyFindings={keyFindings}
+              onViewEvidence={openEvidenceDrawer}
+              topFindings={topThreeFindings}
+              onViewRiskyPermissions={() => openLayerModal('security')}
+              onViewNetworkDomains={() => openLayerModal('privacy')}
+            />
           </div>
 
-          {/* Right Column - Factor Breakdown */}
-          <div className="results-v2-col">
-            <FactorBreakdown 
-              title="Security Factors"
-              factors={securityFactors}
+          {/* Right Column: Security/Privacy/Governance cards */}
+          <div className="results-v2-right">
+            {totalFindingsCount > 0 && (
+              <div className="results-v2-findings-count" aria-live="polite">
+                <span className="results-v2-findings-count-num">{totalFindingsCount}</span>
+                <span className="results-v2-findings-count-label">
+                  {totalFindingsCount === 1 ? 'finding' : 'findings'}
+                </span>
+              </div>
+            )}
+            <div className="results-v2-sidebar">
+            <ResultsSidebarTile
+              title="Security"
+              score={scores?.security?.score}
+              band={scores?.security?.band || 'NA'}
+              findingsCount={securityIssueCount}
+              onClick={() => openLayerModal('security')}
             />
-            <FactorBreakdown 
-              title="Privacy Factors"
-              factors={privacyFactors}
+            <ResultsSidebarTile
+              title="Privacy"
+              score={scores?.privacy?.score ?? null}
+              band={scores?.privacy?.band || 'NA'}
+              findingsCount={privacyIssueCount}
+              onClick={() => openLayerModal('privacy')}
             />
-            <FactorBreakdown 
-              title="Governance Factors"
-              factors={governanceFactors}
+            <ResultsSidebarTile
+              title="Governance"
+              score={scores?.governance?.score ?? null}
+              band={scores?.governance?.band || 'NA'}
+              findingsCount={governanceIssueCount}
+              onClick={() => openLayerModal('governance')}
             />
+            </div>
           </div>
         </div>
-
-        {/* Executive Summary */}
-        {scanResults?.executiveSummary && (
-          <section className="summary-section">
-            <h2 className="section-title">Executive Summary</h2>
-            <div className="summary-card">
-              <p>{scanResults.executiveSummary}</p>
-            </div>
-          </section>
-        )}
       </main>
+
+      {/* Evidence Drawer - Global, mounted once */}
+      <EvidenceDrawer 
+        open={evidenceDrawer.open}
+        evidenceIds={evidenceDrawer.evidenceIds}
+        evidenceIndex={evidenceIndex || {}}
+        onClose={closeEvidenceDrawer}
+      />
 
       {/* File Viewer Modal */}
       <FileViewerModal
         isOpen={fileViewerModal.isOpen}
         onClose={() => setFileViewerModal({ isOpen: false, file: null })}
         file={fileViewerModal.file}
-        extensionId={scanResults?.extensionId || scanId}
+        extensionId={meta?.extensionId || scanId}
         onGetFileContent={getFileContent}
       />
 
-      {/* Footer */}
-      <footer className="results-v2-footer">
-        <p>
-          Generated by ExtensionShield • Results should be reviewed by a security professional
-        </p>
-      </footer>
+      {/* Layer modals use report_view_model.layer_details for per-layer insights */}
+      {layerModal.layer === 'security' && (
+        <LayerModal
+          open={layerModal.open}
+          onClose={closeLayerModal}
+          layer="security"
+          score={scores?.security?.score}
+          band={scores?.security?.band || 'NA'}
+          factors={factorsByLayer?.security || []}
+          keyFindings={dedupeFindings(allSecurityFindings)}
+          gateResults={scanResults?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'security') || []}
+          layerReasons={scores?.reasons?.filter(r => r.toLowerCase().includes('security') || r.toLowerCase().includes('sast') || r.toLowerCase().includes('malware')) || []}
+          layerDetails={scanResults?.report_view_model?.layer_details}
+          onViewEvidence={openEvidenceDrawer}
+        />
+      )}
+
+      {layerModal.layer === 'privacy' && (
+        <LayerModal
+          open={layerModal.open}
+          onClose={closeLayerModal}
+          layer="privacy"
+          score={scores?.privacy?.score}
+          band={scores?.privacy?.band || 'NA'}
+          factors={factorsByLayer?.privacy || []}
+          keyFindings={dedupeFindings(allPrivacyFindings)}
+          gateResults={scanResults?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'privacy') || []}
+          layerReasons={scores?.reasons?.filter(r => r.toLowerCase().includes('privacy') || r.toLowerCase().includes('exfil') || r.toLowerCase().includes('tracking')) || []}
+          layerDetails={scanResults?.report_view_model?.layer_details}
+          onViewEvidence={openEvidenceDrawer}
+        />
+      )}
+
+      {layerModal.layer === 'governance' && (
+        <LayerModal
+          open={layerModal.open}
+          onClose={closeLayerModal}
+          layer="governance"
+          score={scores?.governance?.score}
+          band={scores?.governance?.band || 'NA'}
+          factors={factorsByLayer?.governance || []}
+          keyFindings={dedupeFindings(allGovernanceFindings)}
+          gateResults={scanResults?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'governance') || []}
+          layerReasons={scores?.reasons?.filter(r => r.toLowerCase().includes('governance') || r.toLowerCase().includes('policy') || r.toLowerCase().includes('tos') || r.toLowerCase().includes('disclosure')) || []}
+          layerDetails={scanResults?.report_view_model?.layer_details}
+          onViewEvidence={openEvidenceDrawer}
+        />
+      )}
     </div>
+    </>
   );
 };
 
 export default ScanResultsPageV2;
-

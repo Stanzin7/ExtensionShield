@@ -1,0 +1,204 @@
+/* ============================================================================
+   Contribute Page – streamlined
+   ============================================================================ */
+
+.contribute-page {
+  min-height: 100vh;
+  background: var(--extensionshield-bg-primary, #0d1424);
+  color: var(--extensionshield-text-primary, #f8fafc);
+  font-family: var(--font-sans);
+}
+
+.contribute-content {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(var(--extensionshield-header-height, 60px) + 2rem) 1.5rem 4rem;
+}
+
+.contribute-header {
+  margin-bottom: 2.5rem;
+
+  h1 {
+    font-size: clamp(1.75rem, 3.5vw, 2.125rem);
+    font-weight: var(--weight-strong, 700);
+    color: var(--extensionshield-text-primary, #f8fafc);
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    line-height: 1.6;
+  }
+}
+
+/* ============================================================================
+   Contribution grid
+   ============================================================================ */
+
+.contribution-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.contribution-card {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem 1.25rem;
+  background: var(--extensionshield-bg-card, rgba(15, 23, 42, 0.6));
+  border: 1px solid var(--extensionshield-border, rgba(148, 163, 184, 0.12));
+  border-radius: var(--radius-md, 10px);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:hover {
+    border-color: var(--extensionshield-border-accent, rgba(34, 197, 94, 0.35));
+    background: var(--extensionshield-bg-elevated, rgba(15, 23, 42, 0.8));
+  }
+
+  .card-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--extensionshield-text-primary, #f8fafc);
+    margin-bottom: 0.2rem;
+  }
+
+  p {
+    font-size: 0.8125rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    line-height: 1.5;
+    margin-bottom: 0.375rem;
+  }
+}
+
+.card-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--extensionshield-text-secondary, #94a3b8);
+  background: rgba(148, 163, 184, 0.08);
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  &[data-type="scan"] {
+    color: var(--extensionshield-accent, #22c55e);
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  &[data-type="report"] {
+    color: var(--risk-bad, #ef4444);
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  &[data-type="community"] {
+    color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.08);
+  }
+
+  &[data-type="share"] {
+    color: var(--color-info, hsl(217, 91%, 60%));
+    background: rgba(59, 130, 246, 0.08);
+  }
+}
+
+.card-tag {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--extensionshield-text-tertiary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+
+  &.critical {
+    color: var(--risk-bad, #ef4444);
+  }
+}
+
+/* Footer */
+.contribute-footer {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--extensionshield-border, rgba(148, 163, 184, 0.12));
+
+  p {
+    font-size: 0.875rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    line-height: 1.65;
+    margin: 0;
+  }
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .contribute-content {
+    padding: calc(var(--extensionshield-header-height, 60px) + 1.5rem) 1.25rem 3rem;
+  }
+
+  .contribute-header {
+    margin-bottom: 2rem;
+  }
+
+  .contribution-card {
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* ============================================================================
+   Light mode
+   ============================================================================ */
+
+.light .contribute-page {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .contribute-header h1 {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .contribute-header .subtitle {
+  color: var(--extensionshield-text-secondary);
+}
+
+.light .contribution-card {
+  background: var(--extensionshield-bg-card);
+  border-color: var(--extensionshield-border);
+
+  &:hover {
+    border-color: var(--extensionshield-border-accent);
+    background: var(--extensionshield-bg-elevated);
+  }
+
+  h3 {
+    color: var(--extensionshield-text-primary);
+  }
+
+  p {
+    color: var(--extensionshield-text-secondary);
+  }
+}
+
+.light .contribute-footer {
+  border-top-color: var(--extensionshield-border);
+
+  p {
+    color: var(--extensionshield-text-secondary);
+  }
+}

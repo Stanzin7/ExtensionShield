@@ -1,0 +1,300 @@
+/* ============================================================================
+   Footer – Same structure & spacing as .how-protect-section / .how-protect-container
+   ============================================================================ */
+
+.app-footer {
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+  padding: var(--landing-section-padding-y-top, clamp(2rem, 4vw, 3.25rem))
+           var(--landing-section-padding-x, var(--layout-padding-x, 2rem))
+           var(--landing-section-padding-y-bottom, clamp(2.5rem, 5vw, 4rem));
+  padding-bottom: 2rem;
+  background: transparent;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: var(--landing-section-inner-max, min(1200px, var(--layout-max-width, 1440px)));
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--extensionshield-border) 15%,
+      var(--extensionshield-accent) 50%,
+      var(--extensionshield-border) 85%,
+      transparent 100%
+    );
+    opacity: 0.9;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    max-width: 600px;
+    height: 120px;
+    background: radial-gradient(
+      ellipse 80% 100% at 50% 100%,
+      color-mix(in srgb, var(--extensionshield-accent) 8%, transparent) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+}
+
+/* Same as .how-protect-container */
+.app-footer__inner {
+  max-width: var(--landing-section-inner-max, min(1200px, var(--layout-max-width, 1440px)));
+  margin: 0 auto;
+  padding: 0 4rem;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+
+  @media (max-width: 768px) {
+    padding: 0 0.75rem;
+  }
+}
+
+/* Same as .how-protect-grid – centered, constrained width */
+.app-footer__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--landing-section-gap, 2rem 2.5rem);
+  align-items: start;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto clamp(2rem, 4vw, 3rem);
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    margin-bottom: 2rem;
+  }
+}
+
+/* ========== Left column: brand + disclaimer ========== */
+.app-footer__brand-col {
+  min-width: 0;
+  max-width: 400px;
+}
+
+.app-footer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  margin-bottom: 1rem;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    opacity: 0.92;
+
+    .app-footer__logo {
+      transform: scale(1.06);
+    }
+  }
+}
+
+.app-footer__logo {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.app-footer__name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--extensionshield-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.app-footer__tagline {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--extensionshield-accent);
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+.app-footer__disclaimer,
+.app-footer__clarification {
+  font-size: 0.875rem;
+  color: var(--extensionshield-text-muted);
+  line-height: 1.6;
+  margin: 0;
+  opacity: 0.95;
+}
+
+.app-footer__disclaimer {
+  margin-bottom: 0.5rem;
+}
+
+.app-footer__clarification {
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}
+
+/* ========== Right column: link groups ========== */
+.app-footer__links-col {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.app-footer__groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 150px));
+  gap: 0.75rem 1.25rem;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+}
+
+.app-footer__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.app-footer__group-heading {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--extensionshield-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.app-footer__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-footer__link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--extensionshield-text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease, transform 0.15s ease;
+  display: inline-block;
+
+  &:hover {
+    color: var(--extensionshield-accent);
+  }
+}
+
+/* ========== Bottom bar ========== */
+.app-footer__bottom {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.app-footer__accent-line {
+  width: 60px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--extensionshield-accent), transparent);
+  opacity: 0.8;
+}
+
+.app-footer__copy {
+  font-size: 0.75rem;
+  color: var(--extensionshield-text-muted);
+  margin: 0 auto;
+  opacity: 0.9;
+  text-align: center;
+  width: 100%;
+}
+
+/* ========== Light theme ========== */
+.light .app-footer::before {
+  opacity: 0.85;
+}
+
+.light .app-footer__tagline {
+  color: var(--extensionshield-accent);
+}
+
+.light .app-footer__link:hover {
+  color: var(--extensionshield-accent);
+}
+
+.light .app-footer__accent-line {
+  opacity: 0.9;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 600px) {
+  .app-footer {
+    padding: 3rem 1rem 4rem;
+  }
+
+  .app-footer__logo .shield-logo {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .app-footer__name {
+    font-size: 1.0625rem;
+  }
+
+  .app-footer__tagline {
+    font-size: 0.875rem;
+  }
+
+  .app-footer__disclaimer,
+  .app-footer__clarification {
+    font-size: 0.8125rem;
+  }
+
+  .app-footer__link {
+    font-size: 0.8125rem;
+  }
+
+  .app-footer__copy {
+    font-size: 0.6875rem;
+  }
+}
+
+.app-footer__cloud-cta {
+  text-align: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #94a3b8);
+  opacity: 0.85;
+
+  a {
+    color: var(--accent, #60a5fa);
+    text-decoration: none;
+    font-weight: 500;
+    &:hover { text-decoration: underline; }
+  }
+}

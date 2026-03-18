@@ -1,8 +1,54 @@
+import { getScanResultsUrl } from "../utils/constants";
+import { fetchJson, buildFetchError } from "./requestHelpers";
+
+// User-friendly message for service unavailability
+const SERVICE_UNAVAILABLE_MESSAGE = "ExtensionShield is temporarily unavailable. We're working to restore service and will be back shortly. Please try again in a few minutes.";
+
 class RealScanService {
   constructor() {
     // Use environment variable for API URL, default to empty string for same-origin (production)
     // For local development, set VITE_API_URL=http://localhost:8007 in .env.local
     this.baseURL = import.meta.env.VITE_API_URL || "";
+    this.userIdStorageKey = "extensionshield_user_id";
+    this.accessToken = null;
+    // In-flight request deduplication to prevent duplicate API calls
+    // from concurrent polling loops (ScanContext + ScanProgressPage).
+    this._inflightStatus = new Map();  // extensionId → Promise
+    this._inflightResults = new Map(); // extensionId → Promise
+  }
+
+  getOrCreateUserId() {
+    try {
+      const existing = localStorage.getItem(this.userIdStorageKey);
+      if (existing) return existing;
+
+      const id =
+        (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
+          ? globalThis.crypto.randomUUID()
+          : `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      localStorage.setItem(this.userIdStorageKey, id);
+      return id;
+    } catch (e) {
+      // If localStorage is unavailable, fall back to an ephemeral id.
+      return `anon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+  }
+
+  getUserHeaders() {
+    return { "X-User-Id": this.getOrCreateUserId() };
+  }
+
+  setAccessToken(token) {
+    this.accessToken = token || null;
+  }
+
+  getAuthHeaders() {
+    if (!this.accessToken) return {};
+    return { Authorization: `Bearer ${this.accessToken}` };
+  }
+
+  getRequestHeaders() {
+    return { ...this.getUserHeaders(), ...this.getAuthHeaders() };
   }
 
   // Extract extension ID from Chrome Web Store URL
@@ -11,25 +57,61 @@ class RealScanService {
     return match ? match[1] : null;
   }
 
+  async getDeepScanLimitStatus() {
+    const CACHE_MS = 60 * 1000;
+    const now = Date.now();
+    if (this._deepScanLimitCache && now - this._deepScanLimitCacheAt < CACHE_MS) {
+      return this._deepScanLimitCache;
+    }
+    const { response, body } = await fetchJson(`${this.baseURL}/api/limits/deep-scan`, {
+      method: "GET",
+      headers: {
+        ...this.getRequestHeaders(),
+      },
+    });
+
+    if (!response.ok) {
+      throw buildFetchError(response, body, "Failed to fetch deep-scan limit status");
+    }
+
+    this._deepScanLimitCache = body;
+    this._deepScanLimitCacheAt = Date.now();
+    return body;
+  }
+
+  async hasCachedResults(extensionId) {
+    try {
+      const url = getScanResultsUrl(extensionId);
+      if (!url) return false;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { ...this.getRequestHeaders() },
+      });
+      return response.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Trigger a scan for an extension URL
   async triggerScan(url) {
     try {
-      const response = await fetch(`${this.baseURL}/api/scan/trigger`, {
+      const { response, body } = await fetchJson(`${this.baseURL}/api/scan/trigger`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...this.getRequestHeaders(),
         },
         body: JSON.stringify({ url }),
       });
 
       if (response.ok) {
-        const result = await response.json();
-        return result;
-      } else {
-        throw new Error("Failed to trigger scan");
+        return body;
       }
+
+      throw buildFetchError(response, body, "Failed to trigger scan");
     } catch (error) {
-      console.error("Failed to trigger scan:", error);
+      // console.error("Failed to trigger scan:", error); // prod: no console
       throw error;
     }
   }
@@ -40,61 +122,145 @@ class RealScanService {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${this.baseURL}/api/scan/upload`, {
+      const { response, body } = await fetchJson(`${this.baseURL}/api/scan/upload`, {
         method: "POST",
+        headers: {
+          ...this.getRequestHeaders(),
+        },
         body: formData,
       });
 
       if (response.ok) {
-        const result = await response.json();
-        return result;
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to upload file");
+        return body;
       }
+
+      throw buildFetchError(response, body, "Failed to upload file");
     } catch (error) {
-      console.error("Failed to upload file:", error);
+      // console.error("Failed to upload file:", error); // prod: no console
       throw error;
     }
   }
 
-  // Get real scan results from CLI analysis
+  // Get real scan results from CLI analysis.
+  // Single API: GET /api/scan/results/{extensionId} (URL from constants).
+  // Returns payload as-is from backend (no legacy transformation).
   async getRealScanResults(extensionId) {
+    // Deduplicate concurrent calls for the same extensionId
+    if (this._inflightResults.has(extensionId)) {
+      return this._inflightResults.get(extensionId);
+    }
+    const promise = this._getRealScanResultsInner(extensionId);
+    this._inflightResults.set(extensionId, promise);
+    promise.finally(() => this._inflightResults.delete(extensionId));
+    return promise;
+  }
+
+  async _getRealScanResultsInner(extensionId) {
+    const url = getScanResultsUrl(extensionId);
+    if (!url) return null;
     try {
-      // Try to read the analysis file that CLI creates
-      const response = await fetch(
-        `${this.baseURL}/api/scan/results/${extensionId}`,
-      );
+      const { response, body } = await fetchJson(url, {
+        headers: {
+          ...this.getRequestHeaders(),
+        },
+      });
 
       if (response.ok) {
-        const results = await response.json();
-        return this.formatRealResults(results);
-      } else {
-        throw new Error("No scan results found.");
+        return body;
       }
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      throw buildFetchError(response, body, "Failed to fetch scan results");
     } catch (error) {
-      console.error("Failed to get real scan results:", error);
       throw error;
     }
   }
 
-  // Check scan status
   async checkScanStatus(extensionId) {
+    // Deduplicate: if a request for the same extensionId is already in-flight, reuse it.
+    if (this._inflightStatus.has(extensionId)) {
+      return this._inflightStatus.get(extensionId);
+    }
+    const promise = this._checkScanStatusInner(extensionId);
+    this._inflightStatus.set(extensionId, promise);
+    promise.finally(() => this._inflightStatus.delete(extensionId));
+    return promise;
+  }
+
+  async _checkScanStatusInner(extensionId) {
+    const url = `${this.baseURL}/api/scan/status/${extensionId}`;
     try {
-      const response = await fetch(
-        `${this.baseURL}/api/scan/status/${extensionId}`,
-      );
+      const { response, body } = await fetchJson(url);
+      const data = body || {};
+
       if (response.ok) {
-        return await response.json();
+        // Check for service errors and return user-friendly message
+        if (
+          data.error &&
+          (data.error_code === 401 ||
+            data.error_code === 503 ||
+            data.error?.includes("API key") ||
+            data.error?.includes("Invalid API key") ||
+            data.error?.includes("SERVICE_UNAVAILABLE") ||
+            data.error?.includes("temporarily unavailable"))
+        ) {
+          return {
+            scanned: false,
+            status: "failed",
+            error: SERVICE_UNAVAILABLE_MESSAGE,
+            error_code: 503,
+          };
+        }
+        return data;
       }
+
+      // Handle service unavailability errors
+      if (response.status === 401 || response.status === 503) {
+        return {
+          scanned: false,
+          status: "failed",
+          error: SERVICE_UNAVAILABLE_MESSAGE,
+          error_code: 503,
+        };
+      }
+
       return { scanned: false };
     } catch (error) {
-      console.error("Failed to check scan status:", error);
-      // Determine if it's a network error (server down)
-      if (error.message.includes("fetch") || error.message.includes("network")) {
-        throw new Error("Backend server unavailable. Please make sure the API server is running (make api).");
+      // All network/connection errors should show user-friendly message
+      if (
+        error?.message?.includes("fetch") ||
+        error?.message?.includes("network") ||
+        error?.message?.includes("Failed to fetch")
+      ) {
+        return {
+          scanned: false,
+          status: "failed",
+          error: SERVICE_UNAVAILABLE_MESSAGE,
+          error_code: 503,
+        };
       }
-      return { scanned: false, status: "error", error: error.message };
+      if (
+        error?.status === 401 ||
+        error?.status === 503 ||
+        error?.message?.includes("401") ||
+        error?.message?.includes("API key") ||
+        error?.message?.includes("SERVICE_UNAVAILABLE")
+      ) {
+        return {
+          scanned: false,
+          status: "failed",
+          error: SERVICE_UNAVAILABLE_MESSAGE,
+          error_code: 503,
+        };
+      }
+      return {
+        scanned: false,
+        status: "error",
+        error: error?.message,
+      };
     }
   }
 
@@ -176,9 +342,30 @@ class RealScanService {
 
         // Entropy/Obfuscation analysis
         entropyAnalysis: cliResults.entropy_analysis || null,
+        
+        // V2 Scoring - preserve raw fields for normalizer
+        security_score: cliResults.security_score,
+        privacy_score: cliResults.privacy_score,
+        governance_score: cliResults.governance_score,
+        overall_confidence: cliResults.overall_confidence,
+        decision_v2: cliResults.decision_v2,
+        decision_reasons_v2: cliResults.decision_reasons_v2,
+        scoring_v2: cliResults.scoring_v2,
+        
+        // Governance bundle - needed for factors and evidence
+        governance_bundle: cliResults.governance_bundle,
+        governance_verdict: cliResults.governance_verdict,
+        
+        // Preserve raw manifest and metadata for permissions
+        manifest: cliResults.manifest,
+        metadata: cliResults.metadata,
+        permissions_analysis: cliResults.permissions_analysis,
+        
+        // Timestamp
+        timestamp: cliResults.timestamp,
       };
     } catch (error) {
-      console.error("Error formatting CLI results:", error);
+      // console.error("Error formatting CLI results:", error); // prod: no console
       return {
         securityScore: 0,
         riskLevel: "UNKNOWN",
@@ -211,10 +398,11 @@ class RealScanService {
   }
 
   // Determine risk level from CLI results
+  // Thresholds: Green (75-100), Yellow (50-74), Red (0-49)
   determineRiskLevel(score) {
-    if (score < 30) return "HIGH";
-    if (score < 70) return "MEDIUM";
-    return "LOW";
+    if (score >= 75) return "LOW";
+    if (score >= 50) return "MEDIUM";
+    return "HIGH";
   }
 
   // Format file analysis results
@@ -318,7 +506,7 @@ class RealScanService {
         throw new Error(errorData.detail || "Failed to fetch file content");
       }
     } catch (error) {
-      console.error("Failed to get file content:", error);
+      // console.error("Failed to get file content:", error); // prod: no console
       throw error;
     }
   }
@@ -337,7 +525,7 @@ class RealScanService {
         throw new Error("Failed to fetch file list");
       }
     } catch (error) {
-      console.error("Failed to get file list:", error);
+      // console.error("Failed to get file list:", error); // prod: no console
       throw error;
     }
   }
@@ -376,19 +564,19 @@ class RealScanService {
   // COMPLIANCE METHODS
   // ============================================================================
 
-  // Get compliance report (report.json)
+  // Get compliance report (report.json) - uses same GET /api/scan/results/:id
   async getComplianceReport(scanId) {
     try {
-      const response = await fetch(
-        `${this.baseURL}/api/scan/results/${scanId}`
-      );
+      const url = getScanResultsUrl(scanId);
+      if (!url) throw new Error("Invalid scan id");
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         return this.formatComplianceResults(data);
       }
       throw new Error("Failed to fetch compliance report");
     } catch (error) {
-      console.error("Failed to get compliance report:", error);
+      // console.error("Failed to get compliance report:", error); // prod: no console
       throw error;
     }
   }
@@ -454,7 +642,7 @@ class RealScanService {
         facts: reportData.facts || null,
       };
     } catch (error) {
-      console.error("Error formatting compliance results:", error);
+      // console.error("Error formatting compliance results:", error); // prod: no console
       return {
         scan_id: null,
         rule_results: [],
@@ -492,7 +680,7 @@ class RealScanService {
         throw new Error(error.detail || "Failed to download enforcement bundle");
       }
     } catch (error) {
-      console.error("Failed to download enforcement bundle:", error);
+      // console.error("Failed to download enforcement bundle:", error); // prod: no console
       throw error;
     }
   }
@@ -510,24 +698,8 @@ class RealScanService {
         throw new Error(error.detail || "Failed to get enforcement bundle");
       }
     } catch (error) {
-      console.error("Failed to get enforcement bundle:", error);
+      // console.error("Failed to get enforcement bundle:", error); // prod: no console
       throw error;
-    }
-  }
-
-  // Get citation details (optional)
-  async getCitation(citationId) {
-    try {
-      const response = await fetch(
-        `${this.baseURL}/api/citations/${citationId}`
-      );
-      if (response.ok) {
-        return await response.json();
-      }
-      return null;
-    } catch (error) {
-      console.error("Failed to get citation:", error);
-      return null;
     }
   }
 }

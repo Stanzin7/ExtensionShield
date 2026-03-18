@@ -1,321 +1,179 @@
 /**
- * Authentication Service
- * Handles OAuth (Google, GitHub) and email/password authentication
- * 
- * NOTE: This is a frontend-only implementation for demo purposes.
- * In production, replace with actual backend API calls.
+ * Authentication Service (Supabase Auth)
+ * Keeps the existing modal UI but replaces demo/mock auth with real Supabase Auth.
  */
 
-const AUTH_STORAGE_KEY = "atlas_auth_user";
-const AUTH_TOKEN_KEY = "atlas_auth_token";
+import { supabase } from "./supabaseClient";
+import { validateReturnTo } from "../utils/authUtils";
 
-// Google OAuth Configuration
-// To use Google Sign-In, set up credentials at: https://console.cloud.google.com/apis/credentials
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || "";
-
-// Simulated delay to mimic API calls
-const simulateDelay = (ms = 800) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * Initialize Google Sign-In SDK
- */
-const initGoogleAuth = () => {
-  return new Promise((resolve, reject) => {
-    // Check if already loaded
-    if (window.google?.accounts?.id) {
-      resolve(window.google.accounts.id);
-      return;
-    }
-
-    // Load the Google Identity Services library
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if (window.google?.accounts?.id) {
-        resolve(window.google.accounts.id);
-      } else {
-        reject(new Error("Google Sign-In failed to load"));
-      }
-    };
-    script.onerror = () => reject(new Error("Failed to load Google Sign-In SDK"));
-    document.head.appendChild(script);
-  });
-};
-
-/**
- * Parse JWT token to get user info
- */
-const parseJwt = (token) => {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+const checkSupabaseConfig = () => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+  
+  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("placeholder")) {
+    throw new Error(
+      "Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.\n\n" +
+      "To find these values:\n" +
+      "1. Go to https://app.supabase.com\n" +
+      "2. Select your project\n" +
+      "3. Click 'Settings' (gear icon) in the left sidebar\n" +
+      "4. Click 'API' under Project Settings\n" +
+      "5. Copy the 'Project URL' → this is your VITE_SUPABASE_URL\n" +
+      "6. Copy the 'anon' or 'public' key → this is your VITE_SUPABASE_ANON_KEY\n\n" +
+      "Create a .env file in the frontend/ directory with:\n" +
+      "VITE_SUPABASE_URL=https://your-project-id.supabase.co\n" +
+      "VITE_SUPABASE_ANON_KEY=your-anon-key-here"
     );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
   }
 };
 
-/**
- * Store user data in localStorage
- */
-const storeUser = (user, token = null) => {
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-  if (token) {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-  }
-};
+const signInWithGoogle = async () => {
+  checkSupabaseConfig();
+  
+  // Store the return URL: use existing (e.g. set by View report button) or current page
+  // Use sessionStorage for tab-isolation (prevents cross-tab interference)
+  // Validate to prevent open redirects and loops
+  const existingReturnTo = sessionStorage.getItem("auth:returnTo");
+  const returnTo = validateReturnTo(
+    existingReturnTo || window.location.pathname + window.location.search
+  );
+  sessionStorage.setItem("auth:returnTo", returnTo);
 
-/**
- * Clear stored auth data
- */
-const clearStoredAuth = () => {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-};
+  // Callback must use current origin so PKCE code_verifier (stored here) is available on return.
+  // In production, ensure a single canonical domain (e.g. redirect www to non-www) so OAuth matches.
+  const callbackUrl = `${window.location.origin}/auth/callback`;
 
-/**
- * Get current authenticated user from storage
- */
-const getCurrentUser = () => {
-  try {
-    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Get stored auth token
- */
-const getAuthToken = () => {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
-};
-
-/**
- * Sign in with Google OAuth
- */
-const signInWithGoogle = () => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // If no client ID configured, use demo mode
-      if (!GOOGLE_CLIENT_ID) {
-        console.log("Google Client ID not configured. Using demo mode.");
-        await simulateDelay(1200);
-        
-        const demoUser = {
-          id: "google_demo_" + Date.now(),
-          email: "demo.user@gmail.com",
-          name: "Demo User",
-          avatar: "https://lh3.googleusercontent.com/a/default-user=s96-c",
-          provider: "google",
-          createdAt: new Date().toISOString(),
-        };
-        
-        storeUser(demoUser, "demo_google_token_" + Date.now());
-        resolve(demoUser);
-        return;
-      }
-
-      const googleAuth = await initGoogleAuth();
-      
-      googleAuth.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (response) => {
-          if (response.credential) {
-            const payload = parseJwt(response.credential);
-            if (payload) {
-              const user = {
-                id: payload.sub,
-                email: payload.email,
-                name: payload.name,
-                avatar: payload.picture,
-                provider: "google",
-                createdAt: new Date().toISOString(),
-              };
-              storeUser(user, response.credential);
-              resolve(user);
-            } else {
-              reject(new Error("Failed to parse Google credentials"));
-            }
-          } else {
-            reject(new Error("Google sign-in was cancelled"));
-          }
-        },
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-
-      // Prompt for account selection
-      googleAuth.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // Fall back to One Tap alternative or show error
-          const reasonMap = {
-            browser_not_supported: "Browser not supported",
-            invalid_client: "Invalid Google Client ID",
-            missing_client_id: "Google Client ID not configured",
-            opt_out_or_no_session: "Please enable cookies for Google Sign-In",
-            secure_http_required: "HTTPS required for Google Sign-In",
-            suppressed_by_user: "Sign-in was cancelled",
-            unregistered_origin: "This domain is not registered with Google",
-          };
-          const reason = notification.getNotDisplayedReason() || notification.getSkippedReason();
-          reject(new Error(reasonMap[reason] || "Google Sign-In unavailable"));
-        }
-      });
-    } catch (error) {
-      reject(error);
-    }
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
   });
+
+  if (error) {
+    sessionStorage.removeItem("auth:returnTo");
+    throw new Error(error.message || "Google sign-in failed");
+  }
+
+  // Redirect to Google's OAuth page (required; Supabase returns the URL, we must navigate)
+  if (data?.url) {
+    window.location.href = data.url;
+    return;
+  }
+  throw new Error("Google sign-in did not return a redirect URL");
 };
 
-/**
- * Sign in with GitHub OAuth
- */
 const signInWithGitHub = async () => {
-  // If no client ID configured, use demo mode
-  if (!GITHUB_CLIENT_ID) {
-    console.log("GitHub Client ID not configured. Using demo mode.");
-    await simulateDelay(1200);
-    
-    const demoUser = {
-      id: "github_demo_" + Date.now(),
-      email: "demo.user@github.com",
-      name: "Demo Developer",
-      avatar: "https://avatars.githubusercontent.com/u/0?v=4",
-      provider: "github",
-      createdAt: new Date().toISOString(),
-    };
-    
-    storeUser(demoUser, "demo_github_token_" + Date.now());
-    return demoUser;
-  }
+  checkSupabaseConfig();
+  
+  // Store the return URL: use existing (e.g. set by View report button) or current page
+  const existingReturnTo = sessionStorage.getItem("auth:returnTo");
+  const returnTo = validateReturnTo(
+    existingReturnTo || window.location.pathname + window.location.search
+  );
+  sessionStorage.setItem("auth:returnTo", returnTo);
 
-  // In production, this would redirect to GitHub OAuth
-  // and handle the callback with the authorization code
-  const redirectUri = `${window.location.origin}/auth/github/callback`;
-  const scope = "user:email read:user";
-  
-  const authUrl = new URL("https://github.com/login/oauth/authorize");
-  authUrl.searchParams.set("client_id", GITHUB_CLIENT_ID);
-  authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("scope", scope);
-  authUrl.searchParams.set("state", crypto.randomUUID());
-  
-  // For demo, we'll simulate the OAuth flow
-  // In production, redirect to: window.location.href = authUrl.toString();
-  await simulateDelay(1200);
-  
-  const demoUser = {
-    id: "github_" + Date.now(),
-    email: "user@github.com",
-    name: "GitHub User",
-    avatar: "https://avatars.githubusercontent.com/u/0?v=4",
+  const callbackUrl = `${window.location.origin}/auth/callback`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "github",
-    createdAt: new Date().toISOString(),
-  };
-  
-  storeUser(demoUser, "github_demo_token_" + Date.now());
-  return demoUser;
+    options: {
+      redirectTo: callbackUrl,
+    },
+  });
+
+  if (error) {
+    sessionStorage.removeItem("auth:returnTo");
+    throw new Error(error.message || "GitHub sign-in failed");
+  }
+
+  // Redirect to GitHub's OAuth page (required; Supabase returns the URL, we must navigate)
+  if (data?.url) {
+    window.location.href = data.url;
+    return;
+  }
+  throw new Error("GitHub sign-in did not return a redirect URL");
 };
 
-/**
- * Sign in with email and password
- */
+/** Magic link: one email for both sign-up and sign-in. No password. */
+const signInWithMagicLink = async (email) => {
+  checkSupabaseConfig();
+  const redirectTo =
+    typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname || ""}` : undefined;
+  const { data, error } = await supabase.auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: {
+      emailRedirectTo: redirectTo || undefined,
+    },
+  });
+  if (error) {
+    const msg = error.message || "Could not send magic link";
+    if (error.message?.toLowerCase().includes("sending magic link") || error.status === 500) {
+      throw new Error(
+        `${msg} Check Supabase SMTP and Auth logs (Authentication → Emails).`
+      );
+    }
+    throw new Error(msg);
+  }
+  return data;
+};
+
+/** Message shown after magic link email is sent */
+export const MAGIC_LINK_SENT_MESSAGE =
+  "We sent you a sign-in link. Click it in the email to continue.";
+
 const signInWithEmail = async (email, password) => {
-  if (!email || !password) {
-    throw new Error("Email and password are required");
+  checkSupabaseConfig();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    if (error.message.includes("Email not confirmed")) {
+      throw new Error("Please check your email and click the confirmation link before signing in.");
+    }
+    throw new Error(error.message || "Invalid credentials");
   }
-
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    throw new Error("Invalid email format");
-  }
-
-  // In production, this would make an API call to your backend
-  // For demo, we'll simulate authentication
-  await simulateDelay(1000);
-
-  // Demo: Accept any valid-looking credentials
-  const user = {
-    id: "email_" + Date.now(),
-    email: email,
-    name: email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
-    avatar: null,
-    provider: "email",
-    createdAt: new Date().toISOString(),
-  };
-
-  storeUser(user, "email_token_" + Date.now());
-  return user;
+  return data.user;
 };
 
-/**
- * Sign up with email and password
- */
+/** @deprecated Prefer magic link. Kept for backwards compatibility. */
+export const EMAIL_CONFIRM_REQUIRED_MESSAGE =
+  "Please check your email to confirm your account before signing in. Click the link in the email to finish.";
+
 const signUpWithEmail = async (email, password, name) => {
-  if (!email || !password) {
-    throw new Error("Email and password are required");
+  checkSupabaseConfig();
+  const redirectTo =
+    typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname || ""}` : undefined;
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      ...(name ? { data: { full_name: name } } : {}),
+      ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
+    },
+  });
+  if (error) throw new Error(error.message || "Sign up failed");
+
+  if (data.user && !data.session) {
+    return { user: data.user, needsEmailConfirmation: true };
   }
-
-  if (password.length < 8) {
-    throw new Error("Password must be at least 8 characters");
-  }
-
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    throw new Error("Invalid email format");
-  }
-
-  // In production, this would make an API call to your backend
-  await simulateDelay(1200);
-
-  const user = {
-    id: "email_" + Date.now(),
-    email: email,
-    name: name || email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
-    avatar: null,
-    provider: "email",
-    createdAt: new Date().toISOString(),
-  };
-
-  storeUser(user, "email_token_" + Date.now());
-  return user;
+  return { user: data.user, needsEmailConfirmation: false };
 };
 
-/**
- * Sign out the current user
- */
 const signOut = async () => {
-  // Clear any Google session
-  if (window.google?.accounts?.id) {
-    window.google.accounts.id.disableAutoSelect();
-  }
-  
-  clearStoredAuth();
-  await simulateDelay(300);
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(error.message || "Sign out failed");
 };
 
 const authService = {
-  getCurrentUser,
-  getAuthToken,
   signInWithGoogle,
   signInWithGitHub,
+  signInWithMagicLink,
   signInWithEmail,
   signUpWithEmail,
   signOut,
-  initGoogleAuth,
 };
 
 export default authService;

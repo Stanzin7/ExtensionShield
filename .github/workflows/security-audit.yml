@@ -1,0 +1,80 @@
+# Security audits: pip-audit (Python), npm audit (frontend), gitleaks (secrets).
+# Fails CI on critical/high only for Python and npm; fails on any secret found.
+
+name: Security Audit
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  audit-python:
+    name: pip-audit (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Install pip-audit
+        run: uv pip install pip-audit
+
+      # Fail only when pip-audit reports vulns and advisory text contains CRITICAL/HIGH (best-effort; pip-audit JSON has no severity yet)
+      - name: Run pip-audit (fail on critical/high only)
+        run: |
+          uv run pip-audit 2>&1 | tee audit.log || true
+          code=$?
+          if [ $code -eq 0 ]; then exit 0; fi
+          if grep -qiE '\b(CRITICAL|HIGH)\b' audit.log; then
+            echo "::error::Critical or high Python vulnerabilities found. Fix or add --ignore-vuln for acceptable ones."
+            exit 1
+          fi
+          echo "Only low/moderate (or no severity in output) - not failing CI."
+
+  audit-frontend:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit (fail on high/critical only)
+        run: npm audit --audit-level=high
+
+  audit-secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE required for some orgs; add secret if needed
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

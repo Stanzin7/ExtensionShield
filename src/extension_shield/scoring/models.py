@@ -5,7 +5,7 @@ Pydantic models for the V2 scoring architecture with normalized [0,1] severities
 and confidences. All scores are explainable with factor contributions and evidence.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -36,16 +36,27 @@ class RiskLevel(str, Enum):
     
     @classmethod
     def from_score(cls, score: int) -> "RiskLevel":
-        """Convert score [0-100] to risk level (higher score = safer)."""
-        if score < 30:
-            return cls.CRITICAL
-        elif score < 50:
+        """
+        Convert score [0-100] to risk level (higher score = safer).
+
+        Thresholds (aligned with frontend riskBands.js):
+        - Red (HIGH/CRITICAL): 0-49
+        - Yellow (MEDIUM/WARN): 50-74
+        - Green (LOW/NONE): 75-100
+        """
+        if score < 50:
+            # 0-49: Red zone (HIGH or CRITICAL)
+            if score < 30:
+                return cls.CRITICAL
             return cls.HIGH
-        elif score < 70:
+        elif score < 75:
+            # 50-74: Yellow zone (MEDIUM)
             return cls.MEDIUM
-        elif score < 90:
+        else:
+            # 75-100: Green zone (LOW or NONE)
+            if score >= 95:
+                return cls.NONE
             return cls.LOW
-        return cls.NONE
 
 
 class Decision(str, Enum):
@@ -310,14 +321,38 @@ class ScoringResult(BaseModel):
         description="Overall confidence in scoring result (layer-weighted average of confidences)"
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp when this result was created"
     )
     scoring_version: str = Field(
         default="2.0.0",
         description="Version of the scoring engine used"
     )
-    
+    # Explicit gate/override breakdown for QA and enterprise audits (overall_score = final_overall)
+    base_overall: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Weighted layer sum before gate penalties (sec*0.5 + priv*0.3 + gov*0.2)"
+    )
+    gate_penalty: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Points subtracted from base_overall by hard gate penalties (sum of layer penalties)"
+    )
+    gate_reasons: Optional[List[str]] = Field(
+        default=None,
+        description="Human-readable, auditable reasons for each triggered gate"
+    )
+    coverage_cap_applied: Optional[bool] = Field(
+        default=None,
+        description="True when overall was capped (e.g. SAST missing → cap at 80)"
+    )
+    coverage_cap_reason: Optional[str] = Field(
+        default=None,
+        description="Reason for coverage cap when coverage_cap_applied is True"
+    )
+
     @computed_field
     @property
     def risk_level(self) -> RiskLevel:
@@ -337,7 +372,7 @@ class ScoringResult(BaseModel):
         return self.decision == Decision.NEEDS_REVIEW
     
     @classmethod
-    def compute(
+    def assemble(
         cls,
         scan_id: str,
         extension_id: str,
@@ -345,11 +380,17 @@ class ScoringResult(BaseModel):
         privacy_layer: LayerScore,
         governance_layer: LayerScore,
         layer_weights: Dict[str, float],
+        decision: "Decision",
+        reasons: List[str],
         hard_gates_triggered: Optional[List[str]] = None,
     ) -> "ScoringResult":
         """
-        Compute final scoring result from layer scores.
-        
+        Assemble a ScoringResult from pre-computed layers and a decision.
+
+        Decision logic is centralized in ``ScoringEngine._determine_decision``;
+        this method only aggregates layer scores and attaches the decision that
+        was already computed by the engine.
+
         Args:
             scan_id: Unique scan identifier
             extension_id: Chrome extension ID
@@ -357,57 +398,31 @@ class ScoringResult(BaseModel):
             privacy_layer: Computed privacy layer score
             governance_layer: Computed governance layer score
             layer_weights: Weights for each layer (should sum to 1.0)
-            hard_gates_triggered: Any hard gates that force BLOCK
-            
+            decision: Pre-computed Decision from the engine
+            reasons: Pre-computed decision reasons from the engine
+            hard_gates_triggered: Any hard gates that triggered
+
         Returns:
-            Complete ScoringResult with decision and explanation
+            Complete ScoringResult
         """
         hard_gates = hard_gates_triggered or []
-        
-        # Calculate weighted overall score
+
         sec_weight = layer_weights.get("security", 0.5)
         priv_weight = layer_weights.get("privacy", 0.3)
         gov_weight = layer_weights.get("governance", 0.2)
-        
+
         overall_score = int(
             security_layer.score * sec_weight +
             privacy_layer.score * priv_weight +
             governance_layer.score * gov_weight
         )
-        
-        # Calculate overall confidence (layer-weighted average of layer confidences)
+
         overall_confidence = (
             security_layer.confidence * sec_weight +
             privacy_layer.confidence * priv_weight +
             governance_layer.confidence * gov_weight
         )
-        
-        # Determine decision
-        decision = Decision.ALLOW
-        reasons: List[str] = []
-        
-        # Hard gates override everything
-        if hard_gates:
-            decision = Decision.BLOCK
-            reasons = [f"Hard gate triggered: {gate}" for gate in hard_gates]
-        elif overall_score < 30:
-            decision = Decision.BLOCK
-            reasons.append(f"Overall score {overall_score}/100 below BLOCK threshold (30)")
-        elif overall_score < 60:
-            decision = Decision.NEEDS_REVIEW
-            reasons.append(f"Overall score {overall_score}/100 below ALLOW threshold (60)")
-        else:
-            reasons.append(f"Overall score {overall_score}/100 - extension passes all checks")
-        
-        # Add layer-specific concerns
-        if security_layer.score < 50:
-            reasons.append(f"Security concerns: score {security_layer.score}/100")
-        if privacy_layer.score < 50:
-            reasons.append(f"Privacy concerns: score {privacy_layer.score}/100")
-        if governance_layer.score < 50:
-            reasons.append(f"Governance concerns: score {governance_layer.score}/100")
-        
-        # Build explanation
+
         explanation = cls._build_explanation(
             decision=decision,
             overall_score=overall_score,
@@ -416,7 +431,7 @@ class ScoringResult(BaseModel):
             governance_layer=governance_layer,
             hard_gates=hard_gates,
         )
-        
+
         return cls(
             scan_id=scan_id,
             extension_id=extension_id,
@@ -479,7 +494,7 @@ class ScoringResult(BaseModel):
     
     def model_dump_for_api(self) -> Dict[str, Any]:
         """Dump model for API response with computed fields."""
-        return {
+        out = {
             "scan_id": self.scan_id,
             "extension_id": self.extension_id,
             "security_score": self.security_score,
@@ -499,4 +514,15 @@ class ScoringResult(BaseModel):
             "created_at": self.created_at.isoformat(),
             "scoring_version": self.scoring_version,
         }
+        if self.base_overall is not None:
+            out["base_overall"] = self.base_overall
+        if self.gate_penalty is not None:
+            out["gate_penalty"] = self.gate_penalty
+        if self.gate_reasons is not None:
+            out["gate_reasons"] = self.gate_reasons
+        if self.coverage_cap_applied is not None:
+            out["coverage_cap_applied"] = self.coverage_cap_applied
+        if self.coverage_cap_reason is not None:
+            out["coverage_cap_reason"] = self.coverage_cap_reason
+        return out
 

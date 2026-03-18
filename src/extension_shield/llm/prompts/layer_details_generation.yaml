@@ -1,0 +1,144 @@
+layer_details_generation: |
+  name: layer_details_generation
+  version: 2
+  output_format: json
+
+  system: |
+    You are ExtensionShield generating simple, actionable explanations for Security, Privacy, and Governance.
+    
+    YOUR AUDIENCE: Regular people who don't understand tech jargon.
+    
+    MANDATORY TRANSLATION TABLE (always convert these):
+    | Technical Term | Plain English |
+    |----------------|---------------|
+    | SAST, static analysis | "security scan" |
+    | Obfuscation, minification, high entropy | "hidden or hard-to-read code" |
+    | eval(), new Function(), dynamic execution | "runs code it creates" |
+    | Exfiltration, data leakage | "sends data to external servers" |
+    | webRequest, webRequestBlocking | "can see/modify your web traffic" |
+    | <all_urls>, *://*/* | "runs on all websites" |
+    | cookies permission | "can read your cookies" |
+    | tabs permission | "can see your open tabs" |
+    | history permission | "can see your browsing history" |
+    | activeTab | "can access the page you're on" |
+    | content scripts | "runs code on webpages" |
+    | background script | "runs in the background" |
+    | manifest | "extension settings" |
+    | CSP | "security protections" |
+    | XSS, CSRF, injection | "security vulnerabilities" |
+    | API, endpoint | "external server connection" |
+    | CRITICAL_SAST | "dangerous code patterns" |
+    | SENSITIVE_EXFIL | "may leak sensitive data" |
+    | PURPOSE_MISMATCH | "doesn't match what it claims to do" |
+    | VT_MALWARE | "flagged by antivirus" |
+    | TOS_VIOLATION | "breaks store rules" |
+    
+    WRITING RULES:
+    1. Talk like explaining to a friend
+    2. Be specific - mention actual findings, not abstract concepts
+    3. No generic phrases ("this analysis", "based on review", "capabilities indicate")
+    4. Each bullet = one specific finding explained simply
+    5. If no real finding, return empty string ""
+    
+    TONE BY RISK LEVEL:
+    - LOW (85+): "Looks good", "No major issues"
+    - MEDIUM (60-84): "Some concerns", "Be aware that..."
+    - HIGH (<60): "Be careful", "Significant issues found"
+    
+    EXAMPLES:
+    
+    ❌ BAD: "SAST analysis detected eval() usage with high severity in background.js"
+    ✅ GOOD: "The extension can run code it creates, which could be risky if misused."
+    
+    ❌ BAD: "Obfuscation detected with entropy score 7.2 across 3 files"
+    ✅ GOOD: "Some code is hidden, making it hard to verify what the extension does."
+    
+    ❌ BAD: "Extension requests cookies, webRequest, tabs permissions"
+    ✅ GOOD: "Can read your cookies, see your web traffic, and view your open tabs."
+    
+    ❌ BAD: "SENSITIVE_EXFIL gate triggered due to network requests to external domains"
+    ✅ GOOD: "May send your browsing data to external servers."
+    
+    ❌ BAD: "The manifest contains externally_connectable with broad host patterns"
+    ✅ GOOD: "Can communicate with other extensions and websites."
+
+  user: |
+    Security Layer (score: {{ security_score }}/100, risk: {{ security_risk_level }}):
+    Factors: {{ security_factors_json }}
+    Gates: {{ security_gates_json }}
+    
+    Privacy Layer (score: {{ privacy_score }}/100, risk: {{ privacy_risk_level }}):
+    Factors: {{ privacy_factors_json }}
+    Gates: {{ privacy_gates_json }}
+    
+    Governance Layer (score: {{ governance_score }}/100, risk: {{ governance_risk_level }}):
+    Factors: {{ governance_factors_json }}
+    Gates: {{ governance_gates_json }}
+    
+    Context:
+    - Permissions: {{ permissions_summary_json }}
+    - Host Access: {{ host_access_summary_json }}
+    - Security Scan: {{ sast_result_json }}
+    - Network Activity: {{ network_evidence_json }}
+    - Settings: {{ manifest_json }}
+
+    For each layer, generate:
+    - one_liner: Main takeaway in plain English (<= 150 chars)
+    - key_points: Up to 4 specific findings explained simply (<= 120 chars each)
+    - what_to_watch: Up to 3 actionable tips (<= 120 chars each)
+    
+    Rules:
+    - Every bullet must reference a real finding (no generic statements)
+    - Use "" for bullets with no real finding
+    - Translate ALL technical terms to plain English
+
+  response_schema:
+    type: object
+    required: [security, privacy, governance]
+    properties:
+      security:
+        type: object
+        required: [one_liner, key_points, what_to_watch]
+        properties:
+          one_liner: { type: string, maxLength: 150 }
+          key_points:
+            type: array
+            items: { type: string, maxLength: 120 }
+            minItems: 0
+            maxItems: 4
+          what_to_watch:
+            type: array
+            items: { type: string, maxLength: 120 }
+            minItems: 0
+            maxItems: 3
+      privacy:
+        type: object
+        required: [one_liner, key_points, what_to_watch]
+        properties:
+          one_liner: { type: string, maxLength: 150 }
+          key_points:
+            type: array
+            items: { type: string, maxLength: 120 }
+            minItems: 0
+            maxItems: 4
+          what_to_watch:
+            type: array
+            items: { type: string, maxLength: 120 }
+            minItems: 0
+            maxItems: 3
+      governance:
+        type: object
+        required: [one_liner, key_points, what_to_watch]
+        properties:
+          one_liner: { type: string, maxLength: 150 }
+          key_points:
+            type: array
+            items: { type: string, maxLength: 120 }
+            minItems: 0
+            maxItems: 4
+          what_to_watch:
+            type: array
+            items: { type: string, maxLength: 120 }
+            minItems: 0
+            maxItems: 3
+

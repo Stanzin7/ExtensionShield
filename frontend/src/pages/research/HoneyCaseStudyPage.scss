@@ -1,0 +1,415 @@
+/* ============================================================================
+   Honey Case Study Page
+   ============================================================================ */
+
+.honey-case-study-page {
+  min-height: 100vh;
+  background: transparent;
+  color: var(--extensionshield-text-primary, #f8fafc);
+  position: relative;
+}
+
+.honey-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  
+  .bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 60% 40% at 20% 30%, rgba(255, 149, 0, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 70%, rgba(239, 68, 68, 0.06) 0%, transparent 50%);
+  }
+}
+
+.honey-content {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 6rem 2rem 4rem;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--extensionshield-text-muted, #64748b);
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  
+  a {
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    text-decoration: none;
+    
+    &:hover {
+      color: var(--extensionshield-accent, #22c55e);
+    }
+  }
+}
+
+.honey-header {
+  margin-bottom: 2.5rem;
+  
+  h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: var(--extensionshield-text-primary, #f8fafc);
+  }
+}
+
+.honey-subtitle {
+  font-size: 1.25rem;
+  color: var(--extensionshield-text-secondary, #94a3b8);
+  font-style: italic;
+}
+
+.honey-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.severity-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  
+  &.high {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fdba74;
+    border: 1px solid rgba(249, 115, 22, 0.4);
+  }
+  
+  &.critical {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+  }
+}
+
+.category-badge {
+  padding: 0.375rem 0.75rem;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #a78bfa;
+}
+
+.date-badge {
+  padding: 0.375rem 0.75rem;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--extensionshield-text-muted, #64748b);
+}
+
+/* Stats */
+.honey-stats {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 3rem;
+  padding: 1.5rem 2rem;
+  background: rgba(13, 20, 36, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+}
+
+.stat {
+  flex: 1;
+  
+  .stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--extensionshield-text-primary, #f8fafc);
+    margin-bottom: 0.25rem;
+  }
+  
+  .stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--extensionshield-text-muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  &.danger .stat-value {
+    color: var(--risk-bad);
+  }
+}
+
+/* Article */
+.honey-article {
+  section {
+    margin-bottom: 2.5rem;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--extensionshield-text-primary, #f8fafc);
+  }
+  
+  p {
+    font-size: 1rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    line-height: 1.8;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Findings Grid */
+.findings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.finding-card {
+  padding: 1.5rem;
+  background: rgba(13, 20, 36, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  
+  h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--extensionshield-text-primary, #f8fafc);
+  }
+  
+  p {
+    font-size: 0.875rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+.finding-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Lessons List */
+.lessons-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  
+  li {
+    padding: 1rem 1.25rem;
+    background: rgba(13, 20, 36, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    line-height: 1.6;
+    
+    strong {
+      color: var(--extensionshield-text-primary, #f8fafc);
+      font-weight: 600;
+    }
+  }
+}
+
+/* CTA */
+.honey-cta {
+  margin-top: 3rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(13, 20, 36, 0.6) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 16px;
+  text-align: center;
+  
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--extensionshield-text-primary, #f8fafc);
+  }
+  
+  p {
+    font-size: 0.9375rem;
+    color: var(--extensionshield-text-secondary, #94a3b8);
+    margin-bottom: 1.5rem;
+  }
+
+  .honey-cta-secondary {
+    margin-top: 1rem;
+    margin-bottom: 0;
+    font-size: 0.9375rem;
+
+    a {
+      color: var(--extensionshield-accent, #22c55e);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: var(--extensionshield-accent, #22c55e);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  
+  svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover {
+    box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+    
+    svg {
+      transform: translateX(4px);
+    }
+  }
+}
+
+/* Day mode – Honey case study */
+.light .honey-case-study-page {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .honey-bg .bg-gradient {
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(178, 82, 24, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 70%, rgba(239, 68, 68, 0.04) 0%, transparent 50%);
+}
+
+.light .breadcrumb a:hover {
+  color: var(--extensionshield-accent);
+}
+
+.light .honey-header h1 {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .honey-subtitle {
+  color: var(--extensionshield-text-secondary);
+}
+
+.light .honey-stats {
+  background: rgba(247, 243, 235, 0.95);
+  border: 1px solid var(--extensionshield-border);
+}
+
+.light .finding-card {
+  background: var(--extensionshield-surface-card);
+  border: 1px solid var(--extensionshield-border);
+  box-shadow: 0 4px 20px rgba(38, 35, 31, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.light .finding-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(22, 163, 74, 0.25);
+  box-shadow: 0 12px 40px rgba(38, 35, 31, 0.12);
+}
+
+.light .finding-card h3 {
+  color: var(--extensionshield-text-primary);
+  font-weight: 700;
+}
+
+.light .finding-card p {
+  color: var(--extensionshield-text-secondary);
+  font-weight: 500;
+}
+
+.light .honey-article section h2 {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .honey-article section p {
+  color: var(--extensionshield-text-secondary);
+  font-weight: 500;
+}
+
+.light .honey-stats .stat-value {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .honey-stats .stat-label {
+  color: var(--extensionshield-text-muted);
+  font-weight: 600;
+}
+
+.light .honey-stats .stat.danger .stat-value {
+  color: var(--risk-bad);
+}
+
+.light .date-badge {
+  background: var(--extensionshield-accent-subtle);
+  border-color: var(--extensionshield-border-accent);
+  color: var(--extensionshield-text-secondary);
+  font-weight: 600;
+}.light .lessons-list li {
+  background: rgba(247, 243, 235, 0.9);
+  border: 1px solid var(--extensionshield-border);
+  color: var(--extensionshield-text-secondary);
+}
+
+.light .lessons-list li strong {
+  color: var(--extensionshield-text-primary);
+}
+
+.light .honey-cta {
+  background: linear-gradient(135deg, var(--extensionshield-accent-subtle) 0%, var(--extensionshield-bg-secondary) 100%);
+  border: 1px solid var(--extensionshield-border-accent);
+}
+
+.light .cta-button {
+  background: var(--extensionshield-accent);
+  color: rgb(255 255 255);
+}
+
+.light .cta-button:hover {
+  box-shadow: 0 8px 24px var(--extensionshield-accent-glow);
+}
+
+/* Day mode: labels/badges green to match ExtensionShield */
+.light .category-badge {
+  background: var(--extensionshield-accent-subtle);
+  border-color: var(--extensionshield-border-accent);
+  color: var(--extensionshield-accent);
+  font-weight: 600;
+}

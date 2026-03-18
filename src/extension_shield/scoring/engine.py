@@ -21,6 +21,7 @@ Where:
 """
 
 import logging
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -170,6 +171,13 @@ class ScoringEngine:
             webstore_stats=signal_pack.webstore_stats,
             user_count=user_count,
         )
+        # Coverage sanity: track whether SAST coverage is missing.
+        # If no files were scanned and no findings exist, we treat coverage as limited
+        # and will apply a deterministic cap + review decision later.
+        sast_missing_coverage = (
+            signal_pack.sast.files_scanned == 0
+            and not signal_pack.sast.deduped_findings
+        )
         
         # Privacy factors (use network signal pack for exfiltration analysis)
         privacy_factors = normalize_privacy_factors(
@@ -206,41 +214,100 @@ class ScoringEngine:
             self.weights.governance_weights,
         )
         
-        # Build LayerScore objects
+        # Build LayerScore objects (using adjusted scores after gate penalties)
         security_layer = LayerScore(
             layer_name="security",
-            score=security_score,
+            score=security_score,  # This is now the adjusted score
             risk=round(security_risk, 4),
             factors=security_factors,
         )
         
         privacy_layer = LayerScore(
             layer_name="privacy",
-            score=privacy_score,
+            score=privacy_score,  # This is now the adjusted score
             risk=round(privacy_risk, 4),
             factors=privacy_factors,
         )
         
         governance_layer = LayerScore(
             layer_name="governance",
-            score=governance_score,
+            score=governance_score,  # This is now the adjusted score
             risk=round(governance_risk, 4),
             factors=governance_factors,
         )
         
         # =====================================================================
-        # STEP 3: Calculate overall score (weighted average of layers)
+        # STEP 3: Evaluate hard gates (before calculating overall score)
         # =====================================================================
         
         layer_weights = self.weights.layer_weights
-        overall_score = int(
-            security_score * layer_weights.get("security", 0.5) +
-            privacy_score * layer_weights.get("privacy", 0.3) +
-            governance_score * layer_weights.get("governance", 0.2)
+        base_overall = round(
+            security_score * layer_weights.get("security", 0.34) +
+            privacy_score * layer_weights.get("privacy", 0.33) +
+            governance_score * layer_weights.get("governance", 0.33)
         )
         
+        gate_results = self.gates.evaluate_all(signal_pack, manifest)
+        self._last_gate_results = gate_results
+        
+        # STEP 3.1: Incorporate hard gate penalties into layer scores
+        # Hard gates should affect the numeric scores, not just trigger decisions
+        security_score, privacy_score, governance_score = self._apply_gate_penalties(
+            security_score, privacy_score, governance_score, gate_results
+        )
+        
+        overall_after_gates = round(
+            security_score * layer_weights.get("security", 0.34) +
+            privacy_score * layer_weights.get("privacy", 0.33) +
+            governance_score * layer_weights.get("governance", 0.33)
+        )
+        gate_penalty = base_overall - overall_after_gates
+        gate_reasons_list: List[str] = []
+        for g in gate_results:
+            if g.triggered and g.reasons:
+                gate_reasons_list.extend(g.reasons[:2])
+        
+        # Rebuild LayerScore objects so .score and .risk stay consistent.
+        # risk = 1 - score/100  (the inverse relationship defined by the formula)
+        security_layer = LayerScore(
+            layer_name="security",
+            score=security_score,
+            risk=round(1.0 - security_score / 100.0, 4),
+            factors=security_layer.factors,
+        )
+        privacy_layer = LayerScore(
+            layer_name="privacy",
+            score=privacy_score,
+            risk=round(1.0 - privacy_score / 100.0, 4),
+            factors=privacy_layer.factors,
+        )
+        governance_layer = LayerScore(
+            layer_name="governance",
+            score=governance_score,
+            risk=round(1.0 - governance_score / 100.0, 4),
+            factors=governance_layer.factors,
+        )
+        
+        # =====================================================================
+        # STEP 4: Calculate overall score (weighted average of layers)
+        # AFTER gate penalties are applied
+        # =====================================================================
+        
+        overall_score = overall_after_gates
+        
+        # Coverage sanity: cap overall_score when critical analyzers are missing.
+        # Missing SAST coverage must not look like a perfectly safe 100/100.
+        coverage_reasons: List[str] = []
+        coverage_cap_applied = False
+        coverage_cap_reason: Optional[str] = None
+        if sast_missing_coverage and overall_score > 80:
+            overall_score = 80
+            coverage_cap_applied = True
+            coverage_cap_reason = "SAST coverage missing; score capped at 80"
+            coverage_reasons.append(coverage_cap_reason)
+        
         logger.debug(
-            "Layer scores: security=%d, privacy=%d, governance=%d, overall=%d",
+            "Layer scores (after gate penalties): security=%d, privacy=%d, governance=%d, overall=%d",
             security_score,
             privacy_score,
             governance_score,
@@ -248,11 +315,8 @@ class ScoringEngine:
         )
         
         # =====================================================================
-        # STEP 4: Evaluate hard gates
+        # STEP 5: Get gate results for decision making
         # =====================================================================
-        
-        gate_results = self.gates.evaluate_all(signal_pack, manifest)
-        self._last_gate_results = gate_results
         
         blocking_gates = self.gates.get_blocking_gates(gate_results)
         warning_gates = self.gates.get_warning_gates(gate_results)
@@ -266,7 +330,7 @@ class ScoringEngine:
             )
         
         # =====================================================================
-        # STEP 5: Determine final decision
+        # STEP 6: Determine final decision
         # =====================================================================
         
         decision, reasons = self._determine_decision(
@@ -278,8 +342,17 @@ class ScoringEngine:
             warning_gates=warning_gates,
         )
         
+        # Apply coverage sanity: if coverage is limited and we didn't already
+        # BLOCK, ensure at least NEEDS_REVIEW and surface a clear reason.
+        if coverage_reasons:
+            for cr in coverage_reasons:
+                if cr not in reasons:
+                    reasons.append(cr)
+            if decision != Decision.BLOCK:
+                decision = Decision.NEEDS_REVIEW
+        
         # =====================================================================
-        # STEP 6: Build final result
+        # STEP 7: Build final result
         # =====================================================================
         
         result = ScoringResult(
@@ -304,6 +377,11 @@ class ScoringEngine:
             governance_layer=governance_layer,
             hard_gates_triggered=triggered_gate_ids,
             scoring_version=self.VERSION,
+            base_overall=base_overall,
+            gate_penalty=gate_penalty,
+            gate_reasons=gate_reasons_list or None,
+            coverage_cap_applied=coverage_cap_applied,
+            coverage_cap_reason=coverage_cap_reason,
         )
         
         # Cache for explanation generation
@@ -424,6 +502,41 @@ class ScoringEngine:
             if signal_pack.virustotal.malicious_count > 0:
                 tos_severity += 0.4
                 tos_flags.append("broad_access_with_vt_detection")
+
+        # Travel-docs / visa portal ToS automation risk (deterministic)
+        # If an extension targets protected visa scheduling portals and can inject scripts
+        # or capture screens, treat as a severe governance/compliance concern.
+        try:
+            from extension_shield.scoring.gates import TRAVEL_DOCS_PROTECTED_DOMAINS, VISA_SLOT_ECOSYSTEM_DOMAINS
+
+            host_patterns = (signal_pack.permissions.host_permissions or []) + (signal_pack.permissions.api_permissions or [])
+            host_text = " ".join([str(x).lower() for x in host_patterns if isinstance(x, str)])
+            protected_hit = any(d in host_text for d in TRAVEL_DOCS_PROTECTED_DOMAINS)
+
+            manifest_text = (
+                json.dumps(manifest or {}, sort_keys=True, ensure_ascii=True).lower()
+                if isinstance(manifest, dict) else ""
+            )
+            protected_hit = protected_hit or any(d in manifest_text for d in TRAVEL_DOCS_PROTECTED_DOMAINS)
+
+            has_injection_capability = any(
+                p in (signal_pack.permissions.api_permissions or [])
+                for p in ["scripting", "webRequest", "webRequestBlocking", "declarativeNetRequest"]
+            ) or bool(manifest.get("content_scripts"))
+
+            has_capture_capability = any(
+                p in (signal_pack.permissions.api_permissions or [])
+                for p in ["tabCapture", "desktopCapture"]
+            )
+
+            ecosystem_hit = any(d in manifest_text for d in VISA_SLOT_ECOSYSTEM_DOMAINS)
+            if protected_hit and (has_injection_capability or has_capture_capability or ecosystem_hit):
+                tos_severity = max(tos_severity, 0.9)
+                tos_flags.append("travel_docs_tos_automation_risk")
+                if ecosystem_hit:
+                    tos_flags.append("travel_docs_third_party_processor_risk")
+        except Exception:
+            logger.debug("Travel-docs ToS heuristic failed", exc_info=True)
         
         tos_severity = min(1.0, tos_severity)
         
@@ -510,6 +623,87 @@ class ScoringEngine:
         
         return factors
     
+    def _apply_gate_penalties(
+        self,
+        security_score: int,
+        privacy_score: int, 
+        governance_score: int,
+        gate_results: List[GateResult],
+    ) -> Tuple[int, int, int]:
+        """
+        Apply hard gate penalties to layer scores.
+        
+        Hard gates that trigger should significantly penalize the corresponding layer score.
+        This ensures that gate findings are reflected in both decisions AND numeric scores.
+        
+        Args:
+            security_score: Original security score
+            privacy_score: Original privacy score
+            governance_score: Original governance score
+            gate_results: Results from hard gate evaluation
+            
+        Returns:
+            Tuple of (adjusted_security_score, adjusted_privacy_score, adjusted_governance_score)
+        """
+        # Gate penalty mappings (gate_id -> (layer, penalty))
+        # BLOCK gates get higher penalty than WARN gates
+        gate_penalties = {
+            'CRITICAL_SAST': ('security', 50),      # BLOCK gate
+            'VT_MALWARE': ('security', 45),         # BLOCK gate
+            'TOS_VIOLATION': ('governance', 60),    # BLOCK gate - severe governance issue
+            'PURPOSE_MISMATCH': ('governance', 45), # WARN/BLOCK gate - major consistency issue
+            'SENSITIVE_EXFIL': ('privacy', 40),     # WARN gate
+        }
+        
+        # Track penalties by layer
+        security_penalty = 0
+        privacy_penalty = 0
+        governance_penalty = 0
+        
+        for gate_result in gate_results:
+            if not gate_result.triggered:
+                continue
+                
+            gate_config = gate_penalties.get(gate_result.gate_id)
+            if not gate_config:
+                continue
+                
+            layer, base_penalty = gate_config
+            
+            # Scale penalty based on gate decision severity and confidence
+            penalty_multiplier = 1.0
+            if gate_result.decision == 'BLOCK':
+                penalty_multiplier = 1.0  # Full penalty for BLOCK
+            elif gate_result.decision == 'WARN':
+                penalty_multiplier = 0.7  # Reduced penalty for WARN
+            
+            # Apply confidence scaling
+            adjusted_penalty = int(base_penalty * penalty_multiplier * gate_result.confidence)
+            
+            # Apply penalty to appropriate layer
+            if layer == 'security':
+                security_penalty = max(security_penalty, adjusted_penalty)
+            elif layer == 'privacy':
+                privacy_penalty = max(privacy_penalty, adjusted_penalty)
+            elif layer == 'governance':
+                governance_penalty = max(governance_penalty, adjusted_penalty)
+        
+        # Apply penalties (ensure scores don't go below 0)
+        adjusted_security = max(0, security_score - security_penalty)
+        adjusted_privacy = max(0, privacy_score - privacy_penalty)
+        adjusted_governance = max(0, governance_score - governance_penalty)
+        
+        # Log penalties for debugging
+        if security_penalty > 0 or privacy_penalty > 0 or governance_penalty > 0:
+            logger.info(
+                "Applied gate penalties: security %d->%d (-%d), privacy %d->%d (-%d), governance %d->%d (-%d)",
+                security_score, adjusted_security, security_penalty,
+                privacy_score, adjusted_privacy, privacy_penalty,
+                governance_score, adjusted_governance, governance_penalty,
+            )
+        
+        return adjusted_security, adjusted_privacy, adjusted_governance
+    
     def _determine_decision(
         self,
         overall_score: int,
@@ -527,8 +721,8 @@ class ScoringEngine:
         2. Security score < 30 → BLOCK
         3. Overall score < 30 → BLOCK
         4. Any warning gate → NEEDS_REVIEW
-        5. Security score < 60 → NEEDS_REVIEW
-        6. Overall score < 60 → NEEDS_REVIEW
+        5. Security score < 75 → NEEDS_REVIEW
+        6. Overall score < 75 → NEEDS_REVIEW
         7. All pass → ALLOW
         
         Args:
@@ -567,16 +761,16 @@ class ScoringEngine:
             return Decision.NEEDS_REVIEW, reasons
         
         # Priority 5: Low security score
-        if security_score < 60:
+        if security_score < 75:
             reasons.append(f"Security score {security_score}/100 below threshold")
             return Decision.NEEDS_REVIEW, reasons
-        
+
         # Priority 6: Low overall score
-        if overall_score < 60:
+        if overall_score < 75:
             reasons.append(f"Overall score {overall_score}/100 below threshold")
-            if privacy_score < 60:
+            if privacy_score < 75:
                 reasons.append(f"Privacy score {privacy_score}/100 contributing to low overall")
-            if governance_score < 60:
+            if governance_score < 75:
                 reasons.append(f"Governance score {governance_score}/100 contributing to low overall")
             return Decision.NEEDS_REVIEW, reasons
         

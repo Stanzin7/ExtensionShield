@@ -1,9 +1,12 @@
 /**
  * Database Service
  *
- * Handles communication with the backend API for persistent storage
- * using SQLite database instead of localStorage.
+ * Handles communication with the backend API for persistent storage.
+ * Backend uses Postgres (Supabase) in production; SQLite is a dev fallback.
  */
+
+import { getScanResultsUrl } from "../utils/constants";
+import { fetchJson, buildFetchError } from "./requestHelpers";
 
 class DatabaseService {
   constructor() {
@@ -11,26 +14,37 @@ class DatabaseService {
     // For local development, set VITE_API_URL=http://localhost:8007 in .env.local
     this.baseURL = import.meta.env.VITE_API_URL || "";
     this.API_BASE_URL = `${this.baseURL}/api`;
+    this.accessToken = null;
+  }
+
+  setAccessToken(token) {
+    this.accessToken = token || null;
+  }
+
+  _authHeaders(tokenOverride = undefined) {
+    const token = tokenOverride !== undefined ? tokenOverride : this.accessToken;
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
   }
   /**
    * Get statistics from the database
    */
   async getStatistics() {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/statistics`);
+      const { response, body } = await fetchJson(`${this.API_BASE_URL}/statistics`);
       if (!response.ok) {
-        throw new Error("Failed to fetch statistics");
+        throw buildFetchError(response, body, "Failed to fetch statistics");
       }
-      return await response.json();
+      return body;
     } catch (error) {
-      console.error("Error fetching statistics:", error);
+      // console.error("Error fetching statistics:", error); // prod: no console
       return {
         total_scans: 0,
         high_risk_extensions: 0,
         total_files_analyzed: 0,
         total_vulnerabilities: 0,
         avg_security_score: 0,
-        risk_distribution: { high: 0, medium: 0, low: 0 }
+        risk_distribution: { high: 0, medium: 0, low: 0 },
       };
     }
   }
@@ -38,52 +52,110 @@ class DatabaseService {
   /**
    * Get scan history from the database
    */
-  async getScanHistory(limit = 50) {
+  async getScanHistory(limit = 50, accessToken = undefined) {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/history?limit=${limit}`);
+      const { response, body } = await fetchJson(
+        `${this.API_BASE_URL}/history?limit=${limit}`,
+        {
+          headers: {
+            ...this._authHeaders(accessToken),
+          },
+        }
+      );
       if (!response.ok) {
-        throw new Error("Failed to fetch scan history");
+        if (response.status === 401) return [];
+        throw buildFetchError(response, body, "Failed to fetch scan history");
       }
-      const data = await response.json();
-      return data.history || [];
+      const historyPayload = body || {};
+      if (Array.isArray(historyPayload)) return historyPayload;
+      return historyPayload.history || [];
     } catch (error) {
-      console.error("Error fetching scan history:", error);
+      // console.error("Error fetching scan history:", error); // prod: no console
       return [];
     }
   }
 
   /**
-   * Get recent scans from the database
+   * Get private scan history (uploaded CRX/ZIP builds only)
    */
-  async getRecentScans(limit = 10) {
+  async getPrivateScanHistory(limit = 50, accessToken = undefined) {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/recent?limit=${limit}`);
+      const { response, body } = await fetchJson(
+        `${this.API_BASE_URL}/history/private?limit=${limit}`,
+        {
+          headers: {
+            ...this._authHeaders(accessToken),
+          },
+        }
+      );
       if (!response.ok) {
-        throw new Error("Failed to fetch recent scans");
+        if (response.status === 401) return [];
+        throw buildFetchError(response, body, "Failed to fetch private scan history");
       }
-      const data = await response.json();
-      return data.recent || [];
+      const historyPayload = body || {};
+      if (Array.isArray(historyPayload)) return historyPayload;
+      return historyPayload.history || [];
     } catch (error) {
-      console.error("Error fetching recent scans:", error);
       return [];
     }
   }
 
   /**
-   * Get scan result by extension ID
+   * Get recent scans from the database (Postgres/SQLite).
+   * @param {number} limit - Max rows to return
+   * @param {string} [search] - Optional filter by extension name or ID (server-side)
+   */
+  async getRecentScans(limit = 10, search = "") {
+    try {
+      let url = `${this.API_BASE_URL}/recent?limit=${limit}`;
+      if (search && search.trim()) {
+        url += `&search=${encodeURIComponent(search.trim())}`;
+      }
+      // console.log(`[databaseService] Fetching recent scans from: ${url}`); // prod: no console
+      
+      const { response, body } = await fetchJson(url);
+      if (!response.ok) {
+        throw buildFetchError(response, body, `Failed to fetch recent scans`);
+      }
+
+      if (Array.isArray(body)) return body;
+      if (body?.recent && Array.isArray(body.recent)) return body.recent;
+      return [];
+    } catch (error) {
+      // console.error("[databaseService] Error fetching recent scans:", error); // prod: no console
+      // console.error("[databaseService] Error details:", { message: error.message, stack: error.stack, name: error.name }); // prod: no console
+      // Return empty array to prevent UI crashes, but log the error
+      return [];
+    }
+  }
+
+  /**
+   * Get scan result by extension ID.
+   * Single API: GET /api/scan/results/{extensionId} (URL from constants).
+   * Returns payload as-is from backend (no transformation).
    */
   async getScanResult(extensionId) {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/scan/results/${extensionId}`);
+      const url = getScanResultsUrl(extensionId);
+      if (!url) return null;
+
+      const { response, body } = await fetchJson(url, {
+        headers: {
+          ...this._authHeaders(),
+        },
+      });
+      
       if (!response.ok) {
         if (response.status === 404) {
           return null;
         }
-        throw new Error("Failed to fetch scan result");
+        throw buildFetchError(response, body, "Failed to fetch scan result");
       }
-      return await response.json();
+      
+      // console.log("TOP_KEYS", Object.keys(body || {})); // prod: no console
+      return body;
     } catch (error) {
-      console.error("Error fetching scan result:", error);
+      // console.error("Error fetching scan result:", error); // prod: no console
       return null;
     }
   }
@@ -101,7 +173,7 @@ class DatabaseService {
       }
       return true;
     } catch (error) {
-      console.error("Error deleting scan result:", error);
+      // console.error("Error deleting scan result:", error); // prod: no console
       return false;
     }
   }
@@ -119,7 +191,7 @@ class DatabaseService {
       }
       return true;
     } catch (error) {
-      console.error("Error clearing all results:", error);
+      // console.error("Error clearing all results:", error); // prod: no console
       return false;
     }
   }
@@ -133,50 +205,11 @@ class DatabaseService {
   }
 
   /**
-   * Get scan statistics for a specific extension
-   */
-  async getExtensionStats(extensionId) {
-    const result = await this.getScanResult(extensionId);
-    if (!result) return null;
-
-    return {
-      extensionId: result.extension_id,
-      extensionName: result.extension_name,
-      timestamp: result.timestamp,
-      securityScore: result.security_score,
-      riskLevel: result.risk_level,
-      totalFindings: result.total_findings,
-      totalFiles: result.total_files,
-      highRiskCount: result.high_risk_count,
-      mediumRiskCount: result.medium_risk_count,
-      lowRiskCount: result.low_risk_count
-    };
-  }
-
-  /**
-   * Get URLs from recent scans for autocomplete
-   */
-  async getRecentUrls(limit = 5) {
-    const history = await this.getScanHistory(limit);
-    return history
-      .map(item => item.url)
-      .filter(url => url && url.trim() !== "");
-  }
-
-  /**
-   * Get risk distribution across all scans
-   */
-  async getRiskDistribution() {
-    const stats = await this.getStatistics();
-    return stats.risk_distribution || { high: 0, medium: 0, low: 0 };
-  }
-
-  /**
-   * Get aggregated metrics for dashboard widgets
+   * Get aggregated metrics for dashboard widgets (history only when authenticated to avoid 401)
    */
   async getDashboardMetrics() {
     const stats = await this.getStatistics();
-    const history = await this.getScanHistory(20);
+    const history = this.accessToken ? await this.getScanHistory(20, this.accessToken) : [];
 
     // Get last 7 scans for sparkline (most recent first, then reverse for chronological order)
     const recentScans = history.slice(0, 7).reverse();

@@ -1,17 +1,68 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-KRVC2ZDH');</script>
+    <!-- End Google Tag Manager -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17954318055"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'AW-17954318055');
+    </script>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- Favicons - Prioritize larger sizes for better visibility -->
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512x512.png" />
+    <link rel="icon" type="image/png" sizes="256x256" href="/favicon-256x256.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/favicon-128x128.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="shortcut icon" href="/favicon-48x48.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#faf8f4" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ExtensionShield | Browser Extension Security Scanner</title>
+    <!-- Apply theme before first paint. Default is light; dark only when user has toggled and saved. -->
+    <script>
+      (function() {
+        var path = typeof window !== 'undefined' && window.location && window.location.pathname;
+        var forceDark = false;
+        var theme = forceDark ? 'dark' : (localStorage.getItem('theme') || 'light'); /* site default: light */
+        if (theme === 'light') document.documentElement.classList.add('light');
+        else document.documentElement.classList.remove('light');
+      })();
+    </script>
+    <!-- Content Security Policy -->
+    <!-- CSP is injected by Vite plugins:
+         - Dev: Permissive CSP for Vite HMR (via vite.config.js plugin)
+         - Prod: Strict CSP (via vite.config.js build plugin)
+         - Backend: HTTP header takes precedence (via FastAPI middleware)
+         - Fallback: Meta tag below for static hosting scenarios -->
+    <!-- CSP meta tag will be injected here by Vite build plugin -->
+    <title>Free Chrome Extension Scanner & Security Audit | ExtensionShield</title>
+    <meta name="description" content="Free Chrome extension scanner and security audit for developers. Scan any extension by URL—risk score, permissions, malware check. Audit CRX/ZIP builds before release." />
     
     <!-- Google Fonts - Distinctive Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KRVC2ZDH"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

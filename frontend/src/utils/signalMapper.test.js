@@ -208,23 +208,24 @@ describe('Signal Mapper', () => {
   });
 
   describe('getRiskLevel', () => {
-    it('should return LOW for scores >= 80', () => {
-      expect(getRiskLevel(80)).toBe('LOW');
+    it('should return LOW for scores >= 75', () => {
+      expect(getRiskLevel(75)).toBe('LOW');
       expect(getRiskLevel(100)).toBe('LOW');
-      expect(getRiskLevel(85)).toBe('LOW');
+      expect(getRiskLevel(90)).toBe('LOW');
     });
 
-    it('should return MED for scores >= 60 and < 80', () => {
-      expect(getRiskLevel(60)).toBe('MED');
-      expect(getRiskLevel(75)).toBe('MED');
+    it('should return MEDIUM for scores >= 50 and < 75', () => {
+      expect(getRiskLevel(50)).toBe('MEDIUM');
+      expect(getRiskLevel(60)).toBe('MEDIUM');
+      expect(getRiskLevel(74)).toBe('MEDIUM');
     });
 
-    it('should return MODERATE for scores >= 40 and < 60', () => {
-      expect(getRiskLevel(40)).toBe('MODERATE');
-      expect(getRiskLevel(55)).toBe('MODERATE');
+    it('should return HIGH for scores < 50', () => {
+      expect(getRiskLevel(40)).toBe('HIGH');
+      expect(getRiskLevel(49)).toBe('HIGH');
     });
 
-    it('should return HIGH for scores < 40', () => {
+    it('should return HIGH for lower scores as well', () => {
       expect(getRiskLevel(0)).toBe('HIGH');
       expect(getRiskLevel(39)).toBe('HIGH');
       expect(getRiskLevel(20)).toBe('HIGH');
@@ -236,6 +237,7 @@ describe('Signal Mapper', () => {
       expect(getRiskColorClass('LOW')).toBe('risk-low');
       expect(getRiskColorClass('MED')).toBe('risk-medium');
       expect(getRiskColorClass('MEDIUM')).toBe('risk-medium');
+      expect(getRiskColorClass('MODERATE')).toBe('risk-high');
       expect(getRiskColorClass('HIGH')).toBe('risk-high');
       expect(getRiskColorClass('CRITICAL')).toBe('risk-high');
       expect(getRiskColorClass('UNKNOWN')).toBe('risk-unknown');
