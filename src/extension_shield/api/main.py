@@ -2805,7 +2805,7 @@ def _lookup_scan_result(
 
 @app.post("/api/scan/batch-results")
 @_rate_limit("30/minute")
-async def batch_scan_results(req: BatchResultsRequest):
+async def batch_scan_results(req: BatchResultsRequest, http_request: Request):
     """
     Batch lookup of scan results for multiple extensions.
 
@@ -2846,7 +2846,7 @@ async def batch_scan_results(req: BatchResultsRequest):
 
 @app.post("/api/scan/batch-status")
 @_rate_limit("60/minute")
-async def batch_scan_status(req: BatchStatusRequest):
+async def batch_scan_status(req: BatchStatusRequest, http_request: Request):
     """
     Batch lookup of scan statuses for multiple extensions.
 
