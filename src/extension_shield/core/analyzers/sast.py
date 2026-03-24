@@ -14,8 +14,35 @@ from extension_shield.core.analyzers import BaseAnalyzer
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,  # or INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+SUSPICIOUS_PATTERNS = [
+    # 🌐 Network calls
+    (r'fetch\s*\(', "network_call"),
+    (r'XMLHttpRequest', "network_call"),
+    (r'axios\.', "network_call"),
+    (r'WebSocket', "network_call"),
 
+    # 🍪 Sensitive data
+    (r'chrome\.cookies', "cookie_access"),
+    (r'document\.cookie', "cookie_access"),
+    (r'localStorage', "local_storage"),
+    (r'sessionStorage', "session_storage"),
 
+    # 🔐 Credential / token
+    (r'Authorization', "auth_token"),
+    (r'Bearer\s+[A-Za-z0-9\-_\.]+', "token"),
+
+    # ⚠️ Dangerous
+    (r'eval\s*\(', "eval_usage"),
+    (r'new Function\(', "dynamic_code"),
+    (r'atob\s*\(', "base64_decode"),
+
+    # 🧠 Obfuscation
+    (r'\\x[0-9a-fA-F]{2}', "hex_obfuscation"),
+]
 class JavaScriptAnalyzer(BaseAnalyzer):
     """Analyzes JavaScript files in Chrome extensions using SAST techniques."""
 
@@ -33,6 +60,11 @@ class JavaScriptAnalyzer(BaseAnalyzer):
             with open(config_path, "r", encoding="utf-8") as file:
                 config = json.load(file)
                 logger.info("Loaded SAST configuration from %s", config_path)
+                 # --- ADDED PRINT HERE ---
+                print(f"\n--- SUCCESS: SAST Config Loaded from {config_path} ---")
+                print(config)
+                print("---------------------------------------------------\n")
+                
                 return config
         except FileNotFoundError:
             logger.warning("SAST config file not found at %s, using default settings", config_path)
@@ -41,70 +73,95 @@ class JavaScriptAnalyzer(BaseAnalyzer):
             logger.error("Error parsing SAST config file: %s", exc)
             return {"enabled": False, "exclusion_patterns": {}, "max_file_size_kb": 500}
 
+    def _regex_scan(self, file_path):
+            findings = []
+
+            try:
+                with open(file_path, "r", errors="ignore") as f:
+                    content = f.read()
+
+                for pattern, category in SUSPICIOUS_PATTERNS:
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        findings.append({
+                            "type": category,
+                            "severity": "medium",
+                            "file": file_path,
+                            "count": len(matches),
+                        })
+
+            except Exception as e:
+                logger.warning("Regex scan failed: %s", e)
+
+            return findings
+    def _partial_scan(self, file_path):
+        try:
+                with open(file_path, "r", errors="ignore") as f:
+                    content = f.read(30000)
+
+                findings = []
+                for pattern, category in SUSPICIOUS_PATTERNS:
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        findings.append({
+                            "type": category,
+                            "severity": "medium",
+                            "file": file_path,
+                            "count": len(matches),
+                        })
+
+                return findings
+
+        except Exception:
+         return []
     def _get_semgrep_config(self) -> str:
-        """Get the Semgrep configuration to use for scanning."""
-        config_name = self.sast_config.get("semgrep_config", "javascript")
-        config_options = self.sast_config.get("semgrep_config_options", {})
+            config_path = (
+                Path(__file__).resolve().parents[1] / "semgrep_rules" / "chrome_extension_rules.yml"
+                 )
 
-        semgrep_config = config_options.get(config_name, "p/javascript")
-
-        # If it's a relative path (custom ruleset), resolve it
-        if not semgrep_config.startswith("p/") and not semgrep_config == "auto":
-            config_path = Path(__file__).parent.parent.parent / semgrep_config
             if config_path.exists():
-                semgrep_config = str(config_path)
-                logger.info("Using custom Semgrep ruleset: %s", semgrep_config)
-            else:
-                logger.warning(
-                    "Custom ruleset not found at %s, falling back to p/javascript", config_path
-                )
-                semgrep_config = "p/javascript"
-        else:
-            logger.info("Using Semgrep config: %s", semgrep_config)
+                logger.info("Using custom Semgrep ruleset: %s", config_path)
+                return str(config_path)
 
-        return semgrep_config
+            logger.warning("Custom rules not found, fallback to default!")
+            return "p/javascript"
 
     def _should_skip_file(self, file_path: str) -> tuple[bool, Optional[str]]:
-        """
-        Check if a file should be skipped based on exclusion patterns.
-
-        Returns:
-            tuple: (should_skip: bool, reason: str or None)
-        """
         if not self.sast_config.get("enabled", True):
             return False, None
 
-        # Extract filename and path components
-        file_name = file_path.split("/")[-1]
+        file_name = file_path.split("/")[-1].lower()
         file_path_lower = file_path.lower()
 
         exclusion_patterns = self.sast_config.get("exclusion_patterns", {})
 
-        # Check path segments (e.g., lib/, vendor/, node_modules/)
-        path_segments = exclusion_patterns.get("path_segments", [])
-        for segment in path_segments:
-            if f"/{segment}" in file_path_lower or file_path_lower.startswith(segment):
-                return True, f"path contains '{segment}'"
+        # 🚫 ONLY skip truly useless directories
+        HARD_SKIP_DIRS = ["node_modules", ".git", "dist/assets"]
 
-        # Check file patterns (e.g., *.min.js, *.bundle.js, chunk-*.js)
-        file_patterns = exclusion_patterns.get("file_patterns", [])
-        for pattern in file_patterns:
-            # Use fnmatch for full glob pattern support
-            if fnmatch.fnmatch(file_name.lower(), pattern.lower()):
-                return True, f"matches pattern '{pattern}'"
+        for segment in HARD_SKIP_DIRS:
+            if f"/{segment}" in file_path_lower:
+                return True, f"hard skip dir '{segment}'"
 
-        # Check library names (e.g., jquery, bootstrap)
+        # ⚠️ SOFT FILTER (do NOT skip)
+        LOW_PRIORITY_PATTERNS = ["*.min.js", "*.bundle.js", "chunk-*.js"]
+
+        for pattern in LOW_PRIORITY_PATTERNS:
+            if fnmatch.fnmatch(file_name, pattern):
+                return False, f"low_priority:{pattern}"
+
+        # ⚠️ Libraries → still scan
         library_names = exclusion_patterns.get("library_names", [])
         for lib_name in library_names:
-            if lib_name.lower() in file_name.lower():
-                return True, f"matches library name '{lib_name}'"
+            if lib_name.lower() in file_name:
+                return False, f"library:{lib_name}"
 
-        # Check file size if file exists
-        max_size_kb = self.sast_config.get("max_file_size_kb", 500)
+        # ⚠️ Large files → partial scan instead of skip
+        max_size_kb = self.sast_config.get("max_file_size_kb", 2000)
+
         if os.path.exists(file_path):
             file_size_kb = os.path.getsize(file_path) / 1024
             if file_size_kb > max_size_kb:
-                return True, f"file size ({file_size_kb:.1f}KB) exceeds threshold ({max_size_kb}KB)"
+                return False, f"large_file:{file_size_kb:.1f}KB"
 
         return False, None
 
@@ -289,7 +346,7 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                             )
                             if rel_path in findings_by_file:
                                 findings_by_file[rel_path].append(finding)
-                
+
                 # Fallback: If no third-party API findings detected, scan files directly
                 # This handles cases where Semgrep pattern-regex doesn't work on minified code
                 third_party_found = any(
@@ -298,12 +355,14 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                     for findings_list in findings_by_file.values()
                     for f in findings_list
                 )
-                
+
                 if not third_party_found:
                     # Only add ONE finding total, not one per file
                     for file_path in file_paths:
                         rel_path = JavaScriptAnalyzer._get_relative_path(file_path, extension_dir)
-                        finding = JavaScriptAnalyzer._scan_file_for_third_party_api(file_path, extension_dir)
+                        finding = JavaScriptAnalyzer._scan_file_for_third_party_api(
+                            file_path, extension_dir
+                        )
                         if finding:
                             if rel_path not in findings_by_file:
                                 findings_by_file[rel_path] = []
@@ -319,8 +378,7 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                 return findings_by_file
             logger.info("No findings from batch Semgrep scan")
             return {
-                JavaScriptAnalyzer._get_relative_path(fp, extension_dir): []
-                for fp in file_paths
+                JavaScriptAnalyzer._get_relative_path(fp, extension_dir): [] for fp in file_paths
             }
 
         except subprocess.TimeoutExpired:
@@ -406,28 +464,37 @@ class JavaScriptAnalyzer(BaseAnalyzer):
         return all_findings
 
     def _filter_files(
-        self, file_paths: List[str], extension_dir: str
-    ) -> tuple[List[str], List[Dict]]:
-        """Filter out library files and large files based on exclusion patterns."""
-        files_to_scan = []
-        skipped_files = []
+            self, file_paths: List[str], extension_dir: str
+        ) -> tuple[List[Dict], List[Dict]]:
+            """
+            Returns:
+                files_to_scan: [{path, reason}]
+                skipped_files: [{file, reason}]
+            """
+            files_to_scan = []
+            skipped_files = []
 
-        for file_path in file_paths:
-            should_skip, reason = self._should_skip_file(file_path)
-            if should_skip:
+            for file_path in file_paths:
+                should_skip, reason = self._should_skip_file(file_path)
                 rel_path = self._get_relative_path(file_path, extension_dir)
-                skipped_files.append({"file": rel_path, "reason": reason})
-            else:
-                files_to_scan.append(file_path)
 
-        logger.info(
-            "Filtered %d JavaScript files: %d to scan, %d skipped (libraries/large files)",
-            len(file_paths),
-            len(files_to_scan),
-            len(skipped_files),
-        )
+                if should_skip:
+                    skipped_files.append({"file": rel_path, "reason": reason})
+                    continue
 
-        return files_to_scan, skipped_files
+                files_to_scan.append({
+                    "path": file_path,
+                    "reason": reason
+                })
+
+            logger.info(
+                "Filtered %d JS files → %d to scan, %d skipped",
+                len(file_paths),
+                len(files_to_scan),
+                len(skipped_files),
+            )
+
+            return files_to_scan, skipped_files
 
     @staticmethod
     def _aggregate_findings(all_findings: Dict[str, List]) -> Dict:
@@ -440,7 +507,13 @@ class JavaScriptAnalyzer(BaseAnalyzer):
         severity_counts = {"CRITICAL": 0, "ERROR": 0, "WARNING": 0, "INFO": 0}
         total_findings = 0
         files_with_findings = set()
-        excluded_patterns = ["chrome://", "chrome-extension://", "localhost", "127.0.0.1", "0.0.0.0"]
+        excluded_patterns = [
+            "chrome://",
+            "chrome-extension://",
+            "localhost",
+            "127.0.0.1",
+            "0.0.0.0",
+        ]
 
         for file_path, findings in all_findings.items():
             if findings:
@@ -584,96 +657,119 @@ class JavaScriptAnalyzer(BaseAnalyzer):
         except Exception as exc:
             logger.error("Error generating SAST summary: %s", exc)
             return None
-
+# //Run main scanner in parralelel batches for better performance, with fallback to direct regex scan for third-party API calls if pattern-regex doesn't work on minified code
     def analyze(
-        self, extension_dir: str, manifest: Optional[Dict] = None, metadata: Optional[Dict] = None
-    ) -> Optional[Dict]:
-        """Analyze JavaScript files in the extension directory using SAST."""
+            self,
+            extension_dir: str,
+            manifest: Optional[Dict] = None,
+            metadata: Optional[Dict] = None,
+        ) -> Optional[Dict]:
 
-        if manifest is None:
-            return None
+            if manifest is None:
+                return None
 
-        is_semgrep_available = self._is_semgrep_installed()
-        if not is_semgrep_available:
-            return None
+            if not self._is_semgrep_installed():
+                return None
 
-        js_files = self._extract_javascript_files(extension_dir, manifest)
-        files_to_scan, _ = self._filter_files(js_files, extension_dir)
+            js_files = self._extract_javascript_files(extension_dir, manifest)
+            files_to_scan, _ = self._filter_files(js_files, extension_dir)
 
-        if not files_to_scan:
-            logger.info("No files to scan after filtering")
-            return {
-                "sast_findings": {},
-            }
+            if not files_to_scan:
+                logger.info("No files to scan after filtering")
+                return {"sast_findings": {}}
 
-        all_findings = {}
+            all_findings = {}
 
-        # Get scanning configuration
-        scanning_config = self.sast_config.get("scanning", {})
-        batch_enabled = scanning_config.get("batch_enabled", True)
-        parallel_enabled = scanning_config.get("parallel_enabled", True)
-        max_workers = scanning_config.get("max_parallel_workers", 4)
-        timeout_per_file = scanning_config.get("batch_timeout_per_file_seconds", 10)
+            logger.info("Starting hybrid SAST scan on %d files", len(files_to_scan))
 
-        # Choose scanning strategy based on configuration
-        if parallel_enabled and len(files_to_scan) > max_workers:
-            # Use parallel batch scanning for better performance
-            logger.info("Using parallel batch scanning with %d workers", max_workers)
-            all_findings = self._run_parallel_batch_scans(
-                file_paths=files_to_scan,
-                extension_dir=extension_dir,
-                config=self.semgrep_config,
-                max_workers=max_workers,
-            )
-        elif batch_enabled:
-            # Use single batch scan
-            logger.info("Using batch scanning for %d files", len(files_to_scan))
-            timeout = len(files_to_scan) * timeout_per_file + 60
-            all_findings = self._run_semgrep_batch_scan(
-                file_paths=files_to_scan,
-                extension_dir=extension_dir,
-                config=self.semgrep_config,
-                timeout=timeout,
-            )
-        else:
-            # Fall back to sequential scanning
-            logger.info("Using sequential scanning (batch/parallel disabled)")
-            for file_path in files_to_scan:
-                security_findings = self._run_semgrep_scan(
-                    file_path=file_path, config=self.semgrep_config
-                )
+            for file in files_to_scan:
+                file_path = file["path"]
+                reason = file.get("reason")
+
                 rel_path = self._get_relative_path(file_path, extension_dir)
-                if security_findings and "results" in security_findings:
-                    all_findings[rel_path] = security_findings["results"]
-                else:
+
+                try:
+                    #  HYBRID STRATEGY
+                    if reason and "low_priority" in reason:
+                        logger.info("[SAST] Regex scan → %s (%s)", rel_path, reason)
+                        findings = self._regex_scan(file_path)
+
+                    elif reason and "large_file" in reason:
+                        logger.info("[SAST] Partial scan → %s (%s)", rel_path, reason)
+                        findings = self._partial_scan(file_path)
+
+                    else:
+                        logger.info("[SAST] Semgrep scan → %s", rel_path)
+                        result = self._run_semgrep_scan(file_path, self.semgrep_config)
+                        findings = result.get("results", []) if result else []
+
+                    # Normalize empty
+                    if not findings:
+                        findings = []
+
+                    all_findings[rel_path] = findings
+
+                    #  DEBUG LOG
+                    logger.info(
+                        "[SAST RESULT] %s → %d findings",
+                        rel_path,
+                        len(findings),
+                    )
+
+                except Exception as e:
+                    logger.error("[SAST ERROR] Failed scanning %s: %s", rel_path, e)
                     all_findings[rel_path] = []
 
-        # Fallback: Check if third-party API was detected, if not scan directly
-        third_party_found = any(
-            "third_party" in f.get("check_id", "").lower()
-            or "external_api" in f.get("check_id", "").lower()
-            for findings_list in all_findings.values()
-            for f in findings_list
-        )
+            # =========================================================
+            # 🔥 FALLBACK: third-party API detection
+            # =========================================================
+            third_party_found = any(
+                "third_party" in f.get("check_id", "").lower()
+                or "external_api" in f.get("check_id", "").lower()
+                for findings_list in all_findings.values()
+                for f in findings_list
+            )
 
-        if not third_party_found:
-            # Only add ONE finding total, not one per file
-            for file_path in files_to_scan:
-                rel_path = self._get_relative_path(file_path, extension_dir)
-                finding = self._scan_file_for_third_party_api(file_path, extension_dir)
-                if finding:
-                    if rel_path not in all_findings:
-                        all_findings[rel_path] = []
-                    all_findings[rel_path].append(finding)
-                    logger.debug("Fallback scan found third-party API in %s", rel_path)
-                    break  # Only add ONE finding per analysis, not per file
+            if not third_party_found:
+                logger.info("[SAST] Running fallback API detection")
 
-        # Generate LLM summary of findings
-        sast_analysis = self._summarize_sast_findings(
-            all_findings=all_findings, files_scanned=len(files_to_scan), metadata=metadata
-        )
+                for file in files_to_scan:
+                    file_path = file["path"]
+                    rel_path = self._get_relative_path(file_path, extension_dir)
 
-        return {
-            "sast_analysis": sast_analysis,
-            "sast_findings": all_findings,
-        }
+                    finding = self._scan_file_for_third_party_api(file_path, extension_dir)
+                    if finding:
+                        all_findings.setdefault(rel_path, []).append(finding)
+
+                        logger.info(
+                            "[SAST FALLBACK] Found external API in %s",
+                            rel_path,
+                        )
+                        break
+
+            # =========================================================
+            # 🔥 SUMMARY LOG
+            # =========================================================
+            total_files = len(all_findings)
+            total_findings = sum(len(v) for v in all_findings.values())
+
+            logger.info(
+                "[SAST SUMMARY] Files scanned: %d | Total findings: %d",
+                total_files,
+                total_findings,
+            )
+
+            # =========================================================
+            # LLM summary
+            # =========================================================
+            sast_analysis = self._summarize_sast_findings(
+                all_findings=all_findings,
+                files_scanned=total_files,
+                metadata=metadata,
+            )
+            print(f"SAST Analysis Summary:\n{sast_analysis}")
+            print(f"SAST Findings:\n{json.dumps(all_findings, indent=2)}")
+            return {
+                "sast_analysis": sast_analysis,
+                "sast_findings": all_findings,
+            }
