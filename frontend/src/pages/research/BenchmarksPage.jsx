@@ -138,7 +138,7 @@ const BenchmarksPage = () => {
 
               <div className="chart-card">
                 <TrendChart 
-                  data={trendsData.dataTheftIncidents}
+                  data={trendsData.maliciousExtensions}
                   dataKey="Data Theft Incidents"
                   title="Reported extension-related data exposure incidents (public reports)"
                   color="var(--risk-warn)"
