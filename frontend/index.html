@@ -51,8 +51,88 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
          - Fallback: Meta tag below for static hosting scenarios -->
     <!-- CSP meta tag will be injected here by Vite build plugin -->
     <title>Free Chrome Extension Scanner & Security Audit | ExtensionShield</title>
-    <meta name="description" content="Free Chrome extension scanner and security audit for developers. Scan any extension by URL—risk score, permissions, malware check. Audit CRX/ZIP builds before release." />
-    
+    <meta name="description" content="Free Chrome extension scanner and security audit. Scan any extension by URL — get risk score, permissions analysis, malware check, and governance report. Audit CRX/ZIP builds before release. Trusted by security teams." />
+    <meta name="keywords" content="chrome extension scanner, chrome extension security, extension risk score, is chrome extension safe, browser extension audit, CRX viewer, extension permissions checker, malware scanner, chrome extension analyzer, CRXcavator alternative, CRXplorer alternative" />
+    <meta name="author" content="ExtensionShield" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://extensionshield.com/" />
+
+    <!-- Open Graph (fallback for pages where React Helmet hasn't loaded yet) -->
+    <meta property="og:title" content="Free Chrome Extension Scanner & Security Audit | ExtensionShield" />
+    <meta property="og:description" content="Scan any Chrome extension for security risks, permissions, malware, and privacy issues. Free risk score in under 60 seconds." />
+    <meta property="og:url" content="https://extensionshield.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://extensionshield.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="ExtensionShield" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card (fallback) -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Free Chrome Extension Scanner & Security Audit | ExtensionShield" />
+    <meta name="twitter:description" content="Scan any Chrome extension for security risks, permissions, malware, and privacy issues. Free risk score in under 60 seconds." />
+    <meta name="twitter:image" content="https://extensionshield.com/og.png" />
+
+    <!-- Structured Data: WebSite with SearchAction (enables Google Sitelinks Search Box) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "ExtensionShield",
+      "alternateName": "Extension Shield",
+      "url": "https://extensionshield.com",
+      "description": "Free Chrome extension security scanner. Scan any browser extension for risks, permissions, malware, and privacy issues.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://extensionshield.com/scan?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "ExtensionShield",
+      "url": "https://extensionshield.com",
+      "logo": "https://extensionshield.com/extension-shield-logo.png",
+      "description": "Chrome extension security scanner — safety reports in seconds. Free risk scoring, permissions analysis, and malware detection for browser extensions.",
+      "sameAs": [
+        "https://github.com/Stanzin7/ExtensionShield"
+      ],
+      "foundingDate": "2026",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "url": "https://extensionshield.com/community"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "ExtensionShield",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web, Chrome",
+      "url": "https://extensionshield.com",
+      "offers": [
+        { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free public extension scan by URL or ID" },
+        { "@type": "Offer", "description": "Pro: private CRX/ZIP security audit and vulnerability scan" }
+      ],
+      "description": "Chrome extension security scanner. Scan by URL/ID for free. Upload private CRX/ZIP for pre-release security audit, vulnerability scanning, and fix suggestions.",
+      "featureList": ["Permission analysis", "Malware detection", "Risk scoring", "SAST code analysis", "VirusTotal integration", "Governance reporting", "CRX/ZIP upload audit"]
+    }
+    </script>
+
     <!-- Google Fonts - Distinctive Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
