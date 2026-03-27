@@ -8,8 +8,9 @@ import logging
 from typing import Optional, Dict
 from datetime import datetime
 from dotenv import load_dotenv
-import requests
 from extension_shield.utils.extension import calculate_file_hash, extract_extension_id_by_url
+from extension_shield.core.config import get_settings
+from extension_shield.utils.http_safety import safe_get
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -19,7 +20,19 @@ class ExtensionDownloader:
     """Downloads Chrome extensions from the Chrome Web Store"""
 
     def __init__(self):
-        self.extension_storage_path = os.getenv("EXTENSION_STORAGE_PATH", "./extensions_storage")
+        self.extension_storage_path = get_settings().extension_storage_path
+
+    @staticmethod
+    def _get_chrome_headers() -> Dict[str, str]:
+        """Chrome-like headers required by clients2.google.com to avoid blocking/HTML error pages."""
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/x-chrome-extension,*/*",
+        }
 
     @staticmethod
     def _get_download_url(extension_id: str) -> str:
@@ -32,7 +45,7 @@ class ExtensionDownloader:
         Returns:
             str: The download URL for the extension
         """
-        chrome_version = os.getenv("CHROME_VERSION", "118.0")
+        chrome_version = os.getenv("CHROME_VERSION", "131.0.0.0")
         download_url = (
             "https://clients2.google.com/service/update2/crx"
             f"?response=redirect&prodversion={chrome_version}"
@@ -40,6 +53,12 @@ class ExtensionDownloader:
             f"&x=id%3D{extension_id}%26uc"
         )
         return download_url
+
+    # User-Agent sent when downloading from Chrome Web Store (server IPs often get HTML without it)
+    CHROME_USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/118.0.0.0 Safari/537.36"
+    )
 
     def _download(self, extension_id: str, download_url: str) -> Optional[Dict]:
         """
@@ -57,17 +76,35 @@ class ExtensionDownloader:
             file_path = os.path.join(self.extension_storage_path, filename)
             os.makedirs(self.extension_storage_path, exist_ok=True)
 
-            # Download the file
-            response = requests.get(download_url, stream=True, timeout=120)
+            # Download the file (SSRF protection: only allow clients2.google.com)
+            # Chrome-like headers are required; Google returns HTML/204 without them
+            ALLOWED_HOSTS = {"clients2.google.com"}
+            headers = {"User-Agent": ExtensionDownloader.CHROME_USER_AGENT}
+            response = safe_get(
+                download_url,
+                allowed_hosts=ALLOWED_HOSTS,
+                stream=True,
+                timeout=120,
+                headers=headers,
+            )
             response.raise_for_status()
 
-            content_type = response.headers.get("content-type", "")
-            if (
-                "application/x-chrome-extension" not in content_type
-                and "application/octet-stream" not in content_type
-            ):
-                logger.warning("Unexpected content type: %s", content_type)
-                return None
+            content_type = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+            # Chrome Web Store may return CRX, octet-stream, zip, or empty (server IPs often get empty)
+            allowed_types = (
+                "application/x-chrome-extension",
+                "application/octet-stream",
+                "application/zip",
+                "application/crx",
+            )
+            if content_type:
+                if "text/html" in content_type or content_type.startswith("text/"):
+                    logger.warning(
+                        "Unexpected content type: %s (likely blocked or consent page)", content_type
+                    )
+                    return None
+                if not any(t in content_type for t in allowed_types):
+                    logger.warning("Unexpected content type: %s", content_type)
 
             # Save the file
             with open(file_path, "wb") as f:
@@ -80,7 +117,8 @@ class ExtensionDownloader:
             # Validate file size - Chrome extensions should be at least a few KB
             if file_size < 1024:
                 logger.error(
-                    "Downloaded file too small (%s bytes) - likely not a valid extension", file_size
+                    "Downloaded file too small (%s bytes) for %s - likely HTML error page or 204. "
+                    "Check CHROME_VERSION and User-Agent.", file_size, extension_id,
                 )
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -109,6 +147,9 @@ class ExtensionDownloader:
         """
         try:
             extension_id = extract_extension_id_by_url(extension_url)
+            if not extension_id:
+                logger.warning("Could not extract valid extension ID from URL: %s", extension_url[:80])
+                return None
             download_url = self._get_download_url(extension_id)
             file_info = self._download(extension_id, download_url)
             if not file_info:

@@ -19,12 +19,16 @@ Gate Priority Order:
 5. SENSITIVE_EXFIL  - Sensitive permissions + network exfil + no disclosure → WARN
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
+logger = logging.getLogger(__name__)
+
 from extension_shield.governance.signal_pack import (
+    NetworkSignalPack,
     PermissionsSignalPack,
     SastFindingNormalized,
     SastSignalPack,
@@ -33,6 +37,40 @@ from extension_shield.governance.signal_pack import (
     WebstoreStatsSignalPack,
 )
 from extension_shield.scoring.models import Decision, LayerScore
+
+
+# =============================================================================
+# DOMAIN LISTS (COMPLIANCE / SITE TERMS)
+# =============================================================================
+
+# US visa scheduling ecosystem domains referenced in compliance findings.
+# These sites are known to prohibit automated access/scraping and/or
+# unauthorized third-party processing in their Terms of Use.
+TRAVEL_DOCS_PROTECTED_DOMAINS: Tuple[str, ...] = (
+    "usvisascheduling.com",
+    "ustraveldocs.com",
+    "cgi-federal.com",
+    "b2clogin.com",  # Azure B2C auth used by visa portals
+)
+
+# Known third-party visa-slot / automation ecosystem domains (non-exhaustive).
+# Used to flag potential unauthorized processors when paired with protected portals.
+VISA_SLOT_ECOSYSTEM_DOMAINS: Tuple[str, ...] = (
+    "checkvisaslots.com",
+    "visaslots.ca",
+    "easyslotbooking.com",
+    "usavisaslot.com",
+    "earlyvisa.co",
+    "firstslotsalert.com",
+    "fastervisa.co",
+    "luckybee.app",
+    "visaslotwatch.com",
+    "slotbot.in",
+    "vecnaselfie.com",
+    "visaslots.info",
+    "visaslots.us",
+    "visajar.com",
+)
 
 
 # =============================================================================
@@ -97,6 +135,25 @@ class GateConfig:
         "proxy",                     # Can intercept traffic
         "nativeMessaging",           # Can bypass browser sandbox
     )
+
+    # Travel-docs / visa portal compliance patterns
+    travel_docs_protected_domains: Tuple[str, ...] = TRAVEL_DOCS_PROTECTED_DOMAINS
+    visa_slot_ecosystem_domains: Tuple[str, ...] = VISA_SLOT_ECOSYSTEM_DOMAINS
+    travel_docs_automation_code_patterns: Tuple[str, ...] = (
+        # Automation / interception patterns
+        r"xmlhttprequest\.prototype\.(open|send)\s*=",
+        r"\.open\s*=\s*function",
+        r"\.send\s*=\s*function",
+        r"intercept.*xmlhttprequest",
+        # Screenshot capture patterns
+        r"html2canvas",
+        r"toDataURL\(\s*[\"']image/png[\"']\s*\)",
+        r"captureVisibleTab",
+        # Credential storage patterns
+        r"chrome\.storage\.(local|sync)\.set",
+        r"logindetails",
+        r"securityquestions",
+    )
     
     # PURPOSE_MISMATCH patterns
     credential_capture_patterns: Tuple[str, ...] = (
@@ -129,6 +186,28 @@ class GateConfig:
 
 # Default configuration
 DEFAULT_GATE_CONFIG = GateConfig()
+
+
+# ============================================================================
+# CRITICAL HIGH SAST PATTERNS
+# ============================================================================
+#
+# Some HIGH/ERROR SAST findings are dangerous enough to BLOCK even if the
+# total high-count is below the usual threshold. We match a small, pragmatic
+# allowlist of patterns in check_id/message/category/code_snippet and, when
+# seen in a HIGH/ERROR finding with sufficient confidence, we treat them as
+# critical-high signals.
+CRITICAL_HIGH_SAST_PATTERNS: Tuple[re.Pattern[str], ...] = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"eval\(|new\s+Function",  # dynamic code execution
+        r"keylog|keylogger|credential|password|login|form\s*(capture|intercept)",  # credential / keylogger
+        r"cookie|token|session",  # cookie/token/session exfil
+        r"remote\s*(script|code)|load\s*(remote|external)",  # remote code/script load
+        r"webrequestblocking|modify\s*(headers|request|response)",  # request/response interception
+        r"externally_connectable|message\s*relay|postMessage",  # broad relay / message relay
+    )
+)
 
 
 # =============================================================================
@@ -238,7 +317,7 @@ class HardGates:
                 triggered=True,
                 confidence=confidence,
                 reasons=[
-                    f"VirusTotal detected malware: {malicious_count}/{vt.total_engines} engines flagged malicious",
+                    f"Antivirus scan flagged this extension as malware ({malicious_count} of {vt.total_engines} engines)",
                     f"Threat level: {vt.threat_level}",
                 ],
                 evidence_ids=[f"vt:malicious:{malicious_count}"],
@@ -258,8 +337,8 @@ class HardGates:
                 triggered=True,
                 confidence=confidence * 0.8,  # Lower confidence for warn
                 reasons=[
-                    f"VirusTotal flagged by {malicious_count} engine(s) - possible false positive or emerging threat",
-                    "Manual review recommended",
+                    f"Antivirus scan flagged by {malicious_count} engine(s) — may be a false positive",
+                    "Review before installing",
                 ],
                 evidence_ids=[f"vt:suspicious:{malicious_count}"],
                 details={
@@ -317,6 +396,8 @@ class HardGates:
         high_count = 0
         critical_findings: List[SastFindingNormalized] = []
         high_findings: List[SastFindingNormalized] = []
+        critical_high_hits = 0
+        critical_high_example_ids: List[str] = []
         
         for finding in sast.deduped_findings:
             severity = finding.severity.upper()
@@ -326,11 +407,26 @@ class HardGates:
             elif severity in ("HIGH", "ERROR"):
                 high_count += 1
                 high_findings.append(finding)
+                
+                # Check for critical-high patterns in HIGH/ERROR findings
+                text_parts = [
+                    finding.check_id,
+                    getattr(finding, "message", "") or "",
+                    getattr(finding, "category", "") or "",
+                    getattr(finding, "code_snippet", "") or "",
+                ]
+                combined_text = " ".join(t for t in text_parts if t)
+                for pattern in CRITICAL_HIGH_SAST_PATTERNS:
+                    if pattern.search(combined_text):
+                        critical_high_hits += 1
+                        critical_high_example_ids.append(finding.check_id)
+                        break
         
         # Check BLOCK thresholds
         should_block = (
             critical_count >= self.config.sast_critical_block_count or
-            high_count >= self.config.sast_high_block_count
+            high_count >= self.config.sast_high_block_count or
+            critical_high_hits >= 1
         )
         
         if should_block and sast.confidence >= self.config.sast_confidence_threshold:
@@ -342,13 +438,18 @@ class HardGates:
                 evidence_ids.extend([
                     f"sast:critical:{f.check_id}" for f in critical_findings[:3]
                 ])
-                reasons.append(f"{critical_count} critical SAST finding(s) detected")
+                reasons.append(f"Security scan found {critical_count} critical code issue(s)")
             
             if high_count >= self.config.sast_high_block_count:
                 evidence_ids.extend([
                     f"sast:high:{f.check_id}" for f in high_findings[:3]
                 ])
-                reasons.append(f"{high_count} high-severity SAST finding(s) detected")
+                reasons.append(f"Security scan found {high_count} high-risk code pattern(s)")
+            
+            if critical_high_hits >= 1:
+                reasons.append(
+                    f"Dangerous code pattern found in {critical_high_hits} location(s)"
+                )
             
             return GateResult(
                 gate_id=gate_id,
@@ -360,8 +461,10 @@ class HardGates:
                 details={
                     "critical_count": critical_count,
                     "high_count": high_count,
+                    "critical_high_hits": critical_high_hits,
                     "critical_findings": [f.check_id for f in critical_findings[:5]],
                     "high_findings": [f.check_id for f in high_findings[:5]],
+                    "critical_high_example_ids": critical_high_example_ids[:5],
                 },
             )
         
@@ -384,6 +487,8 @@ class HardGates:
     def evaluate_tos_violation(
         self,
         perms: PermissionsSignalPack,
+        sast: SastSignalPack,
+        network: NetworkSignalPack,
         manifest: Dict[str, Any],
     ) -> GateResult:
         """
@@ -391,6 +496,12 @@ class HardGates:
         
         Certain permissions or behaviors are explicitly prohibited by
         enterprise policies or Chrome Web Store ToS.
+        
+        Additionally, some sites (e.g., U.S. visa scheduling / travel-docs portals)
+        explicitly prohibit automated access/scraping and unauthorized third-party
+        processing. If an extension targets those portals and exhibits automation,
+        screenshot capture, credential storage, or third-party endpoint patterns,
+        we treat this as a high-confidence governance/compliance failure.
         
         Args:
             perms: Permissions signal pack
@@ -419,6 +530,126 @@ class HardGates:
             if "<all_urls>" in matches or "*://*/*" in matches:
                 violations.append("externally_connectable allows all URLs")
                 evidence_ids.append("tos:ext_connectable_wildcard")
+
+        # ---------------------------------------------------------------------
+        # Travel-docs / visa portal ToS risk (deterministic, evidence-based)
+        # ---------------------------------------------------------------------
+
+        def _matches_any_domain(patterns: List[str], domains: Tuple[str, ...]) -> List[str]:
+            hits: List[str] = []
+            for p in patterns:
+                if not isinstance(p, str):
+                    continue
+                low = p.lower()
+                for d in domains:
+                    if d and d in low:
+                        hits.append(d)
+            return list(dict.fromkeys(hits))
+
+        # Evidence anchor 1: protected portal host permissions / content_script matches
+        protected_domain_hits: List[str] = _matches_any_domain(
+            perms.host_permissions or [], self.config.travel_docs_protected_domains
+        )
+
+        cs_matches: List[str] = []
+        for cs in (manifest.get("content_scripts") or []):
+            if not isinstance(cs, dict):
+                continue
+            matches = cs.get("matches") or []
+            if isinstance(matches, list):
+                cs_matches.extend([m for m in matches if isinstance(m, str)])
+        protected_domain_hits = list(
+            dict.fromkeys(
+                protected_domain_hits
+                + _matches_any_domain(cs_matches, self.config.travel_docs_protected_domains)
+            )
+        )
+
+        # Evidence anchor 2: visa-slot ecosystem endpoints in network domains or externally_connectable
+        ext_conn_matches: List[str] = []
+        if isinstance(ext_conn, dict):
+            m = ext_conn.get("matches") or []
+            if isinstance(m, list):
+                ext_conn_matches = [x for x in m if isinstance(x, str)]
+
+        network_domains: List[str] = []
+        try:
+            if network and getattr(network, "enabled", False):
+                network_domains = list(getattr(network, "domains", []) or [])
+        except Exception:
+            logger.debug("Failed to extract network domains for TOS gate", exc_info=True)
+            network_domains = []
+
+        visa_ecosystem_hits = list(
+            dict.fromkeys(
+                _matches_any_domain(network_domains, self.config.visa_slot_ecosystem_domains)
+                + _matches_any_domain(ext_conn_matches, self.config.visa_slot_ecosystem_domains)
+            )
+        )
+
+        # Evidence anchor 3: code patterns in SAST findings (best-effort)
+        tos_patterns = [
+            re.compile(p, re.IGNORECASE)
+            for p in getattr(self.config, "travel_docs_automation_code_patterns", ())
+        ]
+        all_findings_text: List[str] = []
+        for f in (getattr(sast, "deduped_findings", None) or []):
+            try:
+                all_findings_text.append(
+                    f"{getattr(f, 'check_id', '')} {getattr(f, 'message', '')} {getattr(f, 'code_snippet', '')}"
+                )
+            except Exception:
+                logger.debug("Skipping malformed SAST finding in TOS gate")
+                continue
+        joined = "\n".join(all_findings_text).lower()
+
+        pattern_hits: List[str] = []
+        for rx in tos_patterns:
+            if rx.search(joined):
+                pattern_hits.append(rx.pattern)
+        pattern_hits = list(dict.fromkeys(pattern_hits))
+
+        domain_string_hits: List[str] = []
+        for d in self.config.visa_slot_ecosystem_domains:
+            if d in joined:
+                domain_string_hits.append(d)
+        domain_string_hits = list(dict.fromkeys(domain_string_hits))
+
+        # Capability inference: automation or capture capability
+        has_injection_capability = any(
+            p in (perms.api_permissions or [])
+            for p in ["scripting", "webRequest", "webRequestBlocking", "declarativeNetRequest"]
+        ) or bool(manifest.get("content_scripts"))
+        has_capture_capability = any(
+            p in (perms.api_permissions or []) for p in ["tabCapture", "desktopCapture"]
+        ) or any("html2canvas" in ph.lower() for ph in pattern_hits)
+
+        if protected_domain_hits and (
+            has_injection_capability
+            or has_capture_capability
+            or visa_ecosystem_hits
+            or domain_string_hits
+            or pattern_hits
+        ):
+            violations.append(
+                "Accesses visa scheduling sites where automation may violate their terms of service"
+            )
+            evidence_ids.append("tos:travel_docs:protected_domain_access")
+
+            if has_injection_capability:
+                violations.append("Can run scripts on protected government visa sites")
+                evidence_ids.append("tos:travel_docs:automation_capability")
+
+            if has_capture_capability:
+                violations.append("Can capture screenshots of visa and travel documents")
+                evidence_ids.append("tos:travel_docs:screenshot_capture")
+
+            combined_exfil_hits = list(dict.fromkeys(visa_ecosystem_hits + domain_string_hits))
+            if combined_exfil_hits:
+                violations.append(
+                    "Connects to third-party servers alongside government visa sites"
+                )
+                evidence_ids.append("tos:travel_docs:third_party_processor")
         
         if violations:
             return GateResult(
@@ -431,6 +662,12 @@ class HardGates:
                 details={
                     "violations": violations,
                     "checked_permissions": list(self.config.tos_prohibited_permissions),
+                    "travel_docs": {
+                        "protected_domains_hit": protected_domain_hits[:10],
+                        "visa_ecosystem_domains_hit": list(dict.fromkeys(visa_ecosystem_hits + domain_string_hits))[:20],
+                        "pattern_hits": pattern_hits[:20],
+                        "externally_connectable_matches": ext_conn_matches[:20],
+                    },
                 },
             )
         
@@ -518,35 +755,33 @@ class HardGates:
         decision: Literal["ALLOW", "WARN", "BLOCK"] = "ALLOW"
         confidence = 0.8
         
-        # Credential capture on any extension is concerning
         if credential_signals:
             if len(credential_signals) >= 2:
                 decision = "BLOCK"
                 confidence = 0.85
                 mismatch_reasons.append(
-                    f"Multiple credential capture patterns detected: {len(credential_signals)}"
+                    f"May capture your login credentials ({len(credential_signals)} patterns found)"
                 )
             else:
                 decision = "WARN"
-                mismatch_reasons.append("Credential capture pattern detected")
+                mismatch_reasons.append("May capture your login credentials")
         
-        # Benign-claimed extension with concerning capabilities
         if is_benign_claimed:
             if has_network and has_clipboard:
                 decision = "WARN" if decision == "ALLOW" else decision
                 mismatch_reasons.append(
-                    f"'{name}' claims benign purpose but has network + clipboard access"
+                    f"'{name}' says it's simple but can read your clipboard and access the internet"
                 )
             
             if has_capture:
                 decision = "WARN" if decision == "ALLOW" else decision
                 mismatch_reasons.append(
-                    f"'{name}' claims benign purpose but has capture capabilities"
+                    f"'{name}' says it's simple but can capture your screen"
                 )
             
             if tracking_signals:
                 decision = "WARN" if decision == "ALLOW" else decision
-                mismatch_reasons.append("Tracking patterns detected in benign extension")
+                mismatch_reasons.append("Contains tracking code despite being a simple utility")
         
         if mismatch_reasons:
             return GateResult(
@@ -644,20 +879,26 @@ class HardGates:
         risk_factors = 0
         reasons: List[str] = []
         
+        perm_plain = {
+            "cookies": "cookies", "history": "browsing history",
+            "tabs": "tab info", "webRequest": "web traffic",
+            "clipboardRead": "clipboard",
+        }
         if has_sensitive:
             risk_factors += 1
-            reasons.append(f"Sensitive permissions: {', '.join(sensitive_found[:3])}")
+            plain_perms = [perm_plain.get(p, p) for p in sensitive_found[:3]]
+            reasons.append(f"Can access your {', '.join(plain_perms)}")
         
         if has_network or has_network_patterns:
             risk_factors += 1
             if has_network:
-                reasons.append("Has broad network access")
+                reasons.append("Can send data to external servers")
             if has_network_patterns:
-                reasons.append(f"Network patterns in code: {len(network_findings)} findings")
+                reasons.append(f"Code contains patterns that send data externally")
         
         if not has_privacy_policy:
             risk_factors += 1
-            reasons.append("Missing privacy policy")
+            reasons.append("No privacy policy provided")
         
         # WARN if 2+ risk factors (sensitive + network + no privacy)
         if risk_factors >= 2:
@@ -720,7 +961,7 @@ class HardGates:
         results = [
             self.evaluate_vt_malware(signal_pack.virustotal),
             self.evaluate_critical_sast(signal_pack.sast),
-            self.evaluate_tos_violation(signal_pack.permissions, manifest),
+            self.evaluate_tos_violation(signal_pack.permissions, signal_pack.sast, signal_pack.network, manifest),
             self.evaluate_purpose_mismatch(manifest, signal_pack.sast, signal_pack.permissions),
             self.evaluate_sensitive_exfil(
                 signal_pack.permissions,

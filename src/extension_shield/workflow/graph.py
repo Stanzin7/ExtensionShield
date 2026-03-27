@@ -13,6 +13,8 @@ from extension_shield.workflow.nodes import (
     manifest_parser_node,
     extension_analyzer_node,
     summary_generation_node,
+    impact_analysis_node,
+    privacy_compliance_node,
     cleanup_node,
 )
 from extension_shield.workflow.governance_nodes import governance_node
@@ -23,6 +25,8 @@ from extension_shield.workflow.node_types import (
     MANIFEST_PARSER_NODE,
     EXTENSION_ANALYZER_NODE,
     SUMMARY_GENERATION_NODE,
+    IMPACT_ANALYSIS_NODE,
+    PRIVACY_COMPLIANCE_NODE,
     GOVERNANCE_NODE,
     CLEANUP_NODE,
 )
@@ -40,6 +44,8 @@ def build_graph():
     flow.add_node(MANIFEST_PARSER_NODE, manifest_parser_node)
     flow.add_node(EXTENSION_ANALYZER_NODE, extension_analyzer_node)
     flow.add_node(SUMMARY_GENERATION_NODE, summary_generation_node)
+    flow.add_node(IMPACT_ANALYSIS_NODE, impact_analysis_node)
+    flow.add_node(PRIVACY_COMPLIANCE_NODE, privacy_compliance_node)
     flow.add_node(GOVERNANCE_NODE, governance_node)
     flow.add_node(CLEANUP_NODE, cleanup_node)
 

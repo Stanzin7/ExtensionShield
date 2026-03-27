@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Shield, Save, RotateCcw } from "lucide-react";
+import { 
+  Settings, 
+  Shield, 
+  Save, 
+  User,
+  Info
+} from "lucide-react";
+import SEOHead from "../components/SEOHead";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import "./SettingsPage.scss";
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -29,70 +36,130 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="page-container">
+    <>
+      <SEOHead
+        title="Settings"
+        description="Account and scanner settings."
+        pathname="/settings"
+        noindex
+      />
+      <div className="page-container settings-page">
       <div className="page-header">
-        <h1 className="page-title">⚙️ Settings</h1>
+        <h1 className="page-title">
+          <Settings />
+          Settings
+        </h1>
         <p className="page-subtitle">
           Configure Extension Compliance Scanner system settings and preferences
         </p>
       </div>
 
-      <div className="glass-card max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6 border-b border-border/50 pb-4">
-          <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6 text-primary" />
-            <h2 className="text-xl font-bold">System Configuration</h2>
-          </div>
+      {/* Beta Launch Notice */}
+      <div className="beta-notice">
+        <Info />
+        <div>
+          <h3>Beta Launch</h3>
+          <p>
+            ExtensionShield is currently in beta. Some features may be limited or subject to change. 
+            We appreciate your feedback as we continue to improve the platform.
+          </p>
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card-header">
+          <h2>
+            <Settings />
+            System Configuration
+          </h2>
           <Button onClick={handleSave} className="gap-2">
             {saved ? <span className="text-green-400">Saved!</span> : <><Save className="w-4 h-4" /> Save Changes</>}
           </Button>
         </div>
 
-        <div className="space-y-6">
-          {/* Security Engine */}
-          <div className="p-6 rounded-lg bg-surface/50 border border-border/50">
-            <div className="flex items-start gap-4">
-              <Shield className="w-6 h-6 text-success mt-1" />
-              <div className="flex-1">
-                <div className="font-semibold text-lg">Security Engine Mode</div>
-                <p className="text-sm text-foreground-muted mb-4">Set the sensitivity of the security analysis engine.</p>
+        <div>
+          {/* Security Engine Section */}
+          <div className="settings-section">
+            <div className="section-header">
+              <Shield />
+              <div>
+                <div className="section-title">Security Engine Mode</div>
+                <p className="section-description">
+                  Set the sensitivity of the security analysis engine.
+                </p>
 
-                <div className="flex gap-4">
-                  <label className={`flex-1 p-4 rounded-lg border cursor-pointer transition-all ${settings.securityEngine === 'standard' ? 'bg-primary/20 border-primary' : 'bg-background/50 border-border hover:border-border-strong'}`}>
-                    <div className="flex items-center gap-2 mb-2">
+                <div className="security-options">
+                  <label
+                    className={`security-option ${
+                      settings.securityEngine === "standard" ? "active" : ""
+                    }`}
+                  >
+                    <div className="option-label">
                       <input
                         type="radio"
                         name="engine"
-                        checked={settings.securityEngine === 'standard'}
-                        onChange={() => handleChange('securityEngine', 'standard')}
-                        className="text-primary"
+                        checked={settings.securityEngine === "standard"}
+                        onChange={() => handleChange("securityEngine", "standard")}
                       />
-                      <span className="font-bold">Standard</span>
+                      <span>Standard</span>
                     </div>
-                    <p className="text-xs text-foreground-muted">Balanced checks for common vulnerabilities and known threats.</p>
+                    <p className="option-description">
+                      Balanced checks for common vulnerabilities and known threats.
+                    </p>
                   </label>
 
-                  <label className={`flex-1 p-4 rounded-lg border cursor-pointer transition-all ${settings.securityEngine === 'aggressive' ? 'bg-destructive/10 border-destructive' : 'bg-background/50 border-border hover:border-border-strong'}`}>
-                    <div className="flex items-center gap-2 mb-2">
+                  <label
+                    className={`security-option ${
+                      settings.securityEngine === "aggressive" ? "active-aggressive" : ""
+                    }`}
+                  >
+                    <div className="option-label">
                       <input
                         type="radio"
                         name="engine"
-                        checked={settings.securityEngine === 'aggressive'}
-                        onChange={() => handleChange('securityEngine', 'aggressive')}
-                        className="text-destructive"
+                        checked={settings.securityEngine === "aggressive"}
+                        onChange={() => handleChange("securityEngine", "aggressive")}
                       />
-                      <span className="font-bold text-destructive">Aggressive</span>
+                      <span style={{ color: settings.securityEngine === "aggressive" ? "#8b5cf6" : "inherit" }}>
+                        Aggressive
+                      </span>
                     </div>
-                    <p className="text-xs text-foreground-muted">Deep heuristic analysis. May produce more false positives.</p>
+                    <p className="option-description">
+                      Deep heuristic analysis. May produce more false positives.
+                    </p>
                   </label>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Account Section */}
+          <div className="settings-section">
+            <div className="section-header">
+              <User />
+              <div>
+                <div className="section-title">Account</div>
+                <p className="section-description">
+                  Manage your account settings and preferences.
+                </p>
+                
+                <div className="account-info">
+                  <div className="account-row">
+                    <span className="label">Account Status</span>
+                    <span className="value active">Active</span>
+                  </div>
+                  <div className="account-row">
+                    <span className="label">Plan</span>
+                    <span className="value">Free (Beta)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+    </>
   );
 };
 

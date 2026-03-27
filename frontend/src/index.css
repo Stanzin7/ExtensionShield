@@ -2,60 +2,137 @@
 
 :root {
   /* ============================================================================
-     EXTENSIONSHIELD - Dark Theme with Emerald Accents
-     Extension Governance Platform
+     EXTENSIONSHIELD - Dark theme (when .light is not on <html>)
+     Single warm dark shade derived from light palette (pitch/coal) – WCAG AA.
+     Modular: light mode in .light {} is unchanged.
      ============================================================================ */
 
-  /* Background Colors - Deep Navy Dark Theme */
-  --color-background: 222 47% 5%;
-  --color-surface: 222 47% 7%;
-  --color-surface-elevated: 222 47% 9%;
-  --color-surface-hover: 222 47% 12%;
+  /* Dialog overlay (modal backdrop) – dark default */
+  --dialog-overlay-bg: rgba(0, 0, 0, 0.75);
 
-  /* Foreground Colors */
-  --color-foreground: 210 40% 98%;
-  --color-foreground-muted: 215 20% 65%;
-  --color-foreground-subtle: 215 16% 47%;
+  /* Background – warm dark (same hue family as light pitch/coal) */
+  --color-background: 34 12% 10%;
+  --color-surface: 34 12% 13%;
+  --color-surface-elevated: 34 10% 16%;
+  --color-surface-hover: 34 10% 18%;
+  --color-card: 34 12% 13%;
+  --color-card-foreground: 40 15% 96%;
+  --color-popover: 34 10% 16%;
+  --color-popover-foreground: 40 15% 96%;
 
-  /* Primary Brand - Emerald */
+  /* Foreground – warm off-white and grays */
+  --color-foreground: 40 15% 96%;
+  --color-foreground-muted: 35 12% 72%;
+  --color-foreground-subtle: 35 10% 58%;
+
+  /* Primary / Accent - ExtensionShield brand (emerald) */
   --color-primary: 142 71% 45%;
   --color-primary-hover: 142 71% 40%;
-  --color-primary-foreground: 222 47% 5%;
+  --color-primary-foreground: 34 12% 10%;
 
   /* Secondary - Purple */
   --color-secondary: 256 65% 65%;
   --color-secondary-hover: 256 65% 58%;
-  --color-secondary-foreground: 210 40% 98%;
+  --color-secondary-foreground: 40 15% 96%;
 
   /* Accent - Emerald */
   --color-accent: 142 71% 45%;
   --color-accent-hover: 142 71% 40%;
-  --color-accent-foreground: 222 47% 5%;
+  --color-accent-foreground: 34 12% 10%;
 
-  /* Status Colors */
-  --color-muted: 215 16% 47%;
-  --color-muted-foreground: 215 20% 65%;
+  /* Status */
+  --color-muted: 35 10% 55%;
+  --color-muted-foreground: 35 12% 72%;
 
   --color-destructive: 0 84% 60%;
   --color-destructive-hover: 0 84% 55%;
-  --color-destructive-foreground: 210 40% 98%;
+  --color-destructive-foreground: 40 15% 96%;
 
   --color-success: 142 71% 45%;
   --color-success-hover: 142 71% 40%;
-  --color-success-foreground: 210 40% 98%;
+  --color-success-foreground: 40 15% 96%;
 
   --color-warning: 38 92% 50%;
   --color-warning-hover: 38 92% 45%;
-  --color-warning-foreground: 222 47% 5%;
+  --color-warning-foreground: 34 12% 10%;
 
-  /* Borders & Inputs */
-  --color-border: 215 20% 15%;
-  --color-border-subtle: 215 20% 12%;
-  --color-border-strong: 215 20% 20%;
+  /* Info / focus */
+  --color-info: 217 91% 60%;
+  --color-info-hover: 217 91% 50%;
+  --color-info-foreground: 0 0% 100%;
+  --color-info-bg: rgba(59, 130, 246, 0.12);
+  --color-info-border: rgba(59, 130, 246, 0.4);
 
-  --color-input: 222 47% 8%;
+  /* Borders & Inputs – warm gray */
+  --color-border: 35 12% 22%;
+  --color-border-subtle: 35 10% 18%;
+  --color-border-strong: 35 12% 28%;
+
+  --color-input: 34 12% 14%;
   --color-input-focus: 142 71% 45%;
   --color-ring: 142 71% 45%;
+
+  /* Risk palette - shared by report/chart components */
+  --risk-good: #10B981;
+  --risk-warn: #F59E0B;
+  --risk-bad: #EF4444;
+  --risk-neutral: #6B7280;
+  --risk-good-bg: rgba(16, 185, 129, 0.12);
+  --risk-good-border: rgba(16, 185, 129, 0.4);
+  --risk-warn-bg: rgba(245, 158, 11, 0.12);
+  --risk-warn-border: rgba(245, 158, 11, 0.4);
+  --risk-bad-bg: rgba(239, 68, 68, 0.12);
+  --risk-bad-border: rgba(239, 68, 68, 0.4);
+  --risk-neutral-bg: rgba(107, 114, 128, 0.12);
+  --risk-neutral-border: rgba(107, 114, 128, 0.4);
+
+  /* ============================================================================
+     THEME SYSTEM VARIABLES – dark mode (warm shade from light palette)
+     ============================================================================ */
+  --theme-bg-primary: #1c1a17;
+  --theme-bg-secondary: #252320;
+  --theme-bg-tertiary: #2e2b28;
+  --theme-bg-card: #252320;
+  --theme-bg-surface: rgba(37, 35, 32, 0.92);
+  --theme-bg-surface-hover: #2e2b28;
+  --theme-bg-glass: rgba(37, 35, 32, 0.88);
+  --theme-bg-glass-strong: #2e2b28;
+  --theme-bg-overlay: rgba(28, 26, 23, 0.97);
+  
+  --theme-text-primary: #ffffff;
+  --theme-text-secondary: #e8e6e3;
+  --theme-text-muted: #b8b3ab;
+  --theme-text-subtle: #7a756d;
+  
+  --theme-accent: #22c55e;
+  --theme-accent-hover: #16a34a;
+  --theme-accent-subtle: rgba(34, 197, 94, 0.14);
+  --theme-accent-glow: rgba(34, 197, 94, 0.25);
+  
+  --theme-border: rgba(180, 172, 157, 0.22);
+  --theme-border-subtle: rgba(180, 172, 157, 0.14);
+  --theme-border-strong: rgba(180, 172, 157, 0.32);
+  --theme-border-accent: rgba(34, 197, 94, 0.35);
+  --theme-border-hover: rgba(180, 172, 157, 0.28);
+  
+  --theme-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --theme-shadow-card-hover: 0 8px 28px rgba(0, 0, 0, 0.3);
+  --theme-shadow-dropdown: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --theme-shadow-glow: 0 0 0 1px rgba(34, 197, 94, 0.2);
+  
+  --theme-hover-bg: rgba(255, 255, 255, 0.06);
+  --theme-hover-border: rgba(180, 172, 157, 0.28);
+  --theme-active-bg: rgba(34, 197, 94, 0.12);
+  
+  --theme-input-bg: rgba(37, 35, 32, 0.9);
+  --theme-input-border: rgba(180, 172, 157, 0.2);
+  --theme-input-focus-border: rgba(34, 197, 94, 0.5);
+  
+  --theme-scrollbar-track: #252320;
+  --theme-scrollbar-thumb: rgba(180, 172, 157, 0.28);
+  --theme-scrollbar-thumb-hover: rgba(180, 172, 157, 0.4);
+  
+  --theme-code-bg: rgba(0, 0, 0, 0.25);
 
   /* Radii */
   --radius-sm: 0.5rem;
@@ -65,6 +142,603 @@
   --radius-xl: 2rem;
   --radius-2xl: 3rem;
   --radius-full: 9999px;
+
+  /* Typography – single source of truth */
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas, monospace;
+
+  --weight-body: 400;
+  --weight-ui: 500;
+  --weight-heading: 600;
+  --weight-strong: 700;
+
+  --leading-tight: 1.4;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.7;
+
+  /* Report / Scan results */
+  --report-font: var(--font-sans);
+  --report-text-base: 1rem;
+  --report-text-sm: 0.875rem;
+  --report-text-xs: 0.875rem;
+  --report-text-lg: 1.125rem;
+  --report-text-xl: 1.25rem;
+  --report-text-2xl: 1.5rem;
+  --report-text-3xl: 1.875rem;
+  --report-text-4xl: 2.25rem;
+  --report-line-tight: var(--leading-tight);
+  --report-line-normal: var(--leading-normal);
+  --report-line-relaxed: var(--leading-relaxed);
+
+  /* ExtensionShield tokens – dark (same warm shade) */
+  --extensionshield-bg-primary: #1c1a17;
+  --extensionshield-bg-secondary: #252320;
+  --extensionshield-bg-tertiary: #2e2b28;
+  --extensionshield-bg-card: #252320;
+  --extensionshield-surface-card: #252320;
+  --extensionshield-surface-hover: #2e2b28;
+  --extensionshield-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --extensionshield-accent: #22c55e;
+  --extensionshield-accent-hover: #16a34a;
+  /* Primary CTA background: WCAG AA with white text (dark mode) */
+  --extensionshield-accent-cta: #16a34a;
+  --extensionshield-accent-glow: rgba(34, 197, 94, 0.25);
+  --extensionshield-accent-subtle: rgba(34, 197, 94, 0.14);
+  --extensionshield-purple: #8b5cf6;
+  --extensionshield-purple-glow: rgba(139, 92, 246, 0.4);
+  --extensionshield-orange: #f97316;
+  --extensionshield-orange-glow: rgba(249, 115, 22, 0.4);
+  --extensionshield-danger: var(--risk-bad);
+  --extensionshield-text-primary: #ffffff;
+  --extensionshield-text-secondary: #e8e6e3;
+  --extensionshield-text-muted: #b8b3ab;
+  --extensionshield-border: rgba(180, 172, 157, 0.22);
+  --extensionshield-border-accent: rgba(34, 197, 94, 0.35);
+  --extensionshield-border-subtle: rgba(180, 172, 157, 0.14);
+  --extensionshield-bg-elevated: #2e2b28;
+}
+
+/* Optional: lighter dark variant (same warm hue) – use data-theme="dark-lighter" on <html> if needed */
+[data-theme="dark-lighter"] {
+  --extensionshield-bg-primary: #252320;
+  --extensionshield-bg-secondary: #2e2b28;
+  --theme-bg-primary: #252320;
+  --theme-bg-secondary: #2e2b28;
+  --color-background: 34 12% 13%;
+  --color-surface: 34 10% 16%;
+  --color-surface-elevated: 34 10% 18%;
+  --color-surface-hover: 34 10% 20%;
+  --color-card: 34 10% 16%;
+  --color-input: 34 12% 14%;
+}
+
+/* ============================================================================
+   DARK MODE (default) – card/surface consistency across all routes
+   Same look as Enterprise page: theme backgrounds and borders everywhere.
+   ============================================================================ */
+:root:not(.light) .surface-card,
+:root:not(.light) .bridge-step,
+:root:not(.light) .deception-card,
+:root:not(.light) .pricing-card,
+:root:not(.light) .link-card,
+:root:not(.light) .contribution-card,
+:root:not(.light) .community-card,
+:root:not(.light) .blog-card,
+:root:not(.light) .finding-card,
+:root:not(.light) .case-study-card,
+:root:not(.light) .research-card,
+:root:not(.light) .enterprise-card,
+:root:not(.light) .enterprise-form,
+:root:not(.light) .highlight-tile,
+:root:not(.light) .methodology-info-box,
+:root:not(.light) .glossary-term,
+:root:not(.light) .extension-card,
+:root:not(.light) .idea-card,
+:root:not(.light) .summary-panel,
+:root:not(.light) .results-sidebar-tile,
+:root:not(.light) .login-overlay-content,
+:root:not(.light) .aggregate-card,
+:root:not(.light) .pipeline-card,
+:root:not(.light) .open-source-credit,
+:root:not(.light) .chart-card,
+:root:not(.light) .recommendation-card,
+:root:not(.light) .capability-card,
+:root:not(.light) .report-card,
+:root:not(.light) .glass-card,
+:root:not(.light) .karma-panel,
+:root:not(.light) .api-card {
+  background: var(--extensionshield-bg-card);
+  border: 1px solid var(--extensionshield-border);
+  box-shadow: var(--extensionshield-card-shadow);
+  color: var(--extensionshield-text-primary);
+}
+
+/* Dark: form fields (e.g. Enterprise, contact forms) inherit theme */
+:root:not(.light) .field input,
+:root:not(.light) .field textarea {
+  background: var(--extensionshield-bg-secondary);
+  border: 1px solid var(--extensionshield-border);
+  color: var(--extensionshield-text-primary);
+}
+
+:root:not(.light) .field input::placeholder,
+:root:not(.light) .field textarea::placeholder {
+  color: var(--extensionshield-text-muted);
+}
+
+/* Dark: headings and body text use theme primary for WCAG */
+:root:not(.light) h1,
+:root:not(.light) h2,
+:root:not(.light) .enterprise-header h1,
+:root:not(.light) .enterprise-card h2,
+:root:not(.light) .enterprise-form h2 {
+  color: var(--extensionshield-text-primary);
+}
+
+/* ============================================================================
+   LIGHT MODE THEME
+   Warm cream/ivory tones - WCAG AA compliant.
+   Toggle UI: components/ThemeToggle.jsx | Class applied by: context/ThemeContext.jsx
+   ============================================================================ */
+.light {
+  /* Background - Warm light tones */
+  --color-background: 0 0% 100%;
+  --color-surface: 0 0% 98%;
+  --color-surface-elevated: 0 0% 96%;
+  --color-surface-hover: 0 0% 94%;
+  --color-card: 0 0% 98%;
+  --color-card-foreground: 222 47% 11%;
+  --color-popover: 0 0% 96%;
+  --color-popover-foreground: 222 47% 11%;
+
+  /* Foreground - WCAG AA on light */
+  --color-foreground: 222 47% 11%;
+  --color-foreground-muted: 215 16% 47%;
+  --color-foreground-subtle: 215 12% 35%;
+
+  /* Primary Brand - Emerald (darker for light mode) */
+  --color-primary: 142 71% 40%;
+  --color-primary-hover: 142 71% 35%;
+  --color-primary-foreground: 222 47% 5%;
+
+  /* Secondary - Purple */
+  --color-secondary: 256 65% 60%;
+  --color-secondary-hover: 256 65% 55%;
+  --color-secondary-foreground: 0 0% 100%;
+
+  /* Accent - Emerald */
+  --color-accent: 142 71% 40%;
+  --color-accent-hover: 142 71% 35%;
+  --color-accent-foreground: 0 0% 100%;
+
+  /* Status */
+  --color-muted: 215 16% 47%;
+  --color-muted-foreground: 215 20% 35%;
+
+  --color-destructive: 0 84% 60%;
+  --color-destructive-hover: 0 84% 55%;
+  --color-destructive-foreground: 0 0% 100%;
+
+  --color-success: 142 71% 40%;
+  --color-success-hover: 142 71% 35%;
+  --color-success-foreground: 0 0% 100%;
+
+  --color-warning: 38 92% 50%;
+  --color-warning-hover: 38 92% 45%;
+  --color-warning-foreground: 222 47% 5%;
+
+  /* Info / focus */
+  --color-info: 217 91% 60%;
+  --color-info-hover: 217 91% 50%;
+  --color-info-foreground: 0 0% 100%;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info-border: rgba(59, 130, 246, 0.35);
+
+  /* Borders & Inputs */
+  --color-border: 220 12% 88%;
+  --color-border-subtle: 220 12% 92%;
+  --color-border-strong: 220 10% 78%;
+
+  --color-input: 220 14% 96%;
+  --color-input-focus: 142 71% 42%;
+  --color-ring: 142 71% 45%;
+
+  /* Risk palette - slightly adjusted for light backgrounds */
+  --risk-good: #059669;
+  --risk-warn: #d97706;
+  --risk-bad: #dc2626;
+  --risk-neutral: #6B7280;
+  --risk-good-bg: rgba(5, 150, 105, 0.1);
+  --risk-good-border: rgba(5, 150, 105, 0.3);
+  --risk-warn-bg: rgba(217, 119, 6, 0.1);
+  --risk-warn-border: rgba(217, 119, 6, 0.3);
+  --risk-bad-bg: rgba(220, 38, 38, 0.1);
+  --risk-bad-border: rgba(220, 38, 38, 0.3);
+  --risk-neutral-bg: rgba(107, 114, 128, 0.1);
+  --risk-neutral-border: rgba(107, 114, 128, 0.3);
+
+  /* ============================================================================
+     ExtensionShield palette (chalk, pitch, ash, stone, clay, limestone, sage, rust)
+     Used for consistent card outline and background in light mode.
+     ============================================================================ */
+  --color__rust: rgb(183 80 12);
+  --color__ochre: rgb(214 126 67);
+  --color__sage: rgb(139 166 140);
+  --color__pine: rgb(61 90 63);
+  --color__slate: rgb(95 113 147);
+  --color__glacier: rgb(149 174 221);
+  --color__chalk: rgb(251 249 245);
+  --color__pitch: rgb(36 34 30);
+  --color__coal: rgb(47 44 37);
+  --color__ash: rgb(73 70 63);
+  --color__ash-stone: rgb(114 109 111);
+  --color__stone: rgb(180 172 157);
+  --color__clay: rgb(217 210 196);
+  --color__limestone: rgb(247 243 235);
+  --color__rust--values: 183 80 12;
+  --color__ochre--values: 214 126 67;
+  --color__sage--values: 139 166 140;
+  --color__pine--values: 61 90 63;
+  --color__slate--values: 95 113 147;
+  --color__glacier--values: 149 174 221;
+  --color__chalk--values: 251 249 245;
+  --color__pitch--values: 36 34 30;
+  --color__coal--values: 47 44 37;
+  --color__ash--values: 73 70 63;
+  --color__ash-stone--values: 114 109 111;
+  --color__stone--values: 180 172 157;
+  --color__clay--values: 217 210 196;
+  --color__limestone--values: 247 243 235;
+  --extra-color__red: rgb(192 0 0);
+  --color__white: rgb(255 255 255);
+  --color__black: rgb(0 0 0);
+  --color__white--values: 255 255 255;
+  --color__black--values: 0 0 0;
+  --dimension__rounded-corner: 0.625rem;
+
+  /* ExtensionShield - light surfaces (vibrant, high contrast) */
+  --extensionshield-bg-primary: #ffffff;
+  --extensionshield-bg-secondary: var(--color__chalk);
+  --extensionshield-bg-tertiary: var(--color__limestone);
+  --extensionshield-bg-card: var(--color__chalk);
+  --extensionshield-card-shadow: 0 4px 20px rgba(36, 34, 30, 0.08), 0 0 0 1px rgba(73, 70, 63, 0.12);
+  --extensionshield-accent: #15803d;
+  --extensionshield-accent-hover: #166534;
+  /* Primary CTA: same as accent in light (WCAG AA with white text) */
+  --extensionshield-accent-cta: var(--extensionshield-accent);
+  --extensionshield-accent-subtle: rgba(21, 128, 61, 0.12);
+  --extensionshield-accent-glow: rgba(21, 128, 61, 0.25);
+  --extensionshield-cta-rust: var(--color__rust);
+  --extensionshield-cta-rust-hover: rgb(155 68 10);
+  --extensionshield-text-primary: var(--color__pitch);
+  --extensionshield-text-secondary: var(--color__coal);
+  --extensionshield-text-muted: var(--color__ash);
+  --extensionshield-border: rgba(73, 70, 63, 0.22);
+  --extensionshield-border-strong: var(--color__stone);
+  --extensionshield-border-accent: rgba(21, 128, 61, 0.45);
+  --extensionshield-surface-card: var(--color__chalk);
+  --extensionshield-surface-hover: var(--color__limestone);
+  --extensionshield-border-subtle: rgba(73, 70, 63, 0.12);
+  --extensionshield-bg-elevated: var(--color__limestone);
+
+  /* ============================================================================
+     THEME SYSTEM VARIABLES (light mode – vibrant, WCAG AA)
+     ============================================================================ */
+  --theme-bg-primary: #ffffff;
+  --theme-bg-secondary: var(--color__chalk);
+  --theme-bg-tertiary: var(--color__limestone);
+  --theme-bg-card: var(--color__chalk);
+  --theme-bg-surface: var(--color__chalk);
+  --theme-bg-surface-hover: var(--color__limestone);
+  --theme-bg-glass: var(--color__chalk);
+  --theme-bg-glass-strong: #ffffff;
+  --theme-bg-overlay: #ffffff;
+  
+  --theme-text-primary: var(--color__pitch);
+  --theme-text-secondary: var(--color__coal);
+  --theme-text-muted: var(--color__ash);
+  --theme-text-subtle: var(--color__ash-stone);
+  
+  --theme-accent: #15803d;
+  --theme-accent-hover: #166534;
+  --theme-accent-subtle: rgba(21, 128, 61, 0.12);
+  --theme-accent-glow: rgba(21, 128, 61, 0.25);
+  
+  --theme-border: rgba(73, 70, 63, 0.28);
+  --theme-border-subtle: var(--color__clay);
+  --theme-border-strong: var(--color__stone);
+  --theme-border-accent: rgba(21, 128, 61, 0.5);
+  --theme-border-hover: rgba(21, 128, 61, 0.3);
+  
+  --theme-shadow-card: 0 4px 20px rgba(36, 34, 30, 0.08), 0 0 0 1px rgba(73, 70, 63, 0.12);
+  --theme-shadow-card-hover: 0 12px 40px rgba(36, 34, 30, 0.12), 0 0 0 1px rgba(21, 128, 61, 0.2);
+  --theme-shadow-dropdown: 0 8px 32px rgba(36, 34, 30, 0.12), 0 0 0 1px rgba(73, 70, 63, 0.14);
+  --theme-shadow-glow: 0 0 0 1px rgba(21, 128, 61, 0.15);
+  
+  --theme-hover-bg: rgba(36, 34, 30, 0.05);
+  --theme-hover-border: var(--color__stone);
+  --theme-active-bg: rgba(21, 128, 61, 0.1);
+  
+  --theme-input-bg: #ffffff;
+  --theme-input-border: var(--color__clay);
+  --theme-input-focus-border: var(--theme-accent);
+  
+  --theme-scrollbar-track: var(--color__limestone);
+  --theme-scrollbar-thumb: rgba(73, 70, 63, 0.3);
+  --theme-scrollbar-thumb-hover: rgba(73, 70, 63, 0.45);
+  
+  --theme-code-bg: rgba(36, 34, 30, 0.06);
+}
+
+/* Force day background so no other layer overrides it */
+html.light {
+  background: var(--extensionshield-bg-primary) !important;
+  color-scheme: light;
+}
+
+.light body {
+  background: var(--extensionshield-bg-primary) !important;
+  color: hsl(var(--color-foreground)) !important;
+}
+
+.light #root {
+  background: var(--extensionshield-bg-primary) !important;
+}
+
+.light .extensionshield-app,
+.light .app-background,
+.light .app-bg-base {
+  background: var(--extensionshield-bg-primary) !important;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: var(--color__limestone);
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(73, 70, 63, 0.25);
+  border: 2px solid var(--color__limestone);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(73, 70, 63, 0.35);
+}
+
+/* Light mode: dialog overlay (all modals – game mode, results, completion, etc.) */
+.light {
+  --dialog-overlay-bg: rgba(38, 35, 31, 0.4);
+}
+
+/* Light mode: glass surfaces – chalk/white with visible outline */
+.light .glass {
+  background: var(--color__chalk);
+  border: 1px solid var(--color__clay);
+  box-shadow: 0 4px 12px rgba(36, 34, 30, 0.06);
+}
+
+.light .glass-strong {
+  background: #ffffff;
+  border: 1px solid var(--color__stone);
+  box-shadow: 0 4px 16px rgba(36, 34, 30, 0.08);
+}
+
+/* Card style (light) – vibrant: chalk card bg + visible clay/stone outline */
+.light .surface-card,
+.light .bridge-step,
+.light .deception-card,
+.light .pricing-card,
+.light .link-card,
+.light .contribution-card,
+.light .community-card,
+.light .blog-card,
+.light .finding-card,
+.light .case-study-card,
+.light .research-card,
+.light .enterprise-card,
+.light .highlight-tile,
+.light .methodology-info-box,
+.light .glossary-term,
+.light .extension-card,
+.light .idea-card,
+.light .summary-panel,
+.light .results-sidebar-tile,
+.light .login-overlay-content,
+.light .aggregate-card,
+.light .pipeline-card,
+.light .open-source-credit,
+.light .chart-card,
+.light .recommendation-card,
+.light .capability-card,
+.light .report-card,
+.light .glass-card,
+.light .karma-panel,
+.light .api-card {
+  background: var(--extensionshield-bg-card);
+  border: 1px solid var(--color__clay);
+  box-shadow: var(--extensionshield-card-shadow);
+}
+
+.light .api-card {
+  border-left: 3px solid var(--extensionshield-accent);
+}
+
+.light .api-card:hover {
+  border-color: var(--extensionshield-border-accent);
+  border-left-color: var(--extensionshield-accent);
+  box-shadow: var(--theme-shadow-card-hover);
+}
+
+.light .surface-card {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.light .surface-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--extensionshield-border-accent);
+  box-shadow: 0 12px 40px rgba(36, 34, 30, 0.1), 0 0 0 1px rgba(22, 163, 74, 0.12);
+}
+
+.light .surface-panel {
+  background: var(--color__chalk);
+  border: 1px solid var(--color__clay);
+  box-shadow: 0 4px 16px rgba(36, 34, 30, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.light .surface-panel:hover {
+  border-color: var(--color__stone);
+}
+
+/* Light mode: homepage hero & stats – bright card style */
+.light .hero-glass-card {
+  background: var(--color__chalk);
+  border: 1px solid var(--color__clay);
+  box-shadow: 0 4px 20px rgba(36, 34, 30, 0.08), 0 0 0 1px rgba(73, 70, 63, 0.12);
+}
+.light .hero-glass-card:hover {
+  border-color: var(--extensionshield-border-accent);
+  box-shadow: 0 12px 40px rgba(36, 34, 30, 0.1), 0 0 0 1px rgba(21, 128, 61, 0.2);
+}
+
+.light .glass-card-icon {
+  background: rgba(36, 34, 30, 0.06);
+  border: 1px solid var(--color__clay);
+  box-shadow: 0 2px 8px rgba(36, 34, 30, 0.06);
+}
+
+.light .glass-card-meta {
+  border-top: 1px solid var(--color__clay);
+}
+
+.light .stats-bar {
+  background: var(--color__chalk);
+  border: 1px solid var(--color__clay);
+  box-shadow: 0 4px 20px rgba(36, 34, 30, 0.08), 0 0 0 1px rgba(73, 70, 63, 0.12);
+}
+
+.light .search-container {
+  background: #ffffff;
+  border: 1px solid var(--color__clay);
+  box-shadow: 0 2px 10px rgba(36, 34, 30, 0.06);
+}
+.light .search-container:focus-within {
+  border-color: var(--extensionshield-accent);
+  box-shadow: 0 0 0 4px var(--extensionshield-accent-subtle), 0 0 0 1px var(--extensionshield-accent);
+}
+
+/* Homepage search icon button: no background, no border, dark icon for contrast */
+.light .search-btn.search-btn-icon,
+.light .search-btn.search-btn-icon:hover {
+  background: transparent !important;
+  border: none !important;
+  color: #262626 !important;
+  box-shadow: none !important;
+}
+
+/* Optional rust CTA (reference-style warm accent) */
+.light .cta-rust,
+.light .btn-cta-rust {
+  background: var(--extensionshield-cta-rust);
+  color: var(--color__white);
+  border: 1px solid var(--extensionshield-cta-rust);
+}
+.light .cta-rust:hover,
+.light .btn-cta-rust:hover {
+  background: var(--extensionshield-cta-rust-hover);
+  border-color: var(--extensionshield-cta-rust-hover);
+  color: var(--color__white);
+}
+
+/* Light mode: all accent (green) filled buttons – white text for consistency (exclude icon-only search btn) */
+.light .cta-button,
+.light .action-signin,
+.light .search-btn:not(.search-btn-icon),
+.light .submit-btn,
+.light .login-overlay-btn,
+.light .empty-action-btn,
+.light .pricing-btn.popular-btn,
+.light .pricing-btn.enterprise-btn,
+.light .dev-cta-button.primary {
+  color: #fff !important;
+}
+.light .cta-button:hover,
+.light .action-signin:hover,
+.light .search-btn:hover:not(.search-btn-icon),
+.light .submit-btn:hover,
+.light .login-overlay-btn:hover,
+.light .empty-action-btn:hover,
+.light .pricing-btn.popular-btn:hover,
+.light .pricing-btn.enterprise-btn:hover,
+.light .dev-cta-button.primary:hover {
+  color: #fff !important;
+}
+
+/* Day mode: improved contrast (WCAG) – body and secondary text at least medium weight */
+.light p,
+.light .section-content,
+.light [class*="-detail"],
+.light [class*="-description"],
+.light .card-content p,
+.light .bridge-step p,
+.light .highlight-detail,
+.light .blog-card p,
+.light .contribute-header .subtitle,
+.light .open-source-header p,
+.light .enterprise-header p,
+.light .form-note,
+.light .community-landing-message,
+.light .community-footnote,
+.light .link-content p {
+  font-weight: 500;
+}
+
+/* Animated card hover (day): lift + shadow, same feel as dark mode */
+.light .bridge-step,
+.light .deception-card,
+.light .pricing-card,
+.light .link-card,
+.light .contribution-card,
+.light .community-card,
+.light .blog-card,
+.light .finding-card,
+.light .case-study-card,
+.light .research-card,
+.light .enterprise-card,
+.light .highlight-tile,
+.light .methodology-info-box,
+.light .glossary-term {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.light .bridge-step:hover,
+.light .deception-card:hover,
+.light .pricing-card:hover,
+.light .link-card:hover,
+.light .contribution-card:hover,
+.light .community-card:hover,
+.light .blog-card:hover,
+.light .finding-card:hover,
+.light .case-study-card:hover,
+.light .research-card:hover,
+.light .enterprise-card:hover,
+.light .highlight-tile:hover,
+.light .glossary-term:hover,
+.light .karma-panel:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(38, 35, 31, 0.12);
+}
+.light .bridge-step:hover,
+.light .deception-card:hover,
+.light .link-card:hover,
+.light .contribution-card:hover,
+.light .community-card:hover,
+.light .blog-card:hover,
+.light .finding-card:hover,
+.light .case-study-card:hover,
+.light .research-card:hover,
+.light .enterprise-card:hover,
+.light .karma-panel:hover {
+  border-color: rgba(22, 163, 74, 0.25);
 }
 
 @theme {
@@ -73,6 +747,10 @@
   --color-surface: hsl(var(--color-surface));
   --color-surface-elevated: hsl(var(--color-surface-elevated));
   --color-surface-hover: hsl(var(--color-surface-hover));
+  --color-card: hsl(var(--color-card));
+  --color-card-foreground: hsl(var(--color-card-foreground));
+  --color-popover: hsl(var(--color-popover));
+  --color-popover-foreground: hsl(var(--color-popover-foreground));
 
   --color-foreground: hsl(var(--color-foreground));
   --color-foreground-muted: hsl(var(--color-foreground-muted));
@@ -100,6 +778,12 @@
   --color-warning: hsl(var(--color-warning));
   --color-warning-hover: hsl(var(--color-warning-hover));
 
+  --color-info: hsl(var(--color-info));
+  --color-info-hover: hsl(var(--color-info-hover));
+  --color-info-foreground: hsl(var(--color-info-foreground));
+  --color-info-bg: var(--color-info-bg);
+  --color-info-border: var(--color-info-border);
+
   --color-border: hsl(var(--color-border));
   --color-input: hsl(var(--color-input));
   --color-ring: hsl(var(--color-ring));
@@ -126,21 +810,29 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0f1a !important;
+  background: var(--extensionshield-bg-primary);
+  color-scheme: dark;
+  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 
 body {
-  background: #0a0f1a !important;
+  background: transparent;
   color: hsl(var(--color-foreground)) !important;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
-    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  line-height: 1.6;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--leading-normal);
+  font-weight: var(--weight-body);
+  min-height: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 
 #root {
-  background: #0a0f1a !important;
+  background: transparent;
 }
 
 /* ============================================================================
@@ -153,18 +845,18 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0d1424;
+  background: var(--theme-scrollbar-track);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: var(--theme-scrollbar-thumb);
   border-radius: 5px;
-  border: 2px solid #0d1424;
+  border: 2px solid var(--theme-scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.3);
+  background: var(--theme-scrollbar-thumb-hover);
 }
 
 /* ============================================================================
@@ -172,17 +864,47 @@ body {
    ============================================================================ */
 
 .glass {
-  background: rgba(16, 24, 40, 0.6);
+  background: var(--theme-bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid var(--theme-border);
 }
 
 .glass-strong {
-  background: rgba(16, 24, 40, 0.8);
+  background: var(--theme-bg-glass-strong);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  border: 1px solid var(--theme-border);
+}
+
+/* ============================================================================
+   SURFACE UTILITIES - Standardized card/panel surfaces (background, border, shadow, blur, hover)
+   ============================================================================ */
+.surface-card {
+  background: var(--theme-bg-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  box-shadow: var(--theme-shadow-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+.surface-card:hover {
+  border-color: var(--theme-border-hover);
+  box-shadow: var(--theme-shadow-card-hover);
+}
+
+.surface-panel {
+  background: var(--theme-bg-card);
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  box-shadow: var(--theme-shadow-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.surface-panel:hover {
+  border-color: var(--theme-border-hover);
 }
 
 /* ============================================================================
@@ -340,6 +1062,46 @@ body {
 ::-moz-selection {
   background: rgba(34, 197, 94, 0.25);
   color: hsl(var(--color-foreground));
+}
+
+.light ::selection {
+  background: rgba(178, 82, 24, 0.2);
+  color: hsl(var(--color-foreground));
+}
+
+.light ::-moz-selection {
+  background: rgba(178, 82, 24, 0.2);
+  color: hsl(var(--color-foreground));
+}
+
+/* ============================================================================
+   PAGE BACK LINK/BUTTON (all routes: centered, ellipsis, hover)
+   ============================================================================ */
+.page-back-wrap {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.page-back {
+  display: inline-block;
+  color: var(--theme-text-secondary, #b8b3ab);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  padding: 0.25rem 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+.page-back:hover {
+  color: var(--theme-accent, #22c55e);
+}
+a.page-back {
+  cursor: pointer;
 }
 
 /* ============================================================================

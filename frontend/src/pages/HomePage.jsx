@@ -1,676 +1,610 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ArrowRight, Download } from "lucide-react";
+import { useScan } from "../context/ScanContext";
+import { useAuth } from "../context/AuthContext";
+import { requiresAuthForScan } from "../utils/authUtils";
+import databaseService from "../services/databaseService";
+import SEOHead from "../components/SEOHead";
+import { HeroOrbitalCarousel } from "../components/hero";
+import DemoModal from "../components/DemoModal";
+import UploadModal from "../components/UploadModal";
+import DevOpenCoreSection from "../components/home/DevOpenCoreSection";
+import HowWeProtectYouSection from "../components/home/HowWeProtectYouSection";
+import { CHROME_EXTENSION_STORE_URL, EXTENSION_ICON_PLACEHOLDER, getExtensionIconUrl } from "../utils/constants";
+import { getScanResultsRoute } from "../utils/slug";
 import "./HomePage.scss";
-
-// Static configuration - defined outside component to prevent recreation
-const BADGE_CONFIG = [
-  { id: 0, icon: "👁️", label: "Keystroke Logging", status: "detected", side: "left" },
-  { id: 1, icon: "🔐", label: "Password Theft", status: "clear", side: "left" },
-  { id: 2, icon: "📤", label: "Data Exfiltration", status: "detected", side: "left" },
-  { id: 3, icon: "📹", label: "Camera Access", status: "detected", side: "right" },
-  { id: 4, icon: "🌍", label: "Foreign Servers", status: "clear", side: "right" },
-  { id: 5, icon: "💳", label: "Banking Fraud", status: "detected", side: "right" },
-];
-
-const SCAN_STATUS_MESSAGES = [
-  "Checking permissions...",
-  "Analyzing JavaScript...",
-  "Scanning for data exfiltration...",
-  "Detecting keyloggers...",
-  "Verifying API endpoints...",
-];
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { startScan, setUrl, error: scanError } = useScan();
+  const { isAuthenticated, openSignInModal } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [scanInput, setScanInput] = useState("");
-  const [scanProgress, setScanProgress] = useState(0);
-  const [currentThreat, setCurrentThreat] = useState(0);
-  const [badgePositions, setBadgePositions] = useState([]);
-  const [revealedSections, setRevealedSections] = useState({});
-  const [scanCount, setScanCount] = useState(0); // Start at 0 - honest default
-  const containerRef = useRef(null);
-  const animationRef = useRef(null);
-  const badgesRef = useRef([]);
+  // Hero stat: real cumulative usage is 100+ (DB was reset, so live count would show lower). Animation runs immediately on load.
+  const EXTENSIONS_DISPLAY_TARGET = 100;
+  const [extensionsScannedCount] = useState(EXTENSIONS_DISPLAY_TARGET);
+  const [displayCount, setDisplayCount] = useState(0);
+  const displayCountRef = useRef(0);
+  const rafRef = useRef(null);
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const demoTriggerRef = useRef(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [heroAudience, setHeroAudience] = useState("users"); // "users" | "developers"
 
-  // Scan counter - TODO: Replace with real API call to get actual count
-  // When ready: fetch('/api/stats').then(data => setScanCount(data.totalScans))
-  useEffect(() => {
-    // TODO: Fetch real scan count from API
-    // Example: fetch('/api/stats').then(res => res.json()).then(data => setScanCount(data.totalScans));
-  }, []);
+  // Autocomplete — same as /scan: logo + name only, no scoring
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
+  const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
+  const autocompleteTimerRef = useRef(null);
 
-  // Scroll reveal observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setRevealedSections((prev) => ({
-              ...prev,
-              [entry.target.id]: true,
-            }));
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -50px 0px" }
-    );
-
-    const sections = document.querySelectorAll(".reveal-section");
-    sections.forEach((section) => observer.observe(section));
-
-    return () => observer.disconnect();
-  }, []);
-
-  const scrollToProof = () => {
-    document.getElementById("proof")?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  // Initialize badge positions
-  const initializeBadges = useCallback(() => {
-    if (!containerRef.current) return;
-    
-    const container = containerRef.current.getBoundingClientRect();
-    const phoneWidth = 300;
-    const phoneHeight = 600;
-    const badgeWidth = 150;
-    const badgeHeight = 110;
-    const padding = 20;
-    
-    // Calculate zones - left side and right side of phone
-    const centerX = container.width / 2;
-    const centerY = container.height / 2;
-    const phoneLeft = centerX - phoneWidth / 2;
-    const phoneRight = centerX + phoneWidth / 2;
-    
-    const initialPositions = BADGE_CONFIG.map((badge, index) => {
-      let x, y;
-      const isLeft = badge.side === "left";
-      
-      if (isLeft) {
-        // Left side badges - spread vertically
-        x = padding + Math.random() * (phoneLeft - badgeWidth - padding * 3);
-        y = padding + (index % 3) * ((container.height - badgeHeight - padding * 2) / 3) + Math.random() * 40;
-      } else {
-        // Right side badges - spread vertically
-        x = phoneRight + padding + Math.random() * (container.width - phoneRight - badgeWidth - padding * 2);
-        y = padding + ((index - 3) % 3) * ((container.height - badgeHeight - padding * 2) / 3) + Math.random() * 40;
-      }
-      
-      // Random velocity in all directions
-      const speed = 0.3 + Math.random() * 0.4;
-      const angle = Math.random() * Math.PI * 2;
-      
-      return {
-        ...badge,
-        x: Math.max(padding, Math.min(x, container.width - badgeWidth - padding)),
-        y: Math.max(padding, Math.min(y, container.height - badgeHeight - padding)),
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        width: badgeWidth,
-        height: badgeHeight,
-      };
-    });
-    
-    setBadgePositions(initialPositions);
-    badgesRef.current = initialPositions;
-  }, []);
-
-  // Physics animation loop
-  const animate = useCallback(() => {
-    if (!containerRef.current || badgesRef.current.length === 0) {
-      animationRef.current = requestAnimationFrame(animate);
+  const handleAutocomplete = useCallback((query) => {
+    const q = (query || "").trim();
+    if (!q || q.length < 2 || /^https?:\/\//.test(q) || /^[a-z]{32}$/i.test(q)) {
+      setAutocompleteSuggestions([]);
+      setAutocompleteLoading(false);
       return;
     }
+    setAutocompleteLoading(true);
+    setAutocompleteSuggestions([]);
+    clearTimeout(autocompleteTimerRef.current);
+    autocompleteTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await databaseService.getRecentScans(6, q);
+        setAutocompleteSuggestions(results || []);
+        setAutocompleteIndex(0);
+      } catch {
+        setAutocompleteSuggestions([]);
+      } finally {
+        setAutocompleteLoading(false);
+      }
+    }, 80);
+  }, []);
 
-    const container = containerRef.current.getBoundingClientRect();
-    const padding = 15;
-    const phoneWidth = 280;
-    const phoneHeight = 580;
-    const centerX = container.width / 2;
-    const centerY = container.height / 2;
-    
-    // Phone exclusion zone
-    const phoneZone = {
-      left: centerX - phoneWidth / 2 - 30,
-      right: centerX + phoneWidth / 2 + 30,
-      top: centerY - phoneHeight / 2 - 20,
-      bottom: centerY + phoneHeight / 2 + 20,
+  const handleSelectSuggestion = useCallback((scan) => {
+    setAutocompleteSuggestions([]);
+    const route = getScanResultsRoute(scan.extension_id, scan.extension_name);
+    navigate(route);
+  }, [navigate]);
+
+  // Animate display count from current to target (incremental counter effect)
+  useEffect(() => {
+    const target = Math.max(0, extensionsScannedCount);
+    const start = displayCountRef.current;
+    const diff = target - start;
+    if (diff === 0) return;
+
+    const durationMs = 1400;
+    const easeOutQuart = (t) => 1 - (1 - t) ** 4;
+    const startTime = performance.now();
+
+    const tick = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const eased = easeOutQuart(progress);
+      const current = Math.round(start + diff * eased);
+      displayCountRef.current = current;
+      setDisplayCount(current);
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        displayCountRef.current = target;
+        setDisplayCount(target);
+      }
     };
 
-    const newPositions = badgesRef.current.map((badge, i) => {
-      let { x, y, vx, vy, width, height } = badge;
-      
-      // Update position
-      x += vx;
-      y += vy;
-      
-      // Boundary collision (container edges)
-      if (x <= padding) {
-        x = padding;
-        vx = Math.abs(vx) * 0.9;
-      }
-      if (x >= container.width - width - padding) {
-        x = container.width - width - padding;
-        vx = -Math.abs(vx) * 0.9;
-      }
-      if (y <= padding) {
-        y = padding;
-        vy = Math.abs(vy) * 0.9;
-      }
-      if (y >= container.height - height - padding) {
-        y = container.height - height - padding;
-        vy = -Math.abs(vy) * 0.9;
-      }
-      
-      // Phone exclusion zone collision
-      const badgeCenterX = x + width / 2;
-      const badgeCenterY = y + height / 2;
-      
-      if (badgeCenterX > phoneZone.left && badgeCenterX < phoneZone.right &&
-          badgeCenterY > phoneZone.top && badgeCenterY < phoneZone.bottom) {
-        // Push away from phone center
-        const pushX = badgeCenterX < centerX ? -1 : 1;
-        const pushY = badgeCenterY < centerY ? -1 : 1;
-        vx = pushX * Math.abs(vx) * 1.2;
-        vy = pushY * Math.abs(vy) * 1.2;
-        x += pushX * 5;
-        y += pushY * 5;
-      }
-      
-      // Badge-to-badge collision
-      badgesRef.current.forEach((other, j) => {
-        if (i === j) return;
-        
-        const dx = (x + width / 2) - (other.x + other.width / 2);
-        const dy = (y + height / 2) - (other.y + other.height / 2);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const minDistance = (width + other.width) / 2 + 20;
-        
-        if (distance < minDistance && distance > 0) {
-          // Collision detected - bounce apart
-          const angle = Math.atan2(dy, dx);
-          const overlap = minDistance - distance;
-          
-          // Separate badges
-          x += Math.cos(angle) * overlap * 0.5;
-          y += Math.sin(angle) * overlap * 0.5;
-          
-          // Bounce velocity
-          vx += Math.cos(angle) * 0.3;
-          vy += Math.sin(angle) * 0.3;
-        }
-      });
-      
-      // Add slight random drift for organic movement
-      vx += (Math.random() - 0.5) * 0.02;
-      vy += (Math.random() - 0.5) * 0.02;
-      
-      // Damping to prevent runaway speeds
-      const maxSpeed = 1.2;
-      const speed = Math.sqrt(vx * vx + vy * vy);
-      if (speed > maxSpeed) {
-        vx = (vx / speed) * maxSpeed;
-        vy = (vy / speed) * maxSpeed;
-      }
-      
-      // Minimum speed to keep things moving
-      const minSpeed = 0.15;
-      if (speed < minSpeed) {
-        const angle = Math.random() * Math.PI * 2;
-        vx = Math.cos(angle) * minSpeed;
-        vy = Math.sin(angle) * minSpeed;
-      }
-      
-      return { ...badge, x, y, vx, vy };
-    });
-    
-    badgesRef.current = newPositions;
-    setBadgePositions([...newPositions]);
-    
-    animationRef.current = requestAnimationFrame(animate);
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [extensionsScannedCount]);
+
+  const scrollToProof = useCallback(() => {
+    document.getElementById("proof")?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => {
     setIsVisible(true);
-    
-    // Animate scan progress
-    const progressTimer = setInterval(() => {
-      setScanProgress(prev => {
-        if (prev >= 100) return 0;
-        return prev + 1;
-      });
-    }, 50);
+  }, []);
 
-    // Cycle through threat checks
-    const threatTimer = setInterval(() => {
-      setCurrentThreat(prev => (prev + 1) % SCAN_STATUS_MESSAGES.length);
-    }, 2000);
-    
-    // Initialize floating badges after a short delay
-    const initTimer = setTimeout(() => {
-      initializeBadges();
-      animationRef.current = requestAnimationFrame(animate);
-    }, 500);
-    
-    // Handle window resize
-    const handleResize = () => {
-      initializeBadges();
-    };
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      clearInterval(progressTimer);
-      clearInterval(threatTimer);
-      clearTimeout(initTimer);
-      window.removeEventListener('resize', handleResize);
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [initializeBadges, animate]);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = () => setReducedMotion(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
-  const handleScan = () => {
-    if (scanInput.trim()) {
-      navigate('/scanner', { state: { prefillUrl: scanInput.trim() } });
+  const handleScan = useCallback(() => {
+    const input = scanInput.trim();
+    if (input) {
+      setScanInput("");
+      setUrl("");
+      startScan(input);
     } else {
-      navigate('/scanner');
+      navigate("/scan");
     }
+  }, [scanInput, setUrl, startScan, navigate]);
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "ExtensionShield",
+    "url": "https://extensionshield.com",
+    "logo": "https://extensionshield.com/logo.png",
+    "description": "Chrome extension scanner — safety reports in seconds.",
+    "sameAs": [
+      "https://github.com/Stanzin7/ExtensionShield"
+    ]
+  };
+
+  const softwareAppSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ExtensionShield",
+    "applicationCategory": "SecurityApplication",
+    "operatingSystem": "Web",
+    "offers": [
+      { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free public extension scan by URL or ID" },
+      { "@type": "Offer", "description": "Pro: private CRX/ZIP security audit and vulnerability scan" }
+    ],
+    "description": "Chrome extension security scanner. Scan by URL/ID for free. Upload private CRX/ZIP for pre-release security audit, vulnerability scanning, and fix suggestions.",
+    "url": "https://extensionshield.com/scan"
+  };
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Can I scan a private CRX/ZIP?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Pro users can upload a private CRX or ZIP build for a pre-release security audit. Sign in and go to Upload CRX/ZIP from the Scan menu." }
+      },
+      {
+        "@type": "Question",
+        "name": "What does the audit check?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The audit checks security (SAST, malware/VirusTotal, obfuscation), privacy (permissions, data exfil, network calls), and governance (policy alignment, disclosure). You get evidence-linked findings and fix suggestions." }
+      },
+      {
+        "@type": "Question",
+        "name": "Do you store uploads?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Uploads are processed to generate the report. We do not retain your private build for longer than needed to complete the scan. Reports are private by default; you choose whether to share." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does this help with Chrome Web Store policy risks?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The governance layer covers policy alignment, disclosure accuracy, and consistency—so you can address store policy risks before submission." }
+      },
+      {
+        "@type": "Question",
+        "name": "Is the Chrome extension scanner free?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Our free extension scanner lets you scan any Chrome extension by Web Store URL or extension ID. Private CRX/ZIP upload and audit are available on Pro for developers." }
+      }
+    ]
   };
 
   return (
-    <div className="home-page">
-      {/* Hero Section */}
-      <section className="hero-section">
-        {/* Background Effects */}
-        <div className="hero-bg">
-          <div className="bg-gradient" />
-          <div className="bg-grid" />
-          <div className="bg-glow glow-1" />
-          <div className="bg-glow glow-2" />
-          
-          {/* Red Scanner/Radar Effect */}
-          <div className="radar-scanner">
-            <div className="radar-ring radar-ring-1" />
-            <div className="radar-ring radar-ring-2" />
-            <div className="radar-ring radar-ring-3" />
-            <div className="radar-ring radar-ring-4" />
-            <div className="radar-sweep" />
-            <div className="radar-center" />
-          </div>
-        </div>
-
-        {/* Hero Headline - Moves to top on mobile */}
-        <div className={`hero-headline ${isVisible ? 'visible' : ''}`}>
-          <h1 className="hero-title">
-            Find <span className="highlight">hidden threats</span> in Chrome extensions
-          </h1>
-          <p className="hero-subtitle">
-            <span className="honey-logo-small">
-              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path 
-                  d="M50 5L93.3 27.5V72.5L50 95L6.7 72.5V27.5L50 5Z" 
-                  fill="url(#honeyGradientSmall)" 
-                  stroke="url(#honeyStrokeSmall)"
-                  strokeWidth="1.5"
-                />
-                <path d="M50 30L62 38V54L50 62L38 54V38L50 30Z" fill="rgba(255,255,255,0.15)" />
-                <path d="M35 45L47 53V69L35 77L23 69V53L35 45Z" fill="rgba(255,255,255,0.1)" />
-                <path d="M65 45L77 53V69L65 77L53 69V53L65 45Z" fill="rgba(255,255,255,0.1)" />
-                <text x="50" y="58" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold" fontFamily="Arial">h</text>
-                <defs>
-                  <linearGradient id="honeyGradientSmall" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FF9500" />
-                    <stop offset="50%" stopColor="#FF6B00" />
-                    <stop offset="100%" stopColor="#E85D04" />
-                  </linearGradient>
-                  <linearGradient id="honeyStrokeSmall" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FFB347" />
-                    <stop offset="100%" stopColor="#FF8C00" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </span>
-            Honey fooled 17M users. Don't trust reviews—trust the code.
-          </p>
-        </div>
-
-        <div 
-          ref={containerRef}
-          className={`hero-content ${isVisible ? 'visible' : ''}`}
+    <>
+      <SEOHead
+        title="Free Chrome Extension Scanner & Security Audit | ExtensionShield"
+        description="Free Chrome extension scanner and security audit for developers. Scan any extension by URL—get risk score, permissions & malware check. Audit CRX/ZIP builds before release."
+        pathname="/"
+        ogType="website"
+        schema={[organizationSchema, softwareAppSchema, faqSchema]}
+        keywords="free extension scanner, free extension audit, Chrome extension scanner, Chrome extension security, extension security audit, developer extension audit, scan Chrome extension"
+      />
+      
+      <div className="home-page">
+        {/* Hero Section - Two-column layout with frosted glass scan preview */}
+        <section
+          className="hero-section"
+          aria-label="Chrome Extension Security Gate"
         >
-          {/* Floating Security Badges - Physics-based movement */}
-          {badgePositions.map((badge) => (
-            <div
-              key={badge.id}
-              className={`floating-badge physics-badge ${badge.status}`}
-              style={{
-                transform: `translate(${badge.x}px, ${badge.y}px)`,
-              }}
+          {/* Mobile/tablet: scanner not supported — show idea + Step-by-step guide + Check on desktop */}
+          <div className="hero-mobile-message">
+            <p className="hero-tagline">CHROME EXTENSION SECURITY GATE</p>
+            <h1 className="hero-title">Ship safer Chrome extensions.</h1>
+            <button
+              type="button"
+              className="hero-mobile-demo-btn"
+              onClick={() => setDemoModalOpen(true)}
+              title="Step-by-step guide"
             >
-              <span className="badge-icon">{badge.icon}</span>
-              <span className="badge-label">{badge.label}</span>
-              <span className="badge-status">
-                {badge.status === 'detected' ? 'DETECTED' : 'CLEAR'}
+              <span className="hero-demo-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
+                </svg>
               </span>
-            </div>
-          ))}
+              <span>Step-by-step guide</span>
+            </button>
+            <p className="hero-mobile-cta">Check on desktop.</p>
+          </div>
 
-          {/* Central Scanner Device */}
-          <div className="scanner-device">
-            <div className="device-frame">
-              <div className="device-notch" />
-              <div className="device-screen">
-                {/* Scanner Header */}
-                <div className="scanner-header">
-                  <div className="scanner-status">
-                    <span className="status-dot" />
-                    <span>Live Scan</span>
-                  </div>
-                </div>
+          <div className="hero-desktop-content">
+          <div className="hero-grid">
+            {/* Left Panel - Headline, Input, CTA */}
+            <motion.div
+              className="hero-left"
+              initial={{ opacity: 0, y: 24 }}
+              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="hero-audience-toggle" role="group" aria-label="Audience">
+                <button
+                  type="button"
+                  className={`hero-toggle-option ${heroAudience === "users" ? "active" : ""}`}
+                  onClick={() => setHeroAudience("users")}
+                  aria-pressed={heroAudience === "users"}
+                >
+                  Users
+                </button>
+                <button
+                  type="button"
+                  className={`hero-toggle-option ${heroAudience === "developers" ? "active" : ""}`}
+                  onClick={() => setHeroAudience("developers")}
+                  aria-pressed={heroAudience === "developers"}
+                >
+                  Developers
+                </button>
+              </div>
 
-                {/* Scanner Visualization */}
-                <div className="scanner-visual">
-                  <div className="scan-rings">
-                    <div className="ring ring-1" />
-                    <div className="ring ring-2" />
-                    <div className="ring ring-3" />
-                  </div>
-                  <div className="scan-center">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                      <path d="M9 12l2 2 4-4" />
+              {heroAudience === "users" ? (
+              <>
+                <p className="hero-tagline">Extension Risk Check</p>
+                <h1 className="hero-title">
+                  Know what your Chrome extensions can access.
+                </h1>
+                <button
+                  type="button"
+                  ref={demoTriggerRef}
+                  className="scanner-demo-link scanner-demo-link--above"
+                  title="Step-by-step guide to scanning an extension"
+                  onClick={() => setDemoModalOpen(true)}
+                >
+                  <span className="scanner-demo-icon" aria-hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
                     </svg>
+                  </span>
+                  <span>Step-by-step guide</span>
+                </button>
+                <div className="hero-search">
+                  <div className="search-container hero-search-container">
+                    <span className="search-icon search-icon-chrome" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="chrome-logo">
+                        <path d="M12 12L22 12A10 10 0 0 1 7 3.34L12 12Z" fill="#4285F4" />
+                        <path d="M12 12L7 3.34A10 10 0 0 1 7 20.66L12 12Z" fill="#EA4335" />
+                        <path d="M12 12L7 20.66A10 10 0 0 1 22 12L12 12Z" fill="#FBBC05" />
+                        <circle cx="12" cy="12" r="4" fill="#34A853" />
+                        <circle cx="12" cy="12" r="2.5" fill="white" />
+                      </svg>
+                    </span>
+                    <input
+                      type="text"
+                      id="hero-scan-input"
+                      placeholder="Search extension name or paste Store URL"
+                      value={scanInput}
+                      onChange={(e) => {
+                        setScanInput(e.target.value);
+                        handleAutocomplete(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (autocompleteSuggestions.length > 0 && autocompleteIndex >= 0 && autocompleteSuggestions[autocompleteIndex]) {
+                            handleSelectSuggestion(autocompleteSuggestions[autocompleteIndex]);
+                            return;
+                          }
+                          handleScan();
+                          return;
+                        }
+                        if (e.key === "Escape") setAutocompleteSuggestions([]);
+                        if (e.key === "ArrowDown" && autocompleteSuggestions.length > 0) {
+                          e.preventDefault();
+                          setAutocompleteIndex((i) => Math.min(i + 1, autocompleteSuggestions.length - 1));
+                        }
+                        if (e.key === "ArrowUp" && autocompleteSuggestions.length > 0) {
+                          e.preventDefault();
+                          setAutocompleteIndex((i) => Math.max(i - 1, 0));
+                        }
+                      }}
+                      onFocus={() => { if (scanInput.trim().length >= 2) handleAutocomplete(scanInput); }}
+                      onBlur={() => { setTimeout(() => { setAutocompleteSuggestions([]); setAutocompleteLoading(false); }, 150); }}
+                      aria-label="Search extension name or paste Store URL"
+                      autoComplete="off"
+                      role="combobox"
+                      aria-expanded={autocompleteSuggestions.length > 0 || autocompleteLoading}
+                      aria-autocomplete="list"
+                      aria-controls="hero-autocomplete-list"
+                    />
+                    {(autocompleteSuggestions.length > 0 || autocompleteLoading) && (
+                      <ul className="hero-autocomplete" id="hero-autocomplete-list" role="listbox">
+                        {autocompleteLoading && autocompleteSuggestions.length === 0 ? (
+                          <li className="hero-autocomplete-item hero-autocomplete-loading" role="status">
+                            <span className="hero-autocomplete-name">Searching...</span>
+                          </li>
+                        ) : (
+                          autocompleteSuggestions.map((s, i) => (
+                          <li
+                            key={s.extension_id}
+                            role="option"
+                            aria-selected={i === autocompleteIndex}
+                            className={`hero-autocomplete-item${i === autocompleteIndex ? " active" : ""}`}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectSuggestion(s);
+                            }}
+                          >
+                            <img
+                              src={getExtensionIconUrl(s.extension_id)}
+                              alt=""
+                              className="hero-autocomplete-icon"
+                              width="20"
+                              height="20"
+                              onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }}
+                            />
+                            <span className="hero-autocomplete-name">{s.extension_name || s.extension_id}</span>
+                          </li>
+                        ))
+                        )}
+                      </ul>
+                    )}
+                    <motion.button
+                      type="button"
+                      className="search-btn search-btn-icon"
+                      onClick={handleScan}
+                      aria-label="Scan extension"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                      </svg>
+                    </motion.button>
                   </div>
-                  <div className="scan-line" style={{ transform: `rotate(${scanProgress * 3.6}deg)` }} />
-                </div>
-
-                {/* Current Check */}
-                <div className="scanner-status-text">
-                  <span className="status-label">{SCAN_STATUS_MESSAGES[currentThreat]}</span>
-                </div>
-
-                {/* Threat Indicators */}
-                <div className="scanner-threats">
-                  <div className="threat-row">
-                    <span className="threat-icon safe">✓</span>
-                    <span className="threat-name">Permissions</span>
+                  <p className="hero-scan-info">
+                    <svg className="hero-scan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    Checks permissions, network access, version history, and known threats.
+                  </p>
+                  <div className="hero-cta-block">
+                    <a
+                      href={CHROME_EXTENSION_STORE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="get-extension-btn"
+                    >
+                      <Download size={18} strokeWidth={2} aria-hidden />
+                      Add to Chrome
+                    </a>
                   </div>
-                  <div className="threat-row">
-                    <span className="threat-icon safe">✓</span>
-                    <span className="threat-name">Data Safety</span>
-                  </div>
-                  <div className="threat-row scanning">
-                    <span className="threat-icon">◌</span>
-                    <span className="threat-name">Code Analysis</span>
-                  </div>
+                  {scanError && <p className="scan-error-hint">{scanError}</p>}
                 </div>
+              </>
+              ) : (
+              <>
+                <p className="hero-tagline">Pro • Private Build Audit</p>
+                <h1 className="hero-title">
+                  Chrome extension security audit before you ship
+                </h1>
+                <p className="hero-dev-body">
+                  Vulnerabilities, permissions, policy checks — with evidence and fix guidance.
+                </p>
+                <p className="hero-dev-helper">Private by default — share only if you choose.</p>
+                <div className="hero-developers-cta">
+                  {isAuthenticated ? (
+                    <button
+                      type="button"
+                      className="hero-pro-upload-btn"
+                      onClick={() => navigate("/scan/upload")}
+                    >
+                      <span className="hero-pro-upload-btn-icon" aria-hidden>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                      </span>
+                      <span>Upload CRX/ZIP</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="hero-pro-upload-btn"
+                      onClick={() => openSignInModal()}
+                    >
+                      <span>Start a Pro audit</span>
+                    </button>
+                  )}
+                </div>
+              </>
+              )}
+            </motion.div>
 
-                {/* Bottom Action */}
-                <div className="scanner-action">
-                  <div className="action-btn">
-                    <span>View Full Report</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Right Panel - 3D orbital carousel with focus report card */}
+            <motion.div
+              className="hero-right"
+              initial={{ opacity: 0, x: 24 }}
+              animate={isVisible ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <HeroOrbitalCarousel />
+            </motion.div>
           </div>
 
-        </div>
-
-        {/* Hero Actions - Search */}
-        <div className={`hero-actions ${isVisible ? 'visible' : ''}`}>
-          <div className="hero-search">
-            <div className="search-container">
-              <div className="search-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="M21 21l-4.35-4.35" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Paste Chrome Web Store URL or Extension ID"
-                value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-              />
-              <button className="search-btn" onClick={handleScan}>
-                <span>Scan Now</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
+          {/* Stats bar — above scroll cue */}
+          <motion.div
+            className="stats-bar"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="stat-item">
+              <span className="stat-value live">
+                <span className="live-dot" aria-hidden="true" />
+                FREE
+              </span>
+              <span className="stat-label">PUBLIC SCANS</span>
             </div>
-            <p className="search-hint">✓ No install. No signup. Results in 60 seconds.</p>
-          </div>
-        </div>
-
-        {/* Stats Bar - Separate for flexible positioning */}
-        <div className={`stats-bar ${isVisible ? 'visible' : ''}`}>
-          <div className="stat-item">
-            <span className="stat-value counter">
-              {scanCount > 0 ? `${scanCount.toLocaleString()}+` : 'NEW'}
-            </span>
-            <span className="stat-label">Extensions Scanned</span>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <span className="stat-value">47+</span>
-            <span className="stat-label">Security Rules</span>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <span className="stat-value">&lt;60s</span>
-            <span className="stat-label">Scan Time</span>
-          </div>
-          <div className="stat-divider" />
-          <div className="stat-item">
-            <span className="stat-value live">
-              <span className="live-dot" />
-              LIVE
-            </span>
-            <span className="stat-label">Threat Intel</span>
-          </div>
-        </div>
-
-        {/* Scroll Cue */}
-        <button className={`scroll-cue ${isVisible ? 'visible' : ''}`} onClick={scrollToProof}>
-          <span>See how scams happen</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12l7 7 7-7" />
-          </svg>
-        </button>
-      </section>
-
-      {/* Bridge Section - How trusted extensions turn risky */}
-      <section 
-        id="proof" 
-        className={`bridge-section reveal-section ${revealedSections['proof'] ? 'revealed' : ''}`}
-      >
-        <div className="bridge-gradient-top" />
-        <div className="bridge-container">
-          <h2 className="bridge-title">How trusted extensions turn risky</h2>
-          
-          <div className="bridge-steps">
-            <div className="bridge-step">
-              <div className="step-number">1</div>
-              <div className="step-icon trust">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-              </div>
-              <h3>Earn trust</h3>
-              <p>5-star ratings, millions of installs, verified badge.</p>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <span className="stat-value">
+                <span className="stat-value-number">100+</span>
+              </span>
+              <span className="stat-label">Security rules</span>
             </div>
-
-            <div className="bridge-connector">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <span className="stat-value">&lt;&nbsp;60s</span>
+              <span className="stat-label">Scan time</span>
             </div>
-
-            <div className="bridge-step">
-              <div className="step-number">2</div>
-              <div className="step-icon update">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </div>
-              <h3>Ship an update</h3>
-              <p>Payload hidden in a routine "bug fix" release.</p>
+            <div className="stat-divider" />
+            <div className="stat-item">
+              <span className="stat-value live" data-stat="extensions-scanned">
+                <span className="live-dot" aria-hidden="true" />
+                <span className="stat-value-number">{displayCount.toLocaleString()}+</span>
+              </span>
+              <span className="stat-label">Extensions scanned</span>
             </div>
+          </motion.div>
 
-            <div className="bridge-connector">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </div>
-
-            <div className="bridge-step">
-              <div className="step-number">3</div>
-              <div className="step-icon abuse">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h3>Abuse permissions</h3>
-              <p>Data theft, ad injection, affiliate hijacking.</p>
-            </div>
+          {/* Scroll Cue */}
+          <motion.button
+            type="button"
+            className="scroll-cue"
+            onClick={scrollToProof}
+            initial={{ opacity: 0 }}
+            animate={isVisible ? { opacity: 1 } : {}}
+            transition={{ delay: 0.8, duration: 0.4 }}
+            aria-label="Scroll to see how extensions can turn risky"
+          >
+            <span>See how extensions can turn risky</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M12 5v14M5 12l7 7 7-7" />
+            </svg>
+          </motion.button>
           </div>
 
-          <p className="bridge-footer">
-            Most scams don't start malicious — they become malicious after they're trusted.
-          </p>
-        </div>
-      </section>
+          <DemoModal
+            isOpen={demoModalOpen}
+            onClose={() => setDemoModalOpen(false)}
+            triggerRef={demoTriggerRef}
+          />
+          <UploadModal
+            isOpen={uploadModalOpen}
+            onClose={() => setUploadModalOpen(false)}
+          />
+        </section>
 
-      {/* Trust Deception Showcase */}
-      <section 
-        id="deception" 
-        className={`deception-section reveal-section ${revealedSections['deception'] ? 'revealed' : ''}`}
-      >
-        <div className="deception-container">
-          <div className="deception-cards">
-            {/* Card 1 - PDF Helper */}
-            <div className="deception-card">
-              <div className="card-trust-layer">
-                <div className="ext-icon pdf">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <path d="M14 2v6h6" />
-                    <path d="M10 9h4M10 13h4M10 17h2" />
-                  </svg>
-                </div>
-                <h4 className="ext-name">PDF Helper Pro</h4>
-                <div className="ext-rating">
-                  <div className="stars">★★★★★</div>
-                  <span className="rating-score">4.9</span>
-                </div>
-                <div className="ext-users">2M+ users</div>
-                <div className="ext-verified">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Verified</span>
-                </div>
-              </div>
-              <div className="card-truth-layer">
-                <div className="threat-indicator">
-                  <span className="threat-dot" />
-                  <span className="threat-label">DATA THEFT</span>
-                </div>
-              </div>
-            </div>
+        {/* Combined dev + open-core section: left copy, right pipeline */}
+        <DevOpenCoreSection reducedMotion={reducedMotion} />
 
-            {/* Card 2 - Tab Manager */}
-            <div className="deception-card">
-              <div className="card-trust-layer">
-                <div className="ext-icon tabs">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M3 9h18M9 21V9" />
-                  </svg>
-                </div>
-                <h4 className="ext-name">Tab Manager</h4>
-                <div className="ext-rating">
-                  <div className="stars">★★★★★</div>
-                  <span className="rating-score">4.8</span>
-                </div>
-                <div className="ext-users">800K users</div>
-                <div className="ext-verified">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Verified</span>
-                </div>
-              </div>
-              <div className="card-truth-layer">
-                <div className="threat-indicator">
-                  <span className="threat-dot" />
-                  <span className="threat-label">AD INJECTION</span>
-                </div>
-              </div>
-            </div>
+      {/* How we protect you – animated timeline (scroll-triggered, reduced-motion aware) */}
+      <HowWeProtectYouSection />
 
-            {/* Card 3 - Price Saver */}
-            <div className="deception-card">
-              <div className="card-trust-layer">
-                <div className="ext-icon price">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </div>
-                <h4 className="ext-name">Price Saver</h4>
-                <div className="ext-rating">
-                  <div className="stars">★★★★★</div>
-                  <span className="rating-score">4.7</span>
-                </div>
-                <div className="ext-users">5M+ users</div>
-                <div className="ext-verified">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Verified</span>
-                </div>
-              </div>
-              <div className="card-truth-layer">
-                <div className="threat-indicator">
-                  <span className="threat-dot" />
-                  <span className="threat-label">HIJACKING</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <p className="deception-footer">
-            These all passed review. <span className="danger">None are safe.</span>
-          </p>
-        </div>
-      </section>
-
-      {/* Honey Case Study Section */}
+      {/* Honey Case Study Section – scroll-reveal for landing consistency */}
       <section className="honey-case-study">
-        <div className="case-study-container">
+        <motion.div
+          className="case-study-container"
+          initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+          whileInView={reducedMotion ? {} : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.12 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        >
           {/* Header */}
           <div className="case-study-header">
             <span className="case-study-badge">CASE STUDY</span>
             <h2 className="case-study-title">
-              The Honey Extension Scam
-              <span className="subtitle">17 Million Users. $4 Billion Acquisition. One Big Lie.</span>
+              Honey Extension Case Study
+              <span className="subtitle">17M+ users reported. $4B acquisition.</span>
             </h2>
           </div>
 
-          {/* Main Content Grid */}
+          {/* Main Content Grid: content left, honey icon section right (match site layout) */}
           <div className="case-study-content">
-            {/* Left: Honey Icon */}
+            {/* Left: Case study content */}
+            <div className="scam-details">
+              <div className="scam-intro">
+                <p>
+                  Promised savings. Investigators reported <strong>commission diversion</strong> and <strong>alleged worse deals</strong>.
+                </p>
+              </div>
+
+              <div className="scam-points">
+                <div className="scam-point">
+                  <div className="point-icon theft">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 8v4M12 16h.01" />
+                    </svg>
+                  </div>
+                  <div className="point-content">
+                    <h4>Affiliate Link Hijacking</h4>
+                    <p>Investigators found silent overwriting of creator affiliate codes. Creators reported lost commissions.</p>
+                  </div>
+                </div>
+
+                <div className="scam-point">
+                  <div className="point-icon data">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </div>
+                  <div className="point-content">
+                    <h4>Shopping Surveillance</h4>
+                    <p>Investigators reported tracking of views, carts, and purchases. Data reportedly shared with retailers.</p>
+                  </div>
+                </div>
+
+                <div className="scam-point">
+                  <div className="point-icon fake">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div className="point-content">
+                    <h4>Disputed "Best" Coupons</h4>
+                    <p>Users reported finding better deals publicly. The coupon animation was questioned by investigators.</p>
+                  </div>
+                </div>
+
+                <div className="scam-point">
+                  <div className="point-icon money">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="1" x2="12" y2="23" />
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                    </svg>
+                  </div>
+                  <div className="point-content">
+                    <h4>Retailer Kickbacks</h4>
+                    <p>Investigators reported payments to prioritize certain deals. Users disputed whether they received the best available price.</p>
+                  </div>
+                </div>
+              </div>
+
+              <Link to="/research/case-studies" className="scam-footer scam-footer-link">
+                <div className="exposed-by">
+                  <span>Exposed by</span>
+                  <strong>MegaLag</strong>
+                  <span className="date">• December 2024</span>
+                </div>
+                <span className="scam-footer-read-more">
+                  <span>Read case study</span>
+                  <ArrowRight size={16} strokeWidth={2} aria-hidden />
+                </span>
+              </Link>
+            </div>
+
+            {/* Right: Honey Icon section */}
             <div className="honey-icon-section">
               <div className="honey-icon-wrapper">
-                {/* Animated rings */}
-                <div className="honey-ring honey-ring-1" />
-                <div className="honey-ring honey-ring-2" />
-                <div className="honey-ring honey-ring-3" />
-                
                 {/* Honey Logo - Hexagon with honeycomb pattern */}
                 <div className="honey-logo">
                   <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -714,261 +648,23 @@ const HomePage = () => {
               <div className="honey-stats">
                 <div className="honey-stat">
                   <span className="stat-number">17M+</span>
-                  <span className="stat-desc">Active Users</span>
+                  <span className="stat-desc">Reported Users</span>
                 </div>
                 <div className="honey-stat">
                   <span className="stat-number">$4B</span>
-                  <span className="stat-desc">PayPal Paid</span>
+                  <span className="stat-desc">Acquisition</span>
                 </div>
                 <div className="honey-stat">
-                  <span className="stat-number danger">$0</span>
-                  <span className="stat-desc">Real Savings</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Scam Details */}
-            <div className="scam-details">
-              <div className="scam-intro">
-                <p>
-                  Promised savings. Delivered <strong>stolen commissions</strong> and <strong>worse deals</strong>.
-                </p>
-              </div>
-
-              <div className="scam-points">
-                <div className="scam-point">
-                  <div className="point-icon theft">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 8v4M12 16h.01" />
-                    </svg>
-                  </div>
-                  <div className="point-content">
-                    <h4>Affiliate Link Hijacking</h4>
-                    <p>Silently overwrote creator affiliate codes. Creators got nothing.</p>
-                  </div>
-                </div>
-
-                <div className="scam-point">
-                  <div className="point-icon data">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  </div>
-                  <div className="point-content">
-                    <h4>Shopping Surveillance</h4>
-                    <p>Tracked every view, cart, and purchase. Sold data to retailers.</p>
-                  </div>
-                </div>
-
-                <div className="scam-point">
-                  <div className="point-icon fake">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </div>
-                  <div className="point-content">
-                    <h4>Fake "Best" Coupons</h4>
-                    <p>Showed worse deals than publicly available. The animation? Theater.</p>
-                  </div>
-                </div>
-
-                <div className="scam-point">
-                  <div className="point-icon money">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="12" y1="1" x2="12" y2="23" />
-                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                  </div>
-                  <div className="point-content">
-                    <h4>Retailer Kickbacks</h4>
-                    <p>Paid to suppress better deals. You got Honey's best price, not yours.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="scam-footer">
-                <div className="exposed-by">
-                  <span>Exposed by</span>
-                  <strong>MegaLag</strong>
-                  <span className="date">• December 2024</span>
-                </div>
-                <div className="verdict">
-                  <span className="verdict-label">VERDICT</span>
-                  <span className="verdict-value">DECEPTIVE PRACTICES</span>
+                  <span className="stat-number danger">—</span>
+                  <span className="stat-desc">Savings Not Guaranteed</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
-
-      {/* Pricing Section */}
-      <section className="pricing-section">
-        <div className="pricing-header">
-          <h2>Simple, Transparent Pricing</h2>
-          <p>Start free, upgrade for ongoing protection. Only pay for new extension scans—cached lookups are always free.</p>
-        </div>
-
-        <div className="pricing-grid">
-          {/* Free Plan */}
-          <div className="pricing-card">
-            <div className="pricing-card-header">
-              <h3>Free</h3>
-              <p>Get started with security scanning</p>
-            </div>
-            <div className="pricing-amount">
-              <span className="price">$0</span>
-              <span className="credits">10 scans</span>
-            </div>
-            <div className="scan-credit-note">
-              10 free deep scans on signup (lifetime). Scans are only used for new extension builds—if we've already analyzed that exact version, it's an instant free lookup.
-            </div>
-            <ul className="pricing-features">
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>10 free deep scans (lifetime)</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>Unlimited free cached lookups</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>Full security reports (not blurred)</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>AI threat analysis</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>VirusTotal & threat intel</span>
-              </li>
-            </ul>
-            <button className="pricing-btn">Get Started Free</button>
-          </div>
-
-          {/* Pro - Popular */}
-          <div className="pricing-card popular">
-            <div className="popular-badge">BEST VALUE</div>
-            <div className="pricing-card-header">
-              <h3>Pro</h3>
-              <p>Ongoing protection & monitoring</p>
-            </div>
-            <div className="pricing-amount">
-              <span className="price">$4.99</span>
-              <span className="price-period">/month</span>
-            </div>
-            <div className="scan-credit-note">
-              Pro is ongoing protection, not credits. Monitor extensions, get alerts, and see what changed when extensions update.
-            </div>
-            <ul className="pricing-features">
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>Everything in Free</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span><strong>Extension monitoring:</strong> watch for updates</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span><strong>Auto-rescan & alerts</strong> when risk changes</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span><strong>"What changed" diff:</strong> permissions, domains, patterns</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span><strong>Blocklist & warning list</strong> management</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span><strong>Safer alternatives</strong> recommendations</span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span>Email & in-app notifications</span>
-              </li>
-            </ul>
-            <button className="pricing-btn popular-btn">Upgrade to Pro</button>
-          </div>
-        </div>
-
-        {/* How Scans Work */}
-        <div className="pricing-info-box">
-          <div className="info-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4M12 8h.01" />
-            </svg>
-          </div>
-          <div className="info-content">
-            <h4>How Scans Work</h4>
-            <p>A <strong>"new scan"</strong> only happens when we encounter a new extension version (new build hash). If we've already scanned that exact build, you get an instant <strong>free lookup</strong>—no credits used. Deep scans include LLM analysis, VirusTotal checks, and advanced heuristics.</p>
-          </div>
-        </div>
-
-        {/* Enterprise CTA */}
-        <div className="enterprise-cta">
-          <div className="enterprise-cta-content">
-            <div className="enterprise-icon">🏢</div>
-            <div className="enterprise-text">
-              <h4>Enterprise</h4>
-              <p>Governance, Compliance <span className="addon-tag">ADD-ON</span>, SSO, and audit logs for teams.</p>
-            </div>
-          </div>
-          <button className="enterprise-cta-btn">Contact Sales</button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="home-footer">
-        <div className="footer-content">
-          <div className="footer-brand">
-            <span className="brand-project">PROJECT</span>
-            <span className="brand-dot">•</span>
-            <span className="brand-atlas">ATLAS</span>
-          </div>
-          <p className="footer-disclaimer">
-            Security analysis tool for Chrome extensions. Reports are evidence-based 
-            and do not constitute legal advice.
-          </p>
-          <div className="footer-links">
-            <a href="#docs">Documentation</a>
-            <a href="#api">API</a>
-            <a href="#github">GitHub</a>
-          </div>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </>
   );
 };
 

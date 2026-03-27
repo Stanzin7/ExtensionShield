@@ -6,17 +6,39 @@
 # =============================================================================
 FROM node:20-alpine AS frontend-builder
 
+# Accept build arguments for Vite environment variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_BASE_URL
+ARG VITE_AUTH_ENABLED
+
 WORKDIR /app/frontend
+
+# Install build dependencies for node-gyp and native modules
+RUN apk add --no-cache python3 make g++
 
 # Copy package files first for better layer caching
 COPY frontend/package*.json ./
 
 # Install dependencies with increased memory for production builds
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm ci --silent
+# Try npm ci first (faster, more reliable), fallback to npm install if lock file is out of sync
+RUN npm ci || (echo "npm ci failed, regenerating lock file..." && npm install --package-lock-only && npm ci)
 
 # Copy frontend source
 COPY frontend/ ./
+
+# Set Vite environment variables for build
+# Use default empty values if not provided (Railway should pass these as build args)
+# VITE_API_URL is used by frontend (constants.js, services); VITE_API_BASE_URL is alias
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
+ENV VITE_API_URL=${VITE_API_BASE_URL:-}
+ENV VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED:-true}
+
+# Do not echo build-arg values (they may contain URLs/keys). Log only set/unset.
+RUN if [ -n "$VITE_SUPABASE_URL" ]; then echo "VITE_SUPABASE_URL=set"; else echo "VITE_SUPABASE_URL=unset"; fi
 
 # Build production bundle
 RUN npm run build
@@ -49,9 +71,19 @@ COPY pyproject.toml uv.lock README.md ./
 
 # Copy application source code (needed for package build)
 COPY src/ ./src/
+COPY scripts/ ./scripts/
+
+# docs/ is gitignored so not in build context; create empty dir (code only references it in error messages)
+RUN mkdir -p docs
+
+# Copy Supabase migrations (used by run_supabase_migrations.py at startup when Supabase is configured)
+COPY supabase/ ./supabase/
 
 # Install Python dependencies and build the project
 RUN uv sync --frozen --no-dev
+
+# Prefer running the installed venv entrypoints directly (faster startup than `uv run`)
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy frontend build from stage 1
 COPY --from=frontend-builder /app/frontend/dist ./static
@@ -71,8 +103,8 @@ ENV PORT=8007
 EXPOSE 8007
 
 # Health check - uses PORT env var that Railway injects
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:${PORT:-8007}/health || exit 1
 
-# Run the application - uses PORT env var for Railway compatibility
-CMD ["sh", "-c", "uv run uvicorn extension_shield.api.main:app --host 0.0.0.0 --port ${PORT:-8007}"]
+# Run the application with migrations (Supabase only)
+CMD ["sh", "/app/scripts/start_api.sh"]

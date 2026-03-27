@@ -37,6 +37,8 @@ class WorkflowState(TypedDict):
             webstore, SAST).
         executive_summary (Optional[Dict]): Executive summary with overall risk assessment,
             key findings, and recommendations.
+        impact_analysis (Optional[Dict]): Impact analysis buckets for user-facing risk context.
+        privacy_compliance (Optional[Dict]): Privacy + compliance snapshot (LLM) for UI tiles.
         extracted_files (Optional[list]): List of relative file paths extracted from the
             extension, collected before cleanup.
         status (WorkflowStatus): Current status of the workflow.
@@ -54,6 +56,8 @@ class WorkflowState(TypedDict):
     manifest_data: Optional[Dict]
     analysis_results: Optional[Dict]
     executive_summary: Optional[Dict]
+    impact_analysis: Optional[Dict]
+    privacy_compliance: Optional[Dict]
     extracted_files: Optional[list]
     # Governance fields (Pipeline B: Stages 2-8)
     governance_bundle: Optional[Dict]

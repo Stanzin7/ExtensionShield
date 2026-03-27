@@ -1,26 +1,37 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import EnhancedUrlInput from "../../components/EnhancedUrlInput";
+import { useAuth } from "../../context/AuthContext";
 import { useScan } from "../../context/ScanContext";
 import databaseService from "../../services/databaseService";
+import realScanService from "../../services/realScanService";
 import {
-  enrichScanWithSignals,
   getRiskColorClass,
+  getRiskDisplayLabel,
   getSignalColorClass,
-  SIGNAL_LEVELS
+  getSignalDisplayLabel,
 } from "../../utils/signalMapper";
+import { enrichScans } from "../../utils/scanEnrichment";
+import { EXTENSION_ICON_PLACEHOLDER, getExtensionIconUrl } from "../../utils/constants";
+import { getScanResultsRoute } from "../../utils/slug";
+import SEOHead from "../../components/SEOHead";
+import DemoModal from "../../components/DemoModal";
+import ScanActivityIndicator from "../../components/ScanActivityIndicator";
 import "./ScannerPage.scss";
 
 // Tooltip component for signal chips
 const SignalTooltip = ({ type, children }) => {
   const tooltips = {
+    security: "Security: Technical vulnerabilities, SAST findings, and code quality analysis",
+    privacy: "Privacy: Data collection risks, permissions analysis, and exfiltration detection",
+    governance: "Governance: Policy compliance, behavioral consistency, and regulatory adherence",
+    // Legacy tooltips for backward compatibility
     code: "Code Analysis: SAST scanning, entropy detection, and obfuscation checks",
     perms: "Permissions: Analysis of requested browser permissions and access levels",
     intel: "Threat Intel: VirusTotal scan results and malware detection flags"
   };
 
   return (
-    <div className="signal-chip-wrapper" title={tooltips[type]}>
+    <div className="signal-chip-wrapper" title={tooltips[type] || tooltips.code}>
       {children}
     </div>
   );
@@ -28,8 +39,38 @@ const SignalTooltip = ({ type, children }) => {
 
 // Signal chip component
 const SignalChip = ({ type, signal }) => {
-  const labels = { code: "Code", perms: "Perms", intel: "Intel" };
+  const labels = { 
+    security: "Security", 
+    privacy: "Privacy", 
+    governance: "Gov",  // Shortened for space
+    // Legacy labels for backward compatibility
+    code: "Code", 
+    perms: "Perms", 
+    intel: "Intel" 
+  };
+  
   const icons = {
+    security: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+    privacy: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    ),
+    governance: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" />
+        <path d="M16 13H8" />
+        <path d="M16 17H8" />
+        <path d="M10 9H8" />
+      </svg>
+    ),
+    // Legacy icons for backward compatibility
     code: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <polyline points="16,18 22,12 16,6" />
@@ -52,63 +93,77 @@ const SignalChip = ({ type, signal }) => {
 
   const colorClass = getSignalColorClass(signal?.level);
 
+  const displayLabel = getSignalDisplayLabel(signal);
   return (
     <SignalTooltip type={type}>
       <div className={`signal-chip ${colorClass}`}>
-        <span className="signal-icon">{icons[type]}</span>
-        <span className="signal-label">{labels[type]}</span>
-        <span className="signal-value">{signal?.label || "—"}</span>
+        <span className="signal-icon">{icons[type] || icons.code}</span>
+        <span className="signal-label">{labels[type] || labels.code}</span>
+        <span className="signal-value">{displayLabel}</span>
       </div>
     </SignalTooltip>
   );
 };
 
-// Risk badge component
+// Risk badge component with colored border
 const RiskBadge = ({ level, score }) => {
   const colorClass = getRiskColorClass(level);
+  
+  const getBorderColor = () => {
+    if (score === null || score === undefined) return 'rgba(107, 114, 128, 0.3)';
+    if (score >= 75) return '#10B981';
+    if (score >= 50) return '#F59E0B';
+    return '#EF4444';
+  };
+
+  const getTextColor = () => {
+    if (score === null || score === undefined) return '#6B7280';
+    if (score >= 75) return '#10B981';
+    if (score >= 50) return '#F59E0B';
+    return '#EF4444';
+  };
+
   return (
-    <div className={`risk-badge ${colorClass}`}>
-      <span className="risk-level">{level || "—"}</span>
-      <span className="risk-score">{score ?? "—"}/100</span>
+    <div 
+      className={`risk-badge ${colorClass}`}
+      style={{ 
+        borderColor: getBorderColor(),
+        color: getTextColor()
+      }}
+    >
+      <span className="risk-level">{getRiskDisplayLabel(level)}</span>
     </div>
   );
 };
 
-// Row hover actions
-const RowActions = ({ scan, onViewReport, onMonitor, onCopyLink, showActions }) => {
-  const actionsRef = useRef(null);
+// Pure formatters — stable references, no re-creation per render
+const formatUserCount = (count) => {
+  if (!count) return "—";
+  const num = typeof count === "string" ? parseInt(count.replace(/,/g, ""), 10) : count;
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return num.toString();
+};
 
-  if (!showActions) return null;
-
-  return (
-    <div className="row-hover-actions" ref={actionsRef}>
-      <button className="hover-action-btn primary" onClick={onViewReport} title="View Report">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-        <span>View</span>
-      </button>
-      <button className="hover-action-btn pro" onClick={onMonitor} title="Monitor (Pro)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-        </svg>
-        <span>Monitor</span>
-        <span className="pro-badge">PRO</span>
-      </button>
-      <button className="hover-action-btn" onClick={onCopyLink} title="Copy Share Link">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
-      </button>
-    </div>
-  );
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return "—";
+  const now = new Date();
+  const scanTime = new Date(timestamp);
+  const diffMs = now - scanTime;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return scanTime.toLocaleDateString();
 };
 
 const ScannerPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated, openSignInModal } = useAuth();
   const {
     url,
     setUrl,
@@ -116,122 +171,185 @@ const ScannerPage = () => {
     error,
     setError,
     startScan,
-    handleFileUpload,
   } = useScan();
-
-  // API base URL - use environment variable or same-origin
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
-
-  // Placeholder image for extension icons (base64 encoded puzzle piece)
-  const extensionPlaceholder = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxMiIgZmlsbD0iIzJBMkEzNSIvPgogIDxwYXRoIGQ9Ik0zMiAxNkMyNC4yNjggMTYgMTggMjIuMjY4IDE4IDMwQzE4IDMxLjY1NyAxOC4zMjEgMzMuMjI5IDE4LjkwOSAzNC42NjdMMjIuOTg0IDM0LjY2N0MyMy43MyAzNC42NjcgMjQuMzMzIDM1LjI3IDI0LjMzMyAzNi4wMTZWNDAuMDkxQzI0LjMzMyA0MC44MzggMjMuNzMgNDEuNDQxIDIyLjk4NCA0MS40NDFIMTguOTA5QzIwLjU3MSA0NS42ODcgMjQuMzMzIDQ5LjIyNCAyOC45NTkgNTAuNDg2VjQ2LjQxMUMyOC45NTkgNDUuNjY1IDI5LjU2MiA0NS4wNjIgMzAuMzA4IDQ1LjA2MkgzNC4zODNDMzUuMTMgNDUuMDYyIDM1LjczMyA0NC40NTkgMzUuNzMzIDQzLjcxM1YzOS42MzhDMzUuNzMzIDM4Ljg5MSAzNi4zMzYgMzguMjg4IDM3LjA4MyAzOC4yODhINDEuMTU3QzQxLjkwNCAzOC4yODggNDIuNTA3IDM3LjY4NSA0Mi41MDcgMzYuOTM4VjMyLjg2NEM0Mi41MDcgMzIuMTE3IDQzLjExIDMxLjUxNCA0My44NTcgMzEuNTE0SDQ3LjkzMkM0Ny45NzggMzEuMDE1IDQ4IDMwLjUxIDQ4IDMwQzQ4IDIyLjI2OCA0MS43MzIgMTYgMzIgMTZaIiBmaWxsPSIjNEE5MEU2Ii8+CiAgPGNpcmNsZSBjeD0iMjYiIGN5PSIyNiIgcj0iMyIgZmlsbD0iI0ZGRkZGRiIvPgo8L3N2Zz4=";
-
-  // Helper function to get proper image source from extension data
-  const getIconSrc = (extensionId) => {
-    // Use the icon from extracted extension via API, fallback to placeholder
-    if (extensionId) {
-      return `${API_BASE_URL}/api/scan/icon/${extensionId}`;
-    }
-    return extensionPlaceholder;
-  };
 
   const [allScans, setAllScans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null); // e.g. API unreachable
   const [sortConfig, setSortConfig] = useState({ key: "timestamp", direction: "desc" });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [hoveredRow, setHoveredRow] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
   const tableWrapperRef = useRef(null);
+  const demoTriggerRef = useRef(null);
 
-  // Load all scans on mount
-  useEffect(() => {
-    const loadScans = async () => {
-      setLoading(true);
+  const [deepScanLimit, setDeepScanLimit] = useState(null);
+  const [cachedAvailable, setCachedAvailable] = useState(false);
+
+  // Search autocomplete — queries /api/recent?search= for matching extensions
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
+  const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
+  const autocompleteTimerRef = useRef(null);
+
+  const handleAutocomplete = useCallback((query) => {
+    const q = (query || "").trim();
+
+    // Skip autocomplete for URLs and extension IDs (32-char lowercase)
+    if (!q || q.length < 2 || /^https?:\/\//.test(q) || /^[a-z]{32}$/i.test(q)) {
+      setAutocompleteSuggestions([]);
+      setAutocompleteLoading(false);
+      return;
+    }
+
+    // Show dropdown immediately with loading state so it feels instant
+    setAutocompleteLoading(true);
+    setAutocompleteSuggestions([]);
+
+    clearTimeout(autocompleteTimerRef.current);
+    autocompleteTimerRef.current = setTimeout(async () => {
       try {
-        const history = await databaseService.getRecentScans(100);
-        // Fetch full details for each scan to get signals data
-        const enrichedScans = await Promise.all(
-          history.map(async (scan) => {
-            try {
-              const fullResult = await databaseService.getScanResult(
-                scan.extension_id || scan.extensionId
-              );
-
-              // Parse metadata if it's a string (JSON)
-              let metadata = {};
-              if (fullResult?.metadata) {
-                if (typeof fullResult.metadata === "string") {
-                  try {
-                    metadata = JSON.parse(fullResult.metadata);
-                  } catch (e) {
-                    metadata = fullResult.metadata;
-                  }
-                } else {
-                  metadata = fullResult.metadata;
-                }
-              }
-
-              // Enrich with signals
-              const enriched = enrichScanWithSignals(
-                {
-                  ...scan,
-                  extension_name:
-                    scan.extension_name ||
-                    scan.extensionName ||
-                    metadata?.title ||
-                    scan.extension_id ||
-                    scan.extensionId,
-                  extension_id: scan.extension_id || scan.extensionId,
-                  timestamp: scan.timestamp,
-                  user_count: metadata?.user_count || metadata?.userCount || null,
-                  rating: metadata?.rating_value || metadata?.rating || null,
-                  rating_count:
-                    metadata?.rating_count ||
-                    metadata?.ratings_count ||
-                    metadata?.ratingCount ||
-                    null,
-                  logo: metadata?.logo || null,
-                },
-                fullResult
-              );
-
-              return enriched;
-            } catch (err) {
-              console.error(`Error loading data for ${scan.extension_id}:`, err);
-              return {
-                ...scan,
-                extension_name:
-                  scan.extension_name ||
-                  scan.extensionName ||
-                  scan.extension_id ||
-                  scan.extensionId,
-                extension_id: scan.extension_id || scan.extensionId,
-                timestamp: scan.timestamp,
-                user_count: null,
-                rating: null,
-                rating_count: null,
-                logo: null,
-                score: 0,
-                risk_level: "UNKNOWN",
-                findings_count: 0,
-                signals: {
-                  code_signal: { level: SIGNAL_LEVELS.OK, label: "—" },
-                  perms_signal: { level: SIGNAL_LEVELS.OK, label: "—" },
-                  intel_signal: { level: SIGNAL_LEVELS.OK, label: "—" },
-                },
-              };
-            }
-          })
-        );
-        setAllScans(enrichedScans);
-      } catch (error) {
-        console.error("Failed to load scans:", error);
+        const results = await databaseService.getRecentScans(6, q);
+        setAutocompleteSuggestions(results || []);
+        setAutocompleteIndex(0);
+      } catch {
+        setAutocompleteSuggestions([]);
       } finally {
-        setLoading(false);
+        setAutocompleteLoading(false);
+      }
+    }, 80);
+  }, []);
+
+  const handleSelectSuggestion = useCallback((scan) => {
+    setAutocompleteSuggestions([]);
+    const route = getScanResultsRoute(scan.extension_id, scan.extension_name);
+    navigate(route);
+  }, [navigate]);
+
+  const TEASER_LIMIT = 10;
+
+  // Clean the URL input on mount so previous extension ID doesn't persist
+  useEffect(() => {
+    setUrl("");
+  }, [setUrl]);
+
+  // Shared load so we can refetch for live updates (visibility + polling)
+  const loadScans = React.useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setLoadError(null);
+    try {
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 10000)
+      );
+      const history = await Promise.race([
+        databaseService.getRecentScans(TEASER_LIMIT),
+        timeoutPromise,
+      ]);
+      if (!history || history.length === 0) {
+        setAllScans([]);
+        return;
+      }
+      const enrichedScans = await enrichScans(history, { skipFullFetch: true });
+      if (enrichedScans.length > 0) {
+        setAllScans(enrichedScans);
+      } else {
+        const fallbackScans = await enrichScans(history, { skipFullFetch: false });
+        setAllScans(fallbackScans.length > 0 ? fallbackScans : []);
+      }
+    } catch (err) {
+      setAllScans([]);
+      setLoadError(err?.message || "Failed to load recent scans");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load on mount and when navigating back to /scan (e.g., after completing a scan)
+  useEffect(() => {
+    loadScans(true);
+  }, [loadScans, location.pathname]);
+
+  // Live update: refetch when user returns to this tab or navigates back to /scan
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") loadScans(false);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [loadScans]);
+
+  // Live update: poll every 10s so new scans appear shortly after completion (reduced from 20s)
+  useEffect(() => {
+    const interval = setInterval(() => loadScans(false), 10000);
+    return () => clearInterval(interval);
+  }, [loadScans]);
+
+  // Load deep-scan limit status (best-effort)
+  useEffect(() => {
+    let cancelled = false;
+    const loadLimit = async () => {
+      try {
+        const limit = await realScanService.getDeepScanLimitStatus();
+        if (!cancelled) setDeepScanLimit(limit);
+      } catch (e) {
+        // Ignore - backend may be unavailable in some dev setups
       }
     };
-    loadScans();
+    loadLimit();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // If backend blocks a deep scan (429), refresh limit status so the button can disable immediately.
+  useEffect(() => {
+    if (!error || typeof error !== "string") return;
+    if (!error.toLowerCase().includes("daily scan limit")) return;
+
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const limit = await realScanService.getDeepScanLimitStatus();
+        if (!cancelled) setDeepScanLimit(limit);
+      } catch (e) {
+        // ignore
+      }
+    };
+    refresh();
+    return () => {
+      cancelled = true;
+    };
+  }, [error]);
+
+  // If limit is reached, check whether this URL maps to an extension with cached results.
+  useEffect(() => {
+    if (!deepScanLimit || deepScanLimit.remaining > 0) {
+      setCachedAvailable(false);
+      return;
+    }
+
+    const raw = (url || "").trim();
+    const extId = realScanService.extractExtensionId(raw);
+    if (!raw || !extId) {
+      setCachedAvailable(false);
+      return;
+    }
+
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const cached = await realScanService.hasCachedResults(extId);
+        if (!cancelled) setCachedAvailable(Boolean(cached));
+      } catch (e) {
+        if (!cancelled) setCachedAvailable(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [url, deepScanLimit]);
 
   // Handle scroll shadows for horizontal scrolling on mobile
   useEffect(() => {
@@ -274,7 +392,7 @@ const ScannerPage = () => {
     };
   }, [allScans]);
 
-  // Handle prefilled URL from homepage
+  // Legacy: if navigated with prefillUrl state (e.g. from old bookmarks), use it
   useEffect(() => {
     if (location.state?.prefillUrl) {
       setUrl(location.state.prefillUrl);
@@ -282,52 +400,24 @@ const ScannerPage = () => {
     }
   }, [location.state, setUrl]);
 
-  const handleScanClick = async () => {
+  const handleScanClick = useCallback(() => {
     if (!url.trim()) {
       setError("Please enter a Chrome Web Store URL");
       return;
     }
-    await startScan(url);
-    // Reload scans after new scan
-    setTimeout(() => {
-      window.location.reload();
-    }, 2000);
-  };
+    startScan(url);
+  }, [url, startScan, setError]);
 
-  // Format user count
-  const formatUserCount = (count) => {
-    if (!count) return "—";
-    const num = typeof count === "string" ? parseInt(count.replace(/,/g, ""), 10) : count;
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
-  };
+  const deepScanLimitReached = deepScanLimit && deepScanLimit.remaining <= 0;
+  const scanDisabledDueToLimit = Boolean(deepScanLimitReached && !cachedAvailable);
+  const scanDisabledTooltip = "Daily scan limit reached (1 scan for guests). Sign in to get more scans or try again tomorrow.";
 
-  // Format time ago
-  const formatTimeAgo = (timestamp) => {
-    if (!timestamp) return "—";
-    const now = new Date();
-    const scanTime = new Date(timestamp);
-    const diffMs = now - scanTime;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return scanTime.toLocaleDateString();
-  };
-
-  // Handle sorting
-  const handleSort = (key) => {
-    let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
-  };
+  const handleSort = useCallback((key) => {
+    setSortConfig((prev) => {
+      const direction = prev.key === key && prev.direction === "asc" ? "desc" : "asc";
+      return { key, direction };
+    });
+  }, []);
 
   // Sort and paginate data
   const sortedAndPaginatedScans = useMemo(() => {
@@ -337,6 +427,11 @@ const ScannerPage = () => {
       sorted.sort((a, b) => {
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
+        // For timestamp, use fallback chain (API maps scanned_at→timestamp)
+        if (sortConfig.key === "timestamp" || sortConfig.key === "scanned_at") {
+          aVal = a.timestamp ?? a.scanned_at ?? a.created_at ?? a.updated_at;
+          bVal = b.timestamp ?? b.scanned_at ?? b.created_at ?? b.updated_at;
+        }
 
         // Handle null/undefined values
         if (aVal == null) return 1;
@@ -346,7 +441,7 @@ const ScannerPage = () => {
         if (sortConfig.key === "extension_name") {
           aVal = (aVal || "").toLowerCase();
           bVal = (bVal || "").toLowerCase();
-        } else if (sortConfig.key === "timestamp") {
+        } else if (sortConfig.key === "timestamp" || sortConfig.key === "scanned_at") {
           aVal = new Date(aVal).getTime();
           bVal = new Date(bVal).getTime();
         } else if (sortConfig.key === "score" || sortConfig.key === "findings_count") {
@@ -367,60 +462,253 @@ const ScannerPage = () => {
       });
     }
 
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    return sorted.slice(startIndex, startIndex + rowsPerPage);
-  }, [allScans, sortConfig, currentPage, rowsPerPage]);
+    // Teaser: always show first TEASER_LIMIT rows, no pagination
+    return sorted.slice(0, TEASER_LIMIT);
+  }, [allScans, sortConfig]);
 
-  const totalPages = Math.ceil(allScans.length / rowsPerPage);
+  const handleViewReport = useCallback((scan) => {
+    const route = getScanResultsRoute(scan.extension_id, scan.extension_name);
+    navigate(route);
+  }, [navigate]);
 
-  // Actions
-  const handleViewReport = (extId) => {
-    navigate(`/scanner/results/${extId}`);
+  const handleMonitor = useCallback(() => {
+    navigate("/enterprise");
+  }, [navigate]);
+
+  const handleCopyLink = useCallback((scan) => {
+    const route = getScanResultsRoute(scan.extension_id, scan.extension_name);
+    const link = `${window.location.origin}${route}`;
+    navigator.clipboard.writeText(link).then(
+      () => {
+        setCopiedId(scan.extension_id);
+        setTimeout(() => setCopiedId(null), 2000);
+      },
+      () => {}
+    );
+  }, []);
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does Chrome extension security scanning work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ExtensionShield analyzes Chrome extensions using static code analysis (SAST), permission analysis, and threat intelligence to generate a comprehensive risk score. We check for malware, privacy risks, and compliance issues."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is an extension risk score?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The extension risk score is a numerical rating (0-100) that indicates the overall security risk of a Chrome extension. It's calculated based on code analysis, permission requests, and threat intelligence signals."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What permissions should I be concerned about?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Be cautious of extensions requesting broad permissions like 'Read and change all your data on all websites', 'Access your browsing history', or 'Manage your downloads'. Learn more about extension permissions in our glossary."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is there a free Chrome extension scanner?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. ExtensionShield offers a free extension scanner: paste any Chrome Web Store URL or extension ID to get an instant security audit, risk score, permissions check, and malware scan—no signup required."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I scan extensions before installing them?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! ExtensionShield allows you to scan any Chrome extension from the Chrome Web Store before installing it. Simply paste the extension URL or Chrome Web Store ID to get an instant security analysis."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How accurate is the extension security scanner?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ExtensionShield uses multiple security analysis techniques including static code analysis, permission analysis, and threat intelligence from VirusTotal. Our methodology is transparent and documented in our research section."
+        }
+      }
+    ]
   };
 
-  const handleMonitor = (extId) => {
-    // Pro feature - show upgrade modal or navigate to pricing
-    alert("Monitoring is a Pro feature. Upgrade to enable continuous monitoring.");
-  };
-
-  const handleCopyLink = async (extId) => {
-    const link = `${window.location.origin}/scanner/results/${extId}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopiedId(extId);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
+  const softwareAppSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ExtensionShield",
+    "applicationCategory": "SecurityApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Free Chrome extension scanner and security audit"
+    },
+    "description": "Free Chrome extension scanner and security audit. Scan any extension by URL for risk score, permissions, malware check. For developers: audit extensions before release.",
+    "url": "https://extensionshield.com/scan"
   };
 
   return (
-    <div className="scanner-page">
-      <section className="scanner-hero">
-        {/* Background */}
-        <div className="scanner-bg">
-          <div className="bg-gradient" />
-          <div className="bg-grid" />
-        </div>
-
-        {/* Main Content */}
+    <>
+      <SEOHead
+        title="Is This Chrome Extension Safe? Free Extension Risk Check | ExtensionShield"
+        description="Free extension risk check by URL or ID. Get risk score, permissions, privacy and governance signals. See if a Chrome extension is safe before you install."
+        pathname="/scan"
+        ogType="website"
+        schema={[faqSchema, softwareAppSchema]}
+        keywords="free extension scanner, free extension audit, Chrome extension scanner, scan Chrome extension, extension risk score, extension security audit"
+      />
+      <div className="scanner-page">
+        <section className="scanner-hero">
+        {/* Main Content - Similar to hero layout (tagline, headline, sub, input, features) */}
         <div className="scanner-content">
-          {/* Header */}
           <div className="scanner-header">
-            <h1>Extension Scanner</h1>
-            <p>Analyze any Chrome extension for security threats and compliance issues</p>
+            <p className="scanner-tagline">Extension Risk Check</p>
+            <h1 className="scanner-headline">Know what your Chrome extensions can access.</h1>
           </div>
 
-          {/* Scan Input Box */}
-          <div className="scan-input-wrapper">
-            <EnhancedUrlInput
-              value={url}
-              onChange={setUrl}
-              onScan={handleScanClick}
-              onFileUpload={handleFileUpload}
-              isScanning={isScanning}
-            />
+          <div className="scanner-search">
+            <div className="scanner-search-container">
+              <span className="scanner-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="chrome-logo">
+                  <path d="M12 12L22 12A10 10 0 0 1 7 3.34L12 12Z" fill="#4285F4" />
+                  <path d="M12 12L7 3.34A10 10 0 0 1 7 20.66L12 12Z" fill="#EA4335" />
+                  <path d="M12 12L7 20.66A10 10 0 0 1 22 12L12 12Z" fill="#FBBC05" />
+                  <circle cx="12" cy="12" r="4" fill="#34A853" />
+                  <circle cx="12" cy="12" r="2.5" fill="white" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                id="scanner-url-input"
+                placeholder="Search extension name or paste Store URL"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  handleAutocomplete(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (autocompleteSuggestions.length > 0 && autocompleteIndex >= 0 && autocompleteSuggestions[autocompleteIndex]) {
+                      e.preventDefault();
+                      handleSelectSuggestion(autocompleteSuggestions[autocompleteIndex]);
+                      return;
+                    }
+                    setAutocompleteSuggestions([]);
+                    handleScanClick();
+                  }
+                  if (e.key === "Escape") setAutocompleteSuggestions([]);
+                  if (e.key === "ArrowDown" && autocompleteSuggestions.length > 0) {
+                    e.preventDefault();
+                    setAutocompleteIndex((i) => Math.min(i + 1, autocompleteSuggestions.length - 1));
+                  }
+                  if (e.key === "ArrowUp" && autocompleteSuggestions.length > 0) {
+                    e.preventDefault();
+                    setAutocompleteIndex((i) => Math.max(i - 1, 0));
+                  }
+                }}
+                onFocus={() => { if (url.trim().length >= 2) handleAutocomplete(url); }}
+                onBlur={() => { setTimeout(() => { setAutocompleteSuggestions([]); setAutocompleteLoading(false); }, 150); }}
+                aria-label="Search extension name or paste Store URL"
+                autoComplete="off"
+                disabled={isScanning}
+                role="combobox"
+                aria-expanded={autocompleteSuggestions.length > 0 || autocompleteLoading}
+                aria-autocomplete="list"
+                aria-controls="scanner-autocomplete-list"
+              />
+              {(autocompleteSuggestions.length > 0 || autocompleteLoading) && (
+                <ul className="scanner-autocomplete" id="scanner-autocomplete-list" role="listbox">
+                  {autocompleteLoading && autocompleteSuggestions.length === 0 ? (
+                    <li className="scanner-autocomplete-item scanner-autocomplete-loading" role="status">
+                      <span className="autocomplete-name">Searching...</span>
+                    </li>
+                  ) : (
+                    autocompleteSuggestions.map((s, i) => (
+                    <li
+                      key={s.extension_id}
+                      role="option"
+                      aria-selected={i === autocompleteIndex}
+                      className={`scanner-autocomplete-item${i === autocompleteIndex ? " active" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestion(s);
+                      }}
+                    >
+                      <img
+                        src={getExtensionIconUrl(s.extension_id)}
+                        alt=""
+                        className="autocomplete-icon"
+                        width="20"
+                        height="20"
+                        onError={(e) => { e.target.onerror = null; e.target.src = EXTENSION_ICON_PLACEHOLDER; }}
+                      />
+                      <span className="autocomplete-name">{s.extension_name || s.extension_id}</span>
+                    </li>
+                  ))
+                  )}
+                </ul>
+              )}
+              <button
+                type="button"
+                className="scanner-scan-icon"
+                onClick={handleScanClick}
+                disabled={isScanning || !url.trim() || scanDisabledDueToLimit}
+                title={scanDisabledDueToLimit ? scanDisabledTooltip : "Scan extension"}
+                aria-label="Scan extension"
+              >
+                {isScanning ? (
+                  <ScanActivityIndicator
+                    variant="button"
+                    title="Scan in progress"
+                    hideText
+                  />
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="M21 21l-4.35-4.35" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <p className="scanner-scan-info">
+              <svg className="scanner-scan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              Checks permissions, network access, version history, and known threats.
+            </p>
+            <button
+              type="button"
+              ref={demoTriggerRef}
+              className="scanner-demo-link"
+              title="Step-by-step guide to scanning an extension"
+              onClick={() => setDemoModalOpen(true)}
+            >
+              <span className="scanner-demo-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
+                </svg>
+              </span>
+              <span>Step-by-step guide</span>
+            </button>
           </div>
+
+          {scanDisabledDueToLimit && (
+            <div className="deep-scan-limit-banner">
+              Daily scan limit reached (1 scan for guests). Sign in to get more scans or try again tomorrow.
+            </div>
+          )}
 
           {/* Error Message */}
           {error && !error.includes("✅") && !error.includes("🔄") && (
@@ -435,6 +723,12 @@ const ScannerPage = () => {
         <div className="extensions-table-container">
           <div className="table-header-section">
             {loading && <div className="loading-indicator">Loading...</div>}
+            {!loading && allScans.length > 0 && (
+              <div className="table-section-heading">
+                <h2 className="table-section-title">Recent scans</h2>
+                <p className="table-section-subtitle">Click View to open the evidence report.</p>
+              </div>
+            )}
           </div>
 
           {!loading && allScans.length > 0 && (
@@ -521,25 +815,34 @@ const ScannerPage = () => {
                         className={hoveredRow === scan.extension_id ? "row-hovered" : ""}
                         onMouseEnter={() => setHoveredRow(scan.extension_id)}
                         onMouseLeave={() => setHoveredRow(null)}
+                        onClick={() => handleViewReport(scan)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleViewReport(scan);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
                       >
                         <td className="extension-cell">
                           <div className="extension-info">
                             <img
-                              src={getIconSrc(scan.extension_id)}
+                              src={getExtensionIconUrl(scan.extension_id)}
                               alt={scan.extension_name}
                               className="extension-icon"
                               onError={(e) => {
                                 // On error, fallback to placeholder
                                 e.target.onerror = null;
-                                e.target.src = extensionPlaceholder;
+                                e.target.src = EXTENSION_ICON_PLACEHOLDER;
                               }}
                             />
                             <div className="extension-details">
                               <span className="extension-name">
-                                {scan.extension_name || scan.extension_id}
+                                {scan.extension_name || scan.metadata?.title || scan.metadata?.name || scan.manifest?.name || scan.extension_id}
                               </span>
                               <span className="extension-scanned">
-                                {formatTimeAgo(scan.timestamp)}
+                                {formatTimeAgo(scan.timestamp ?? scan.scanned_at ?? scan.created_at ?? scan.updated_at)}
                               </span>
                             </div>
                           </div>
@@ -564,9 +867,9 @@ const ScannerPage = () => {
                         </td>
                         <td className="signals-cell">
                           <div className="signals-container">
-                            <SignalChip type="code" signal={scan.signals?.code_signal} />
-                            <SignalChip type="perms" signal={scan.signals?.perms_signal} />
-                            <SignalChip type="intel" signal={scan.signals?.intel_signal} />
+                            <SignalChip type="security" signal={scan.signals?.security_signal} />
+                            <SignalChip type="privacy" signal={scan.signals?.privacy_signal} />
+                            <SignalChip type="governance" signal={scan.signals?.governance_signal} />
                           </div>
                         </td>
                         <td className="evidence-cell">
@@ -576,7 +879,10 @@ const ScannerPage = () => {
                             </span>
                             <button
                               className="view-report-btn"
-                              onClick={() => handleViewReport(scan.extension_id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewReport(scan);
+                              }}
                             >
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -585,13 +891,6 @@ const ScannerPage = () => {
                               View
                             </button>
                           </div>
-                          <RowActions
-                            scan={scan}
-                            showActions={hoveredRow === scan.extension_id}
-                            onViewReport={() => handleViewReport(scan.extension_id)}
-                            onMonitor={() => handleMonitor(scan.extension_id)}
-                            onCopyLink={() => handleCopyLink(scan.extension_id)}
-                          />
                           {copiedId === scan.extension_id && (
                             <span className="copied-toast">Copied!</span>
                           )}
@@ -602,65 +901,24 @@ const ScannerPage = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
+              {/* Teaser footer: point users to full history */}
               <div className="table-pagination">
                 <div className="pagination-info">
-                  Showing {(currentPage - 1) * rowsPerPage + 1} to{" "}
-                  {Math.min(currentPage * rowsPerPage, allScans.length)} of {allScans.length} rows
+                  Showing {Math.min(sortedAndPaginatedScans.length, allScans.length)} most recent scans
                 </div>
-                <div className="pagination-controls">
-                  <button
-                    className="pagination-btn"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
-                    </svg>
-                  </button>
-                  <button
-                    className="pagination-btn"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M15 18l-6-6 6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    className="pagination-btn"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    className="pagination-btn"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="pagination-rows">
-                  <label>Rows per page:</label>
-                  <select
-                    value={rowsPerPage}
-                    onChange={(e) => {
-                      setRowsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
+                <button
+                  className="view-all-history-btn"
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      sessionStorage.setItem("auth:returnTo", "/scan/history");
+                      openSignInModal();
+                      return;
+                    }
+                    navigate("/scan/history");
+                  }}
+                >
+                  View All History →
+                </button>
               </div>
             </>
           )}
@@ -670,19 +928,39 @@ const ScannerPage = () => {
               <div className="empty-icon">🛡️</div>
               <h3>No extensions scanned yet</h3>
               <p>Start by scanning your first Chrome extension above</p>
+              {loadError ? (
+                <>
+                  <p className="empty-state-hint empty-state-error">
+                    Could not load recent scans: {loadError}
+                  </p>
+                  <p className="empty-state-hint">
+                    Make sure the API is running: run <code>make api</code> in a separate terminal (port 8007). If using a custom API URL, set <code>VITE_API_URL</code> in <code>frontend/.env</code> and restart the frontend.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="empty-state-hint">
+                    Only <strong>Chrome Web Store URL</strong> scans appear here. Uploaded extensions are private and do not show in this list. Paste a Web Store URL above, run the scan, and wait for it to complete—then the list will update.
+                  </p>
+                  {import.meta.env.DEV && (
+                    <p className="empty-state-hint">
+                      Local dev: ensure the API is running (<code>make api</code>) and <code>VITE_API_URL=http://localhost:8007</code> in <code>frontend/.env</code>, then restart the frontend.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
       </section>
 
-      {/* Minimal Footer */}
-      <footer className="scanner-footer">
-        <p>
-          All uploads are processed securely and deleted after 24 hours.
-          <a href="#privacy"> Privacy Policy</a>
-        </p>
-      </footer>
-    </div>
+      <DemoModal
+        isOpen={demoModalOpen}
+        onClose={() => setDemoModalOpen(false)}
+        triggerRef={demoTriggerRef}
+      />
+      </div>
+    </>
   );
 };
 

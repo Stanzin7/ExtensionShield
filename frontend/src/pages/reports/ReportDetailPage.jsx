@@ -1,15 +1,382 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Card, CardContent } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { Download, X, Clock, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Download, X, Clock, TrendingUp, TrendingDown, Minus, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import FileViewerModal from "../../components/FileViewerModal";
+import SafetyLabelCard from "../../components/report/SafetyLabelCard";
+import ScenarioGrid from "../../components/report/ScenarioGrid";
+import TopDriversRow from "../../components/report/TopDriversRow";
+import { SummaryPanel, LayerModal, ReportScoreCard, EvidenceDrawer } from "../../components/report";
 import realScanService from "../../services/realScanService";
 import databaseService from "../../services/databaseService";
 import { getRiskLevel } from "../../utils/signalMapper";
+import { 
+  normalizeScanResultSafe, 
+  validateEvidenceIntegrity,
+  isDevelopmentMode,
+  gateIdToLayer,
+  extractFindingsByLayer
+} from "../../utils/normalizeScanResult";
+import { isUUID } from "../../utils/extensionId";
+import SEOHead from "../../components/SEOHead";
 import "./ReportDetailPage.scss";
+
+// -----------------------------------------------------------------------------
+// New UI renderer for backend `report_view_model` (production payload)
+// -----------------------------------------------------------------------------
+const badgeVariantForRisk = (risk) => {
+  const r = String(risk || "").toUpperCase();
+  if (r.includes("HIGH") || r.includes("CRITICAL") || r === "FAIL") return "destructive";
+  if (r.includes("MEDIUM") || r === "WARN") return "secondary";
+  if (r.includes("LOW") || r === "PASS") return "default";
+  return "outline";
+};
+
+const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf }) => {
+  const [mode, setMode] = useState("simple"); // simple | advanced
+  const [layerModal, setLayerModal] = useState({ open: false, layer: null });
+  const [evidenceDrawer, setEvidenceDrawer] = useState({ open: false, evidenceIds: [] });
+
+  const meta = report?.meta || {};
+  const scorecard = report?.scorecard || {};
+  const impactCards = Array.isArray(report?.impact_cards) ? report.impact_cards : [];
+  const privacy = report?.privacy_snapshot || {};
+  const consumer = report?.consumer_insights || report?.consumerInsights || null;
+
+  const safetyRows = Array.isArray(consumer?.safety_label) ? consumer.safety_label : [];
+  const scenarios = Array.isArray(consumer?.scenarios) ? consumer.scenarios : [];
+  const topDrivers = Array.isArray(consumer?.top_drivers) ? consumer.top_drivers : [];
+
+  const handleEvidenceClick = (evidenceIds) => {
+    setEvidenceDrawer({ open: true, evidenceIds });
+  };
+
+  const openLayerModal = (layer) => {
+    setLayerModal({ open: true, layer });
+  };
+
+  const closeLayerModal = () => {
+    setLayerModal({ open: false, layer: null });
+  };
+
+  // Re-normalize data for SummaryPanel/LayerModal if needed
+  // Or just use what we have from ReportViewModel
+  const factorsByLayer = report?.factorsByLayer || { security: [], privacy: [], governance: [] };
+  const scores = report?.scores || {
+    security: { score: report?.security_layer?.score, band: report?.security_layer?.risk_level },
+    privacy: { score: report?.privacy_layer?.score, band: report?.privacy_layer?.risk_level },
+    governance: { score: report?.governance_layer?.score, band: report?.governance_layer?.risk_level },
+    overall: { score: report?.scorecard?.score, band: report?.scorecard?.score_label },
+    reasons: report?.scorecard?.reasons || []
+  };
+
+  // Extract all findings by layer from raw scan results (includes SAST, factors, gates, etc.)
+  const findingsByLayer = extractFindingsByLayer(rawScanResult);
+  
+  // Combine keyFindings with extracted findings, deduplicating by title
+  const dedupeFindings = (findings) => {
+    const seen = new Set();
+    return findings.filter(f => {
+      const key = f.title?.toLowerCase() || '';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const allSecurityFindings = dedupeFindings([
+    ...(report?.keyFindings?.filter(f => f.layer === 'security') || []),
+    ...findingsByLayer.security,
+  ]);
+  const allPrivacyFindings = dedupeFindings([
+    ...(report?.keyFindings?.filter(f => f.layer === 'privacy') || []),
+    ...findingsByLayer.privacy,
+  ]);
+  const allGovernanceFindings = dedupeFindings([
+    ...(report?.keyFindings?.filter(f => f.layer === 'governance') || []),
+    ...findingsByLayer.governance,
+  ]);
+
+  return (
+    <div className="report-detail-page">
+      <div className="report-content">
+        <div className="report-nav" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Link to="/scan/history" className="back-link">← Back to Scan History</Link>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Button variant="outline" size="sm" onClick={onExportPdf}>
+              <Download size={16} />
+              PDF
+            </Button>
+          </div>
+        </div>
+
+        <Card className="content-card">
+          <CardHeader>
+            <CardTitle style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+              <span>{meta?.name || "Extension Report"}</span>
+              <span style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <Badge variant="outline">{extensionId}</Badge>
+                <Badge variant={badgeVariantForRisk(scorecard?.score_label)}>{scorecard?.score_label || "UNKNOWN"}</Badge>
+                <Badge variant="outline">Confidence: {scorecard?.confidence || "UNKNOWN"}</Badge>
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div style={{ display: "flex", gap: "1rem", alignItems: "baseline", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "2rem", fontWeight: 700 }}>
+                {Number.isFinite(scorecard?.score) ? scorecard.score : 0}
+                <span style={{ fontSize: "1rem", opacity: 0.7 }}>/100</span>
+              </div>
+              <div style={{ fontSize: "1rem", opacity: 0.9 }}>{scorecard?.one_liner || ""}</div>
+            </div>
+
+            <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
+              <Button
+                variant={mode === "simple" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMode("simple")}
+              >
+                Simple
+              </Button>
+              <Button
+                variant={mode === "advanced" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMode("advanced")}
+              >
+                Advanced
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Standardized Summary Panel */}
+        <div style={{ marginTop: "1rem" }}>
+          <SummaryPanel 
+            scores={scores}
+            factorsByLayer={factorsByLayer}
+            rawScanResult={rawScanResult}
+            keyFindings={report?.keyFindings || []}
+            onViewEvidence={handleEvidenceClick}
+          />
+        </div>
+
+        {/* Layer Tiles Row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginTop: "1rem" }}>
+          <ReportScoreCard 
+            title="Security"
+            score={scores.security?.score}
+            band={scores.security?.band || 'NA'}
+            contributors={factorsByLayer.security?.slice(0, 2)}
+            onClick={() => openLayerModal('security')}
+          />
+          <ReportScoreCard 
+            title="Privacy"
+            score={scores.privacy?.score}
+            band={scores.privacy?.band || 'NA'}
+            contributors={factorsByLayer.privacy?.slice(0, 2)}
+            onClick={() => openLayerModal('privacy')}
+          />
+          <ReportScoreCard 
+            title="Governance"
+            score={scores.governance?.score}
+            band={scores.governance?.band || 'NA'}
+            contributors={factorsByLayer.governance?.slice(0, 2)}
+            onClick={() => openLayerModal('governance')}
+          />
+        </div>
+
+        {consumer && (
+          <div className="consumer-insights-section">
+            <div className="consumer-insights-grid">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Safety Labels</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SafetyLabelCard rows={safetyRows} onEvidenceClick={handleEvidenceClick} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Drivers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TopDriversRow drivers={topDrivers} onEvidenceClick={handleEvidenceClick} />
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="consumer-insights-scenarios">
+              <CardHeader>
+                <CardTitle>Scenarios</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScenarioGrid scenarios={scenarios} onEvidenceClick={handleEvidenceClick} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
+          {impactCards.slice(0, 3).map((c) => (
+            <Card key={c.id}>
+              <CardHeader>
+                <CardTitle style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+                  <span>{c.title || c.id}</span>
+                  <Badge variant={badgeVariantForRisk(c.risk_level)}>{c.risk_level || "UNKNOWN"}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {Array.isArray(c.bullets) && c.bullets.length > 0 ? (
+                  <ul style={{ marginLeft: "1rem", listStyle: "disc" }}>
+                    {c.bullets.map((b, idx) => <li key={idx}>{b}</li>)}
+                  </ul>
+                ) : (
+                  <div style={{ opacity: 0.7 }}>No details available.</div>
+                )}
+
+                {Array.isArray(c.mitigations) && c.mitigations.length > 0 && (
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>Mitigations</div>
+                    <ul style={{ marginLeft: "1rem", listStyle: "disc" }}>
+                      {c.mitigations.map((m, idx) => <li key={idx}>{m}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {mode === "advanced" && (
+          <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Privacy &amp; Compliance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {privacy?.privacy_snapshot && (
+                  <div style={{ marginBottom: "0.75rem", opacity: 0.9 }}>{privacy.privacy_snapshot}</div>
+                )}
+
+                {Array.isArray(privacy?.governance_checks) && privacy.governance_checks.length > 0 ? (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                          <th style={{ padding: "0.5rem" }}>Check</th>
+                          <th style={{ padding: "0.5rem" }}>Status</th>
+                          <th style={{ padding: "0.5rem" }}>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {privacy.governance_checks.map((row, idx) => (
+                          <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                            <td style={{ padding: "0.5rem" }}>{row?.check || ""}</td>
+                            <td style={{ padding: "0.5rem" }}>
+                              <Badge variant={badgeVariantForRisk(row?.status)}>{row?.status || "UNKNOWN"}</Badge>
+                            </td>
+                            <td style={{ padding: "0.5rem", opacity: 0.9 }}>{row?.note || ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ opacity: 0.7 }}>No governance checks available.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Evidence</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <details>
+                  <summary style={{ cursor: "pointer", userSelect: "none" }}>Show evidence JSON</summary>
+                  <pre
+                    style={{
+                      marginTop: "0.75rem",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "0.85rem",
+                      opacity: 0.95
+                    }}
+                  >
+                    {JSON.stringify({ evidence: report?.evidence, raw: report?.raw }, null, 2)}
+                  </pre>
+                </details>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Evidence Drawer */}
+        <EvidenceDrawer 
+          open={evidenceDrawer.open}
+          evidenceIds={evidenceDrawer.evidenceIds}
+          evidenceIndex={report?.evidenceIndex || {}}
+          onClose={() => setEvidenceDrawer({ open: false, evidenceIds: [] })}
+        />
+
+        {/* Layer Modals */}
+        {layerModal.layer === 'security' && (
+          <LayerModal
+            open={layerModal.open}
+            onClose={closeLayerModal}
+            layer="security"
+            score={scores.security?.score}
+            band={scores.security?.band}
+            factors={factorsByLayer.security}
+            keyFindings={allSecurityFindings}
+            gateResults={rawScanResult?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'security') || []}
+            layerReasons={scores.reasons?.filter(r => r.toLowerCase().includes('security') || r.toLowerCase().includes('sast')) || []}
+            layerDetails={report?.layer_details}
+            onViewEvidence={handleEvidenceClick}
+          />
+        )}
+
+        {layerModal.layer === 'privacy' && (
+          <LayerModal
+            open={layerModal.open}
+            onClose={closeLayerModal}
+            layer="privacy"
+            score={scores.privacy?.score}
+            band={scores.privacy?.band}
+            factors={factorsByLayer.privacy}
+            keyFindings={allPrivacyFindings}
+            gateResults={rawScanResult?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'privacy') || []}
+            layerReasons={scores.reasons?.filter(r => r.toLowerCase().includes('privacy') || r.toLowerCase().includes('exfil')) || []}
+            layerDetails={report?.layer_details}
+            onViewEvidence={handleEvidenceClick}
+          />
+        )}
+
+        {layerModal.layer === 'governance' && (
+          <LayerModal
+            open={layerModal.open}
+            onClose={closeLayerModal}
+            layer="governance"
+            score={scores.governance?.score}
+            band={scores.governance?.band}
+            factors={factorsByLayer.governance}
+            keyFindings={allGovernanceFindings}
+            gateResults={rawScanResult?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'governance') || []}
+            layerReasons={scores.reasons?.filter(r => r.toLowerCase().includes('governance') || r.toLowerCase().includes('policy')) || []}
+            layerDetails={report?.layer_details}
+            onViewEvidence={handleEvidenceClick}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
 
 // Version History Component
 const VersionHistorySection = ({ currentVersion, currentScore, extensionId, scanHistory }) => {
@@ -120,6 +487,73 @@ const VersionHistorySection = ({ currentVersion, currentScore, extensionId, scan
   );
 };
 
+// Report Data Unavailable Component - shown when normalization fails
+const ReportDataUnavailable = ({ extensionId, rawData, error }) => {
+  const [showRawJson, setShowRawJson] = useState(false);
+  const isDevMode = isDevelopmentMode();
+  
+  const handleCopyJson = () => {
+    try {
+      const jsonStr = JSON.stringify(rawData, null, 2);
+      navigator.clipboard.writeText(jsonStr);
+      alert("Raw JSON copied to clipboard");
+    } catch (e) {
+      // console.error("Failed to copy JSON:", e); // prod: no console
+    }
+  };
+  
+  return (
+    <div className="report-data-unavailable">
+      <div className="unavailable-icon">⚠️</div>
+      <h2>Report Data Unavailable</h2>
+      <p>We couldn't process the scan data for this extension.</p>
+      
+      <div className="extension-id-display">
+        <span className="label">Extension ID:</span>
+        <code>{extensionId || "Unknown"}</code>
+      </div>
+      
+      {error && (
+        <div className="error-message">
+          <span className="label">Error:</span>
+          <span>{error}</span>
+        </div>
+      )}
+      
+      {isDevMode && rawData && (
+        <div className="dev-tools">
+          <div className="dev-tools-header">
+            <span className="dev-label">🛠️ Developer Tools</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleCopyJson}
+              className="copy-btn"
+            >
+              <Copy size={14} />
+              Copy JSON
+            </Button>
+          </div>
+          
+          <button 
+            className="toggle-raw-json"
+            onClick={() => setShowRawJson(!showRawJson)}
+          >
+            {showRawJson ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {showRawJson ? "Hide" : "Show"} Raw JSON
+          </button>
+          
+          {showRawJson && (
+            <pre className="raw-json-display">
+              {JSON.stringify(rawData, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Permission to capability mapping with icons
 const CAPABILITY_MAP = {
   tabCapture: { icon: "🎥", label: "Screen Capture", desc: "Can record your screen or tabs", risk: "medium" },
@@ -146,10 +580,15 @@ const CAPABILITY_MAP = {
 const ReportDetailPage = () => {
   const { reportId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [scanResults, setScanResults] = useState(null);
+  const [rawScanData, setRawScanData] = useState(null); // Keep raw data for error display
+  const [reportViewModel, setReportViewModel] = useState(null); // Normalized view model
+  const [uiReportViewModel, setUiReportViewModel] = useState(null); // Backend report_view_model
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [normalizationError, setNormalizationError] = useState(null);
   const [showInfoPopup, setShowInfoPopup] = useState(null);
   const [fileViewerModal, setFileViewerModal] = useState({ isOpen: false, file: null });
   const [versionHistory, setVersionHistory] = useState([]);
@@ -161,14 +600,47 @@ const ReportDetailPage = () => {
   const loadReportData = async (extId) => {
     try {
       setIsLoading(true);
-      let results = await databaseService.getScanResult(extId);
-      if (!results) {
-        results = await realScanService.getRealScanResults(extId);
+      setNormalizationError(null);
+      
+      // Fetch raw data
+      let rawResults = await databaseService.getScanResult(extId);
+      if (!rawResults) {
+        rawResults = await realScanService.getRealScanResults(extId);
       }
+      
+      // Store raw data for error display
+      setRawScanData(rawResults);
+
+      // Prefer backend UI payload when available
+      const backendReportVM =
+        rawResults && typeof rawResults === "object" && rawResults.report_view_model && typeof rawResults.report_view_model === "object"
+          ? rawResults.report_view_model
+          : null;
+      setUiReportViewModel(backendReportVM);
+      
+      // Format for legacy compatibility
+      let results = rawResults;
       if (results && !results.files) {
         results = realScanService.formatRealResults(results);
       }
       setScanResults(results);
+      
+      // Try to normalize using safe normalizer (won't throw)
+      const viewModel = normalizeScanResultSafe(rawResults);
+      setReportViewModel(viewModel);
+      
+      if (!viewModel) {
+        setNormalizationError("Failed to normalize scan result data");
+        // console.error("[ReportDetailPage] normalizeScanResultSafe returned null"); // prod: no console
+      } else {
+        // Validate evidence integrity and log warnings
+        const validation = validateEvidenceIntegrity(viewModel);
+        if (!validation.valid) {
+          validation.warnings.forEach(warning => {
+            // console.warn(`[ReportDetailPage] Evidence validation warning: ${warning}`); // prod: no console
+          });
+        }
+      }
       
       // Build version history from current scan (in future, this could come from API)
       // For now, we show current version as the only entry
@@ -185,7 +657,7 @@ const ReportDetailPage = () => {
       setError(null);
     } catch (err) {
       setError("Failed to load report data");
-      console.error(err);
+      // console.error(err); // prod: no console
     } finally {
       setIsLoading(false);
     }
@@ -206,11 +678,10 @@ const ReportDetailPage = () => {
     }
   };
 
-  // Get trust level info
   const getTrustLevel = (score) => {
-    if (score >= 80) return { label: "Trusted", color: "green", icon: "✓" };
-    if (score >= 60) return { label: "Moderate", color: "yellow", icon: "!" };
-    if (score >= 40) return { label: "Caution", color: "orange", icon: "⚡" };
+    if (score >= 75) return { label: "Trusted", color: "green", icon: "✓" };
+    if (score >= 50) return { label: "Moderate", color: "yellow", icon: "!" };
+    if (score >= 30) return { label: "Caution", color: "orange", icon: "⚡" };
     return { label: "Warning", color: "red", icon: "⚠" };
   };
 
@@ -233,41 +704,119 @@ const ReportDetailPage = () => {
     });
   };
 
+  const noindexHead = (
+    <SEOHead
+      title="Report"
+      description="Extension scan report."
+      pathname={location.pathname}
+      noindex
+    />
+  );
+
+  const isPrivateReport = reportId && isUUID(reportId);
+  const reportMeta = uiReportViewModel?.meta || {};
+  const reportScore = uiReportViewModel?.scorecard?.score ?? null;
+  const reportExtensionName = reportMeta?.name || null;
+  const reportSEOHead =
+    !isPrivateReport && reportExtensionName
+      ? (
+          <SEOHead
+            title={`${reportExtensionName} — Risk Score ${reportScore ?? "?"} Security Report | ExtensionShield`}
+            description={`Risk score, permissions, network indicators, and Security/Privacy/Governance findings for ${reportExtensionName}.`}
+            pathname={location.pathname}
+            schema={
+              reportExtensionName
+                ? [
+                    {
+                      "@context": "https://schema.org",
+                      "@type": "SoftwareApplication",
+                      name: reportExtensionName,
+                      applicationCategory: "BrowserExtension",
+                      operatingSystem: "Chrome",
+                      ...(scanResults?.manifest?.version && { softwareVersion: scanResults.manifest.version }),
+                    },
+                  ]
+                : undefined
+            }
+          />
+        )
+      : noindexHead;
+
   // Loading state
   if (isLoading) {
     return (
-      <div className="report-detail-page">
-        <div className="report-bg-effects">
-          <div className="report-bg-gradient report-gradient-1" />
-          <div className="report-bg-gradient report-gradient-2" />
-        </div>
-        <div className="report-content">
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Analyzing extension...</p>
+      <>
+        {noindexHead}
+        <div className="report-detail-page">
+          <div className="report-content">
+            <div className="loading-container">
+              <div className="loading-spinner"></div>
+              <p>Analyzing extension...</p>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
-  // Error state
+  // If backend report_view_model is present, render the production report UI
+  if (uiReportViewModel) {
+    return (
+      <>
+        {reportSEOHead}
+        <ReportViewModelDetail
+          report={uiReportViewModel}
+          rawScanResult={scanResults}
+          extensionId={reportId}
+          onExportPdf={handleExportPDF}
+        />
+      </>
+    );
+  }
+
+  // Error state - no data at all
   if (!scanResults && error) {
     return (
-      <div className="report-detail-page">
-        <div className="report-bg-effects">
-          <div className="report-bg-gradient report-gradient-1" />
-          <div className="report-bg-gradient report-gradient-2" />
-        </div>
-        <div className="report-content">
-          <div className="error-container">
-            <div className="error-icon">⚠️</div>
-            <h2>Report Not Found</h2>
-            <p>{error}</p>
-            <Button onClick={() => navigate("/reports")}>Back to Reports</Button>
+      <>
+        {noindexHead}
+        <div className="report-detail-page">
+          <div className="report-content">
+            <div className="error-container">
+              <div className="error-icon">⚠️</div>
+              <h2>Report Not Found</h2>
+              <p>{error}</p>
+              <Button onClick={() => navigate("/scan/history")}>Back to Scan History</Button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
+    );
+  }
+
+  // Normalization failed - show data unavailable with debug info
+  if (scanResults && !reportViewModel) {
+    return (
+      <>
+        {noindexHead}
+        <div className="report-detail-page">
+          <div className="report-content">
+            <div className="report-nav">
+              <Link to="/scan/history" className="back-link">← Back to Scan History</Link>
+            </div>
+            <ReportDataUnavailable 
+              extensionId={reportId}
+              rawData={rawScanData}
+              error={normalizationError}
+            />
+            <div className="error-actions">
+              <Button onClick={() => navigate("/scan/history")}>Back to Scan History</Button>
+              <Button variant="outline" onClick={() => loadReportData(reportId)}>
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -289,22 +838,18 @@ const ReportDetailPage = () => {
   ];
 
   return (
-    <div className="report-detail-page">
-      {/* Background Effects */}
-      <div className="report-bg-effects">
-        <div className="report-bg-gradient report-gradient-1" />
-        <div className="report-bg-gradient report-gradient-2" />
-      </div>
-
-      {/* Content */}
-      <div className="report-content">
-        {/* Navigation */}
-        <div className="report-nav">
-          <Link to="/reports" className="back-link">← Back to Reports</Link>
-          <div className="nav-actions">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/reports/${reportId}`)}>
-              Full Analysis
-            </Button>
+    <>
+      {noindexHead}
+      <div className="report-detail-page">
+        {/* Content */}
+        <div className="report-content">
+          {/* Navigation */}
+          <div className="report-nav">
+            <Link to="/scan/history" className="back-link">← Back to Scan History</Link>
+            <div className="nav-actions">
+              <Button variant="outline" size="sm" onClick={() => navigate(`/reports/${reportId}`)}>
+                Full Analysis
+              </Button>
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               📥 PDF
             </Button>
@@ -610,6 +1155,7 @@ const ReportDetailPage = () => {
         />
       </div>
     </div>
+    </>
   );
 };
 

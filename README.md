@@ -1,70 +1,108 @@
-<h1 align="center">ExtensionShield</h1>
+<div align="center">
 
-<p align="center">
-  <strong>Enterprise Chrome Extension Security & Governance Platform</strong>
+  <img src="frontend/public/extension-shield-logo.svg" alt="ExtensionShield" width="98" height="98" />
+
+  # ExtensionShield
+
+  **Chrome Extension Security Scanner & Governance Platform**
+
+  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · <a href="docs/SECURITY.md" style="color:#2ea043;">Security</a> · <a href="docs/GET_STARTED.md" style="color:#2ea043;">Get Started</a> · <a href="docs/CONTRIBUTING.md" style="color:#2ea043;">Contribute</a>
+
+</div>
+
+<br />
+
+## **Manage and audit Chrome extensions with confidence**
+
+ExtensionShield helps you check Chrome extensions in a simple and clear way.
+
+It scans extensions from the **Chrome Web Store** or from **CRX/ZIP uploads**, shows risk scores, and helps you understand what an extension can access. The **core scanner, CLI, and local analysis** are **MIT-licensed** and work without any cloud dependency.
+
+
+<table>
+<tr>
+<td width="56%" valign="middle">
+<h2><strong>Get the Chrome extension</strong></h2>
+  
+Install the **ExtensionShield Chrome extension** to manage your extensions from **My Extensions**, check their **security audit score**, and spot risky extensions before they become a problem.
+
+- Manage installed extensions in one place  
+- Review labels like **Safe**, **Review**, and **Unknown**  
+- Stay safer while browsing with better extension visibility  
+
+<p>
+  <a href="https://chromewebstore.google.com/detail/extension-shield/lgfembekgpcfapeemgalpeefnlikpobd">
+    <img src="https://img.shields.io/badge/Get%20it%20on-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white"
+         alt="Get it on Chrome Web Store" />
+  </a>
 </p>
 
----
+</td>
+<td width="44%" align="center" valign="middle">
 
-## Quick Start
+<!-- <img src="images/extensionshield-my-extensions.png" alt="ExtensionShield Chrome extension - My Extensions security audit view" width="100%" /> -->
+<img width="438" height="530" alt="Screenshot 2026-03-12 at 1 51 23 PM" src="https://github.com/user-attachments/assets/2ef32c2c-7930-4dfe-b787-45039d789043" />
 
-### Docker (Recommended)
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-org/ExtensionShield.git
-cd ExtensionShield
 
-# 2. Configure environment
-cp env.production.template .env
-# Edit .env and add your OPENAI_API_KEY (required)
+<br />
 
-# 3. Build and run
-docker compose up --build
-
-# 4. Access the application
-# → http://localhost:8007
-```
-
-### Local Development
-
-```bash
-# Install dependencies
-make install                    # Python (uv sync)
-cd frontend && npm install      # Frontend
-
-# Start servers (two terminals)
-make api                        # Terminal 1: API at http://localhost:8007
-make frontend                   # Terminal 2: UI at http://localhost:5173
-```
+</td>
+</tr>
+</table>
 
 ---
 
-## Make Commands
+## **Overview**
 
-```bash
-make help           # Show all commands
-make api            # Start API server
-make frontend       # Start React dev server
-make analyze URL=   # Analyze extension from URL
-make test           # Run tests
-make format         # Format code
-make lint           # Lint code
-```
+ExtensionShield scans Chrome extensions, runs security and privacy analysis, and produces risk scores and summary reports.
+
+Optional cloud features such as auth, history, team monitoring, and community queue are available via <a href="https://extensionshield.com" style="color:#2ea043;">ExtensionShield Cloud</a>.
 
 ---
 
-## Documentation
+## **What ExtensionShield does**
+
+| Feature | Description |
+|--------|-------------|
+| **Scan** | Scan extensions from the Chrome Web Store or by uploading CRX/ZIP files |
+| **Analyze** | Review permissions, SAST, entropy, and optional VirusTotal integration |
+| **Score** | Generate security and privacy risk scores with reports |
+| **Summarize** | Create written summaries of findings when enabled |
+
+In **OSS mode** you get the scanner, CLI, local SQLite storage, and report UI with no cloud required.
+
+In **Cloud mode** you also get auth, scan history, telemetry, and enterprise features.
+
+---
+
+## **Documentation**
 
 | Document | Description |
 |----------|-------------|
-| [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) | Product features, API reference, configuration |
-| [docs/GOVERNANCE_ARCHITECTURE_AND_HLD.md](docs/GOVERNANCE_ARCHITECTURE_AND_HLD.md) | Architecture, data contracts, implementation details |
-| [AGENTS.md](AGENTS.md) | AI/Agent coding guidelines |
-| http://localhost:8007/docs | Interactive API documentation (when running) |
+| <a href="docs/GET_STARTED.md" style="color:#2ea043;">GET_STARTED.md</a> | Setup, config, Docker, CLI, OSS vs Cloud, and Make commands |
+| <a href="scripts/README.md" style="color:#2ea043;">scripts/README.md</a> | What each script does and when to run it |
+| <a href="docs/OPEN_CORE_BOUNDARIES.md" style="color:#2ea043;">OPEN_CORE_BOUNDARIES.md</a> | OSS vs Cloud, enforcement, and configuration |
+| <a href="docs/CONTRIBUTING.md" style="color:#2ea043;">CONTRIBUTING.md</a> | How to contribute |
+| <a href="docs/SECURITY.md" style="color:#2ea043;">SECURITY.md</a> | Reporting vulnerabilities and secrets policy |
+| <a href="docs/COMMERCIAL.md" style="color:#2ea043;">COMMERCIAL.md</a> | Commercial use guidance |
+| <a href="docs/TRADEMARK.md" style="color:#2ea043;">TRADEMARK.md</a> | Brand usage guidelines |
+| <a href="docs/CODE_OF_CONDUCT.md" style="color:#2ea043;">CODE_OF_CONDUCT.md</a> | Community standards |
+| <a href="docs/NOTICE" style="color:#2ea043;">NOTICE</a> | Third-party attributions |
 
 ---
 
-## License
+## **License & attribution**
 
-MIT License — see [LICENSE](LICENSE) for details.
+- **Core** (scanner, CLI, local analysis): **MIT** — see <a href="LICENSE" style="color:#2ea043;">LICENSE</a>  
+- **Cloud** (auth, Supabase, telemetry admin, community queue, enterprise forms): **proprietary**, available via <a href="https://extensionshield.com" style="color:#2ea043;">ExtensionShield Cloud</a>  
+
+---
+
+## **Community**
+
+We build ExtensionShield in the open so security tools stay transparent and easy to inspect.
+
+Feedback, issue reports, docs fixes, tests, and rule improvements are welcome. If ExtensionShield helps you, consider opening a PR, sharing your use case, or supporting the project.
+
+**Acknowledgments**: ExtensionShield is our own design. We took inspiration from <a href="https://github.com/barvhaim/ThreatXtension" style="color:#2ea043;">ThreatXtension</a> in the extension scanning space.

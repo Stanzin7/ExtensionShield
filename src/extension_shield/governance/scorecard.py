@@ -23,7 +23,7 @@ Each factor outputs:
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from .signal_pack import SignalPack, SastFindingNormalized
@@ -84,7 +84,7 @@ class SecurityScorecard:
     total_points: float = 0.0
     max_possible_points: float = 0.0
     overall_confidence: float = 1.0
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     # V2 scoring container (optional, for serialization only - does not affect points-based scoring)
     v2: Optional[Dict[str, Any]] = None
     
@@ -104,13 +104,13 @@ class SecurityScorecard:
     
     @property
     def risk_level(self) -> str:
-        """Overall risk level based on security score."""
+        """Overall risk level based on security score. Red: 0-49, Yellow: 50-74, Green: 75-100."""
         score = self.security_score
         if score < 40:
             return "critical"
-        elif score < 60:
+        elif score < 50:
             return "high"
-        elif score < 80:
+        elif score < 75:
             return "medium"
         return "low"
     

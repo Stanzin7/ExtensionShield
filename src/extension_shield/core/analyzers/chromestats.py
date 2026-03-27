@@ -10,7 +10,7 @@ import os
 import logging
 import requests
 from typing import Dict, Optional, List, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 from extension_shield.core.analyzers import BaseAnalyzer
@@ -75,11 +75,14 @@ class ChromeStatsAnalyzer(BaseAnalyzer):
                 "X-API-Key": self.api_key  # Try API key in header
             }
             
-            response = requests.get(url, headers=headers, params=params, timeout=30)
+            # SSRF protection: only allow chrome-stats.com domain
+            from extension_shield.utils.http_safety import safe_get
+            ALLOWED_HOSTS = {"chrome-stats.com", ".chrome-stats.com"}
+            response = safe_get(url, allowed_hosts=ALLOWED_HOSTS, headers=headers, params=params, timeout=30)
             response.raise_for_status()
             return response.json()
             
-        except requests.exceptions.RequestException as e:
+        except (requests.exceptions.RequestException, ValueError) as e:
             logger.error("Chrome Stats API error: %s", e)
             return None
         except Exception as e:
@@ -498,7 +501,7 @@ class ChromeStatsAnalyzer(BaseAnalyzer):
             'developer_reputation': developer_analysis,
             'geographic_distribution': geo_analysis,
             'similar_extensions': similar_analysis,
-            'analyzed_at': datetime.utcnow().isoformat(),
+            'analyzed_at': datetime.now(timezone.utc).isoformat(),
         }
 
 # Made with Bob

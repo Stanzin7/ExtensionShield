@@ -5,6 +5,7 @@ import re
 from typing import Optional, Dict
 import requests
 from bs4 import BeautifulSoup
+from extension_shield.utils.http_safety import safe_get
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,18 @@ class ExtensionMetadata:
     def _fetch_page(self):
         """Fetches the HTML content of the extension page"""
         try:
-            response = self.session.get(self.extension_url, timeout=10)
+            # SSRF protection: only allow Chrome Web Store domain
+            # This module only fetches from chromewebstore.google.com (Chrome Web Store extension pages)
+            ALLOWED_HOSTS = {"chromewebstore.google.com"}
+            response = safe_get(
+                self.extension_url,
+                allowed_hosts=ALLOWED_HOSTS,
+                timeout=10,
+                headers=dict(self.session.headers)
+            )
             response.raise_for_status()
             return response.text
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError) as e:
             logger.error("Error fetching extension page: %s", e)
             return None
 
@@ -299,7 +308,7 @@ class ExtensionMetadata:
         HTML Structure:
         <details class="...">
             <summary>... Email ...</summary>
-            <div class="...">qaro.lynnie@gmail.com</div>
+            <div class="...">developer@example.com</div>
         </details>
 
         Returns:
@@ -565,6 +574,33 @@ class ExtensionMetadata:
 
         return None
 
+    @staticmethod
+    def _extract_trader_status(soup) -> Optional[str]:
+        """
+        Extract trader / non-trader disclosure from CWS listing (EU DSA requirement).
+        Shown at the bottom of the extension page as "Trader" or "Non-trader".
+
+        Returns:
+            "TRADER" | "NON_TRADER" | None (None => show as UNKNOWN in UI)
+        """
+        try:
+            page_text = soup.get_text()
+            text_lower = page_text.lower()
+            # Look for explicit disclosure (e.g. "Non-trader" or "Trader" in developer/legal section)
+            if re.search(r"\bnon-?trader\b", text_lower):
+                logger.debug("Found trader status: NON_TRADER")
+                return "NON_TRADER"
+            if re.search(r"\btrader\b", text_lower):
+                # Avoid matching "non-trader" as "trader"
+                if "non-trader" in text_lower or "nontrader" in text_lower.replace(" ", ""):
+                    logger.debug("Found trader status: NON_TRADER (from non-trader)")
+                    return "NON_TRADER"
+                logger.debug("Found trader status: TRADER")
+                return "TRADER"
+        except Exception as e:
+            logger.debug("Error extracting trader status: %s", e)
+        return None
+
     def fetch_metadata(self) -> Optional[Dict]:
         """
         Fetches metadata for the Chrome extension from the Chrome Web Store
@@ -596,6 +632,7 @@ class ExtensionMetadata:
             metadata["developer_email"] = self._extract_developer_email(soup)
             metadata["developer_website"] = self._extract_website(soup)
             metadata["privacy_policy"] = self._extract_privacy_policy(soup)
+            metadata["trader_status"] = self._extract_trader_status(soup)
 
             # Additional metadata
             metadata["follows_best_practices"] = self._extract_is_follows_best_practices(soup)
