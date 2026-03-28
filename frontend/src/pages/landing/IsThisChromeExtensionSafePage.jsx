@@ -78,11 +78,11 @@ const IsThisChromeExtensionSafePage = () => {
       />
       <div className="compare-page">
         <div className="compare-container">
-          {/* <div className="compare-back-wrapper"> */}
+          <div className="compare-back-wrapper">
           <button type="button" className="compare-back" onClick={() => navigate(-1)}>
             ← Back
           </button>
-          {/* </div> */}
+          </div>
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Link to="/">Home</Link>
             <span aria-hidden>/</span>
