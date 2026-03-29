@@ -20,7 +20,7 @@ export const topNavItems = [
       {
         icon: "🔍",
         label: "Risk Check (Free)",
-        description: "Chrome Web Store URL or ID",
+        description: "Paste a Chrome Web Store link",
         path: "/scan"
       },
       {

@@ -147,10 +147,10 @@ const HomePage = () => {
     "applicationCategory": "SecurityApplication",
     "operatingSystem": "Web",
     "offers": [
-      { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free public extension scan by URL or ID" },
+      { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free public extension scan by URL" },
       { "@type": "Offer", "description": "Pro: private CRX/ZIP security audit and vulnerability scan" }
     ],
-    "description": "Chrome extension security scanner. Scan by URL/ID for free. Upload private CRX/ZIP for pre-release security audit, vulnerability scanning, and fix suggestions.",
+    "description": "Chrome extension security scanner. Scan by URL for free. Upload private CRX/ZIP for pre-release security audit, vulnerability scanning, and fix suggestions.",
     "url": "https://extensionshield.com/scan"
   };
 
@@ -181,7 +181,7 @@ const HomePage = () => {
       {
         "@type": "Question",
         "name": "Is the Chrome extension scanner free?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Our free extension scanner lets you scan any Chrome extension by Web Store URL or extension ID. Private CRX/ZIP upload and audit are available on Pro for developers." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Our free extension scanner lets you scan any Chrome extension by Web Store URL. Private CRX/ZIP upload and audit are available on Pro for developers." }
       }
     ]
   };
