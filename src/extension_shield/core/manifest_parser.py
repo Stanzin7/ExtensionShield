@@ -194,42 +194,65 @@ class ManifestParser:
         return js_files
 
     @staticmethod
-    def get_dangerous_permissions(manifest_data: dict) -> List[str]:
+    def get_dangerous_permissions(self, manifest_data: dict) -> List[str]:
         """
         Get list of potentially dangerous permissions
-
-        Based on LayerX whitepaper examples
         """
         dangerous = []
 
-        all_permissions = manifest_data.get("permissions", []) + manifest_data.get(
-            "host_permissions", []
+        # Define properly
+        all_permissions = (
+            manifest_data.get("permissions", []) +
+            manifest_data.get("host_permissions", [])
         )
 
         # Known dangerous permissions
         dangerous_list = [
-            "cookies",  # Can steal session cookies
-            "webRequest",  # Can intercept/modify requests
+            "cookies",
+            "webRequest",
             "webRequestBlocking",
-            "proxy",  # Can route traffic through attacker
-            "debugger",  # Full control over tabs
+            "proxy",
+            "debugger",
             "declarativeNetRequest",
-            "management",  # Can control other extensions
-            "nativeMessaging",  # Can communicate with native apps
-            "pageCapture",  # Can capture full page content
-            "privacy",  # Can modify privacy settings
-            "system.storage",  # Access to storage devices
-            "<all_urls>",  # Access to all websites
-            "*://*/*",  # Access to all websites
-            "http://*/*",  # Access to all HTTP sites
-            "https://*/*",  # Access to all HTTPS sites
+            "management",
+            "nativeMessaging",
+            "pageCapture",
+            "privacy",
+            "system.storage",
+            "<all_urls>",
+            "*://*/*",
+            "http://*/*",
+            "https://*/*",
         ]
 
+        # Check normal permissions
         for perm in all_permissions:
             if perm in dangerous_list:
                 dangerous.append(perm)
 
-        return dangerous
+        # Include dangerous content script match patterns (e.g., <all_urls>)
+        dangerous += self.get_dangerous_content_script_matches(manifest_data)
+
+        return sorted(set(dangerous))  # remove duplicates
+    
+
+    def get_dangerous_content_script_matches(self, manifest_data: dict) -> List[str]:
+        """
+        Detect dangerous content script match patterns such as <all_urls> or *://*/*,
+        which indicate the extension can inject scripts into all websites.
+        """
+        dangerous_patterns = {"<all_urls>", "*://*/*"}
+        found = set()
+
+        content_scripts = manifest_data.get("content_scripts", [])
+
+        for script in content_scripts:
+            for match in script.get("matches", []):
+                if match in dangerous_patterns:
+                    found.add(match)
+
+        return sorted(found)
+    
 
     def _load_messages(self, raw_manifest: dict) -> Dict[str, str]:
         """Load _locales messages. Try default_locale, then 'en', then first available."""
