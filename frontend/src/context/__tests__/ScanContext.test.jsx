@@ -42,6 +42,7 @@ const TEST_URL =
   "https://chromewebstore.google.com/detail/test/abcdefghijklmnopabcdefghijklmnop";
 const TEST_EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
 
+// Covers the cached-result path that must still write user history for signed-in scans.
 function TriggerScanButton() {
   const { startScan } = useScan();
 
