@@ -257,3 +257,220 @@ rules:
           postMessage\s*\([^,]+,\s*["']https?://[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}[^\s"\'`)]*["']
       - pattern-regex: |
           navigator\.sendBeacon\s*\(\s*["']https?://[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}[^\s"\'`)]*["']
+# =========================
+# CRITICAL: Code Execution
+# =========================
+
+  - id: no-eval
+    pattern: eval(...)
+    message: "Avoid eval() - possible code injection"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: new-function
+    pattern: new Function(...)
+    message: "Dynamic code execution via Function constructor"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: settimeout-string
+    pattern: setTimeout("...", ...)
+    message: "setTimeout with string is dangerous"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: setinterval-string
+    pattern: setInterval("...", ...)
+    message: "setInterval with string is dangerous"
+    severity: WARNING
+    languages: [javascript]
+# =========================
+#  Network / Remote Code
+# =========================
+
+  - id: dynamic-import-remote
+    pattern: import($URL)
+    message: "Dynamic import detected - possible remote code execution"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: remote-fetch
+    pattern: fetch($URL)
+    message: "External network call detected"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: xhr-usage
+    pattern: new XMLHttpRequest()
+    message: "XHR usage detected - possible data exfiltration"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: post-data-exfiltration
+    pattern: fetch($URL, {method: "POST", ...})
+    message: "POST request - possible data exfiltration"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: hardcoded-external-url
+    pattern: '"http://$DOMAIN/..."'
+    message: "Hardcoded external HTTP URL"
+    severity: WARNING
+    languages: [javascript]
+# =========================
+# 🧬 Obfuscation / Encoding
+# =========================
+
+  - id: base64-decode
+    pattern: atob(...)
+    message: "Base64 decoding detected - possible obfuscation"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: encoded-eval
+    pattern: eval(atob(...))
+    message: "Obfuscated eval detected"
+    severity: ERROR
+    languages: [javascript]
+# =========================
+# 💉 Script Injection
+# =========================
+
+  - id: execute-script
+    pattern-either:
+      - pattern: chrome.tabs.executeScript(...)
+      - pattern: chrome.scripting.executeScript(...)
+    message: "Script injection capability detected"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: script-injection
+    pattern: document.createElement("script")
+    message: "Dynamic script injection detected"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: append-script
+    pattern: |
+      $X = document.createElement("script");
+      $X.src = $URL;
+    message: "Injecting external script into DOM"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: innerhtml-script
+    pattern: element.innerHTML = $X
+    message: "innerHTML used - possible injection"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: document-write
+    pattern: document.write(...)
+    message: "document.write is dangerous"
+    severity: ERROR
+    languages: [javascript]
+
+  # =========================
+  # Data Access / Privacy
+  # =========================
+
+  - id: chrome-cookies-access
+    pattern: chrome.cookies.getAll(...)
+    message: "Accessing cookies - sensitive data"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: chrome-history-access
+    pattern: chrome.history.search(...)
+    message: "Accessing browsing history"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: chrome-tabs-query
+    pattern: chrome.tabs.query(...)
+    message: "Accessing user tabs"
+    severity: WARNING
+    languages: [javascript]
+
+  - id: chrome-storage
+    pattern: chrome.storage.local.get(...)
+    message: "Accessing stored data"
+    severity: WARNING
+    languages: [javascript]
+
+  # =========================
+  # Dangerous Chrome APIs
+  # =========================
+
+  - id: webrequest-interception
+    pattern: chrome.webRequest.onBeforeRequest.addListener(...)
+    message: "Intercepting network requests"
+    severity: ERROR
+    languages: [javascript]
+
+  # =========================
+  # Tracking / Fingerprinting
+  # =========================
+
+  - id: localstorage-tracking
+    pattern: localStorage.setItem(...)
+    message: "Possible tracking via localStorage"
+    severity: INFO
+    languages: [javascript]
+
+  - id: navigator-fingerprint
+    pattern: navigator.userAgent
+    message: "User fingerprinting detected"
+    severity: INFO
+    languages: [javascript]
+
+  # =========================
+  # ⏱ Suspicious Behavior
+  # =========================
+
+  - id: suspicious-interval
+    pattern: setInterval(...)
+    message: "Repeated execution detected"
+    severity: INFO
+    languages: [javascript]
+
+  # =========================
+  # 🔗 Advanced Pattern Chains
+  # =========================
+
+  - id: eval-network-response
+    pattern: |
+      $X = fetch(...);
+      eval($X)
+    message: "Evaluating network response"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: remote-code-chain
+    patterns:
+      - pattern: fetch($URL)
+      - pattern: eval(...)
+    message: "Remote code execution chain detected"
+    severity: ERROR
+    languages: [javascript]
+
+  - id: execute-script-risk
+    pattern: chrome.scripting.executeScript(...)
+    message: "Script injection capability - high risk with all_urls"
+    severity: ERROR
+    languages: [javascript]
+    - id: chrome-all-urls
+      pattern: '"<all_urls>"'
+      message: "Extension has access to all URLs"
+      severity: WARNING
+      languages: [json]
+    - id: chrome-webrequest-blocking
+      pattern: '"webRequestBlocking"'
+      message: "Can intercept and modify requests"
+      severity: ERROR
+      languages: [json]
+    - id: chrome-file-access
+      pattern: '"file:///*"'
+      message: "Access to local files"
+      severity: ERROR
+      languages: [json]

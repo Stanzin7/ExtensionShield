@@ -85,11 +85,22 @@ def extract_extension_id_by_url(url):
 def calculate_file_hash(file_path: str) -> Optional[str]:
     """Calculate SHA256 hash of downloaded file"""
     try:
+        if not os.path.exists(file_path):
+            logger.warning("File does not exist: %s", file_path)
+            return None
+
+        if not os.path.isfile(file_path):
+            logger.warning("Skipping hash, not a file: %s", file_path)
+            return None
+
         sha256_hash = hashlib.sha256()
+
         with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
+            for chunk in iter(lambda: f.read(65536), b""):  # 64KB chunks
                 sha256_hash.update(chunk)
+
         return sha256_hash.hexdigest()
+
     except Exception as exc:
         logger.error("Error calculating file hash: %s", exc)
         return None
