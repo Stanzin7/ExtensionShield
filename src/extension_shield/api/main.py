@@ -6,6 +6,7 @@ and retrieve results.
 """
 
 import base64
+import hmac
 import mimetypes
 import os
 from pathlib import Path
@@ -469,7 +470,7 @@ def _require_admin_key(request: Request) -> None:
             detail="X-Admin-Key header is required"
         )
     
-    if provided_key != admin_key:
+    if not hmac.compare_digest(str(provided_key), str(admin_key)):
         raise HTTPException(
             status_code=403,
             detail="Invalid admin API key"
@@ -496,7 +497,11 @@ def _require_admin_or_telemetry_key(request: Request) -> None:
             status_code=403,
             detail="X-Admin-Key header is required"
         )
-    valid = (admin_key and provided == admin_key) or (telemetry_key and provided == telemetry_key)
+    valid = (
+        bool(admin_key) and hmac.compare_digest(str(provided), str(admin_key))
+    ) or (
+        bool(telemetry_key) and hmac.compare_digest(str(provided), str(telemetry_key))
+    )
     if not valid:
         raise HTTPException(
             status_code=403,
