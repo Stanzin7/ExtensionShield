@@ -53,13 +53,7 @@
 .blog-index-link:hover,
 .blog-index-link:focus-visible {
   opacity: 0.9;
-  border-color: var(--theme-accent, #6366f1);
-}
-
-.blog-index-link:focus-visible {
-  outline: 2px solid var(--theme-accent, #6366f1);
-  outline-offset: 4px;
-  border-radius: 6px;
+  text-decoration-line: underline;
 }
 
 .blog-index-link strong {
