@@ -1,5 +1,16 @@
 {
+  "name": "my-vscode-extension",
+  "displayName": "My VS Code Extension",
+  "description": "VS Code extension for this project.",
+  "version": "0.0.1",
+  "publisher": "your-publisher-id",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
   "main": "out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "scripts": {
     "compile": "tsc -p ./",
     "deploy": "./scripts/deploy.sh",
