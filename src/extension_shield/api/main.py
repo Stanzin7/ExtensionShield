@@ -43,6 +43,7 @@ from extension_shield.workflow.graph import build_graph
 from extension_shield.workflow.state import WorkflowState, WorkflowStatus
 from extension_shield.api.database import db, SupabaseDatabase, _is_extension_id
 from extension_shield.api.supabase_auth import get_current_user_id as _get_current_user_id
+from extension_shield.api.auth_identity import get_user_id as _get_user_id
 from extension_shield.core.config import get_settings
 from extension_shield.utils.mode import require_cloud, get_feature_flags, is_oss_telemetry_allowed, require_cloud_dep
 from extension_shield.api.csp_middleware import CSPMiddleware
@@ -383,25 +384,6 @@ DAILY_DEEP_SCAN_LIMIT = 3  # authenticated users
 ANONYMOUS_DAILY_DEEP_SCAN_LIMIT = 1  # anonymous (IP-based) users – after 1 scan, prompt login
 # deep_scan_usage[user_id][YYYY-MM-DD] = used_count
 deep_scan_usage: Dict[str, Dict[str, int]] = {}
-
-
-def _get_user_id(request: Request) -> str:
-    """
-    Best-effort user identifier.
-
-    Prefer Supabase-authenticated user_id (JWT `sub`) when available.
-    If absent, allow an optional `X-User-Id` header for local/dev usage.
-    No IP-based fallback (privacy-first).
-    """
-    state_user = getattr(getattr(request, "state", None), "user_id", None)
-    if state_user:
-        return str(state_user)
-
-    header_user = request.headers.get("x-user-id") or request.headers.get("X-User-Id")
-    if header_user:
-        return header_user.strip()
-
-    return "anon"
 
 
 def _get_client_ip(request: Request) -> str:
