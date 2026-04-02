@@ -6,6 +6,7 @@ and retrieve results.
 """
 
 import base64
+import hmac
 import mimetypes
 import os
 from pathlib import Path
@@ -43,6 +44,10 @@ from extension_shield.workflow.graph import build_graph
 from extension_shield.workflow.state import WorkflowState, WorkflowStatus
 from extension_shield.api.database import db, SupabaseDatabase, _is_extension_id
 from extension_shield.api.supabase_auth import get_current_user_id as _get_current_user_id
+from extension_shield.api.auth_identity import (
+    can_view_private_scan,
+    get_user_id as _get_user_id,
+)
 from extension_shield.core.config import get_settings
 from extension_shield.utils.mode import require_cloud, get_feature_flags, is_oss_telemetry_allowed, require_cloud_dep
 from extension_shield.api.csp_middleware import CSPMiddleware
@@ -385,25 +390,6 @@ ANONYMOUS_DAILY_DEEP_SCAN_LIMIT = 1  # anonymous (IP-based) users – after 1 sc
 deep_scan_usage: Dict[str, Dict[str, int]] = {}
 
 
-def _get_user_id(request: Request) -> str:
-    """
-    Best-effort user identifier.
-
-    Prefer Supabase-authenticated user_id (JWT `sub`) when available.
-    If absent, allow an optional `X-User-Id` header for local/dev usage.
-    No IP-based fallback (privacy-first).
-    """
-    state_user = getattr(getattr(request, "state", None), "user_id", None)
-    if state_user:
-        return str(state_user)
-
-    header_user = request.headers.get("x-user-id") or request.headers.get("X-User-Id")
-    if header_user:
-        return header_user.strip()
-
-    return "anon"
-
-
 def _get_client_ip(request: Request) -> str:
     """
     Get the client's IP address for rate limiting anonymous users.
@@ -469,7 +455,7 @@ def _require_admin_key(request: Request) -> None:
             detail="X-Admin-Key header is required"
         )
     
-    if provided_key != admin_key:
+    if not hmac.compare_digest(str(provided_key), str(admin_key)):
         raise HTTPException(
             status_code=403,
             detail="Invalid admin API key"
@@ -496,7 +482,11 @@ def _require_admin_or_telemetry_key(request: Request) -> None:
             status_code=403,
             detail="X-Admin-Key header is required"
         )
-    valid = (admin_key and provided == admin_key) or (telemetry_key and provided == telemetry_key)
+    valid = (
+        bool(admin_key) and hmac.compare_digest(str(provided), str(admin_key))
+    ) or (
+        bool(telemetry_key) and hmac.compare_digest(str(provided), str(telemetry_key))
+    )
     if not valid:
         raise HTTPException(
             status_code=403,
@@ -3038,6 +3028,9 @@ async def get_file_list(extension_id: str, http_request: Request) -> FileListRes
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
 
+    if not can_view_private_scan(user_id, results):
+        raise HTTPException(status_code=404, detail="File not found")
+
     extracted_path = results.get("extracted_path")
     if not extracted_path or not os.path.exists(extracted_path):
         raise HTTPException(status_code=404, detail="Extracted files not found")
@@ -3068,6 +3061,9 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     results = scan_results.get(extension_id)
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    if not can_view_private_scan(user_id, results):
+        raise HTTPException(status_code=404, detail="File not found")
 
     extracted_path = results.get("extracted_path")
     if not extracted_path:
