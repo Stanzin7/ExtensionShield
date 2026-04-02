@@ -153,11 +153,10 @@
   function handleScanUrlSubmit() {
     var raw = scanUrlInput && scanUrlInput.value ? scanUrlInput.value.trim() : '';
     var extId = extractExtensionIdFromInput(raw);
-    if (!extId) {
-      setScanUrlMessage('Enter a Chrome Web Store URL.', 'error');
-      return;
-    }
-
+  if (!extId) {
+  setScanUrlMessage('Please enter a valid Chrome Web Store URL or Extension ID.', 'error');
+  return;
+}
     setScanUrlMessage('Scanning…', '');
     setScanSearchLoading(true);
     if (scanResultsContent) scanResultsContent.hidden = true;
@@ -275,11 +274,16 @@
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
-  function esc(s) {
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  try {
     var d = document.createElement('div');
-    d.textContent = s;
+    d.textContent = String(s);
     return d.innerHTML;
+  } catch (e) {
+    return '';
   }
+}
 
   function getIconUrl(ext) {
     var icons = ext && ext.icons;
@@ -619,34 +623,37 @@
     }
   }
 
-  function scan(force) {
-    showStatus('Getting extensions…');
+ function scan(force) {
+  showStatus('Getting extensions…');
 
-    chrome.runtime.sendMessage({ action: 'getAllExtensions' }, function (all) {
+  try {
+    chrome.management.getAll(function (all) {
       if (chrome.runtime.lastError || !all) {
-        chrome.management.getAll(function (fallbackAll) {
-          if (chrome.runtime.lastError) {
-            hideStatus();
-            showError('Cannot access extensions: ' + (chrome.runtime.lastError.message || 'unknown'));
-            return;
-          }
-          var selfId = chrome.runtime.id;
-          var filtered = [];
-          for (var j = 0; j < fallbackAll.length; j++) {
-            if (fallbackAll[j].type === 'extension' && fallbackAll[j].id !== selfId && fallbackAll[j].enabled) filtered.push(fallbackAll[j]);
-          }
-          runScanWithExtensions(filtered, force);
-        });
+        hideStatus();
+        showError('Cannot access extensions');
         return;
       }
 
+      var selfId = chrome.runtime.id;
       var exts = [];
+
       for (var i = 0; i < all.length; i++) {
-        if (all[i].enabled) exts.push(all[i]);
+        if (
+          all[i].type === 'extension' &&
+          all[i].id !== selfId &&
+          all[i].enabled
+        ) {
+          exts.push(all[i]);
+        }
       }
+
       runScanWithExtensions(exts, force);
     });
+  } catch (e) {
+    hideStatus();
+    showError('Unexpected error while scanning');
   }
+}
 
   function runScanWithExtensions(exts, force) {
     if (!exts || exts.length === 0) {
