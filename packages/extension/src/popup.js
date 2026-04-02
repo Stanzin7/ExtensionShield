@@ -159,6 +159,9 @@
 }
     setScanUrlMessage('Scanning…', '');
     setScanSearchLoading(true);
+    if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = true;
+}
     if (scanResultsContent) scanResultsContent.hidden = true;
 
     renderScanResult({
@@ -176,6 +179,9 @@
         renderScanResult(result);
         setScanUrlMessage('', '');
         setScanSearchLoading(false);
+        if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
         return;
       }
 
@@ -185,6 +191,9 @@
           if (triggerResult.status === 'error') {
             setScanUrlMessage('Could not start scan. Try on the website.', 'error');
             setScanSearchLoading(false);
+            if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
             return;
           }
           if (triggerResult.status === 'completed' || triggerResult.already_scanned) {
@@ -193,11 +202,17 @@
               renderScanResult(result);
               setScanUrlMessage('', '');
               setScanSearchLoading(false);
+              if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
             });
           }
           setScanUrlMessage('Scan in progress…', '');
           return waitForScan(extId).then(function (p2) {
             setScanSearchLoading(false);
+            if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
             if (p2._st === 'timeout') {
               setScanUrlMessage('Scan is taking longer. Check again soon.', 'error');
               renderScanResult({
@@ -220,9 +235,15 @@
 
       setScanUrlMessage('Could not fetch results.', 'error');
       setScanSearchLoading(false);
+      if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
     }).catch(function () {
       setScanUrlMessage('Network error. Check your connection.', 'error');
       setScanSearchLoading(false);
+      if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
     });
   }
 
