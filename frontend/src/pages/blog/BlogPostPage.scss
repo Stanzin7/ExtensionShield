@@ -47,10 +47,11 @@
   border-bottom: 1px solid var(--theme-border, rgba(148, 163, 184, 0.2));
   text-decoration: none;
   color: inherit;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, border-color 0.2s ease;
 }
 
-.blog-index-link:hover {
+.blog-index-link:hover,
+.blog-index-link:focus-visible {
   opacity: 0.9;
   text-decoration-line: underline;
 }
@@ -60,6 +61,17 @@
   font-size: 1.05rem;
   margin-bottom: 0.35rem;
   color: var(--theme-accent, #6366f1);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.blog-index-link:hover strong,
+.blog-index-link:focus-visible strong {
+  color: var(--theme-text-primary);
+  text-decoration-color: currentColor;
 }
 
 .blog-index-meta {

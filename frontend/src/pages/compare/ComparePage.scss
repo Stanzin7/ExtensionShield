@@ -14,8 +14,14 @@
   text-align: center;
 }
 
+.compare-back-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
 .compare-back {
-  display: inline-block;
+  display: block;
   background: none;
   border: none;
   color: var(--theme-text-secondary);
@@ -106,7 +112,8 @@
   border: none;
   cursor: pointer;
   font-family: inherit;
-  transition: opacity 0.2s ease, transform 0.15s ease;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+  transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .compare-cta a:hover, 
