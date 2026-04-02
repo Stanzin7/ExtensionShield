@@ -43,7 +43,10 @@ from extension_shield.workflow.graph import build_graph
 from extension_shield.workflow.state import WorkflowState, WorkflowStatus
 from extension_shield.api.database import db, SupabaseDatabase, _is_extension_id
 from extension_shield.api.supabase_auth import get_current_user_id as _get_current_user_id
-from extension_shield.api.auth_identity import get_user_id as _get_user_id
+from extension_shield.api.auth_identity import (
+    can_view_private_scan,
+    get_user_id as _get_user_id,
+)
 from extension_shield.core.config import get_settings
 from extension_shield.utils.mode import require_cloud, get_feature_flags, is_oss_telemetry_allowed, require_cloud_dep
 from extension_shield.api.csp_middleware import CSPMiddleware
@@ -3020,6 +3023,9 @@ async def get_file_list(extension_id: str, http_request: Request) -> FileListRes
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
 
+    if not can_view_private_scan(user_id, results):
+        raise HTTPException(status_code=404, detail="File not found")
+
     extracted_path = results.get("extracted_path")
     if not extracted_path or not os.path.exists(extracted_path):
         raise HTTPException(status_code=404, detail="Extracted files not found")
@@ -3050,6 +3056,9 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     results = scan_results.get(extension_id)
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    if not can_view_private_scan(user_id, results):
+        raise HTTPException(status_code=404, detail="File not found")
 
     extracted_path = results.get("extracted_path")
     if not extracted_path:
