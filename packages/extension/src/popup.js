@@ -153,11 +153,10 @@
   function handleScanUrlSubmit() {
     var raw = scanUrlInput && scanUrlInput.value ? scanUrlInput.value.trim() : '';
     var extId = extractExtensionIdFromInput(raw);
-    if (!extId) {
-      setScanUrlMessage('Enter a Chrome Web Store URL.', 'error');
-      return;
-    }
-
+  if (!extId) {
+  setScanUrlMessage('Please enter a valid Chrome Web Store URL or Extension ID.', 'error');
+  return;
+}
     setScanUrlMessage('Scanning…', '');
     setScanSearchLoading(true);
     if (scanResultsContent) scanResultsContent.hidden = true;
