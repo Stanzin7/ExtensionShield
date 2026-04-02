@@ -274,11 +274,16 @@
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
-  function esc(s) {
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  try {
     var d = document.createElement('div');
-    d.textContent = s;
+    d.textContent = String(s);
     return d.innerHTML;
+  } catch (e) {
+    return '';
   }
+}
 
   function getIconUrl(ext) {
     var icons = ext && ext.icons;
