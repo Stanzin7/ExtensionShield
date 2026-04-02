@@ -1,5 +1,7 @@
 {
+  "main": "out/extension.js",
   "scripts": {
+    "compile": "tsc -p ./",
     "deploy": "./scripts/deploy.sh",
     "supabase": "supabase",
     "db:diff": "supabase db diff",
@@ -13,8 +15,11 @@
     "resend:test": "node scripts/send-resend-test-email.mjs"
   },
   "devDependencies": {
+    "@types/node": "^24.12.0",
+    "@types/vscode": "^1.110.0",
     "dotenv": "^16.4.5",
     "resend": "^4.0.0",
-    "supabase": "^2.75.5"
+    "supabase": "^2.75.5",
+    "typescript": "^5.9.3"
   }
 }
