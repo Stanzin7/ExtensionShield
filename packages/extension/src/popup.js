@@ -1,6 +1,7 @@
 /* ExtensionShield – popup (self-contained, no service worker needed) */
 (function () {
   'use strict';
+  document.addEventListener("DOMContentLoaded", () => {
 
   var API = 'https://extensionshield.com';
   var CACHE_TTL = 6 * 3600 * 1000;
@@ -759,6 +760,7 @@ function esc(s) {
       nextExt();
   }
 
-  initTheme();
-  scan(false);
+ initTheme();
+scan(false);
+});
 })();
