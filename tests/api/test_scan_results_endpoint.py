@@ -95,3 +95,33 @@ class TestGetScanResultsUpgrade:
       assert isinstance(rvm["consumer_insights"], dict)
 
 
+def test_scan_file_blocks_path_traversal(client: TestClient, tmp_path) -> None:
+  """/api/scan/file should block traversal outside extracted root."""
+  extension_id = "pathtraversaltest1234567890123456"
+
+  extracted_dir = tmp_path / "extracted"
+  extracted_dir.mkdir()
+  inside_file = extracted_dir / "manifest.json"
+  inside_file.write_text('{"name": "safe"}', encoding="utf-8")
+
+  outside_file = tmp_path / "outside.txt"
+  outside_file.write_text("secret", encoding="utf-8")
+
+  scan_results[extension_id] = {
+    "extension_id": extension_id,
+    "status": "completed",
+    "visibility": "public",
+    "extracted_path": str(extracted_dir),
+  }
+
+  try:
+    ok = client.get(f"/api/scan/file/{extension_id}/manifest.json")
+    assert ok.status_code == 200
+    assert "safe" in ok.json()["content"]
+
+    blocked = client.get(f"/api/scan/file/{extension_id}/../outside.txt")
+    assert blocked.status_code == 403
+  finally:
+    scan_results.pop(extension_id, None)
+
+

@@ -3100,18 +3100,37 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     if not extracted_path:
         raise HTTPException(status_code=404, detail="Extracted files not found")
 
-    # Construct full file path
-    full_path = os.path.join(extracted_path, file_path)
+    # Resolve extracted root path (handles relative paths stored in DB).
+    extracted_root = Path(extracted_path)
+    if not extracted_root.is_absolute():
+        extracted_root = Path(get_settings().extension_storage_path) / extracted_root
 
-    # Security check: ensure path is within extracted directory
-    if not os.path.abspath(full_path).startswith(os.path.abspath(extracted_path)):
-        raise HTTPException(status_code=403, detail="Access denied")
+    try:
+        extracted_root = extracted_root.resolve(strict=True)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Extracted files not found")
 
-    if not os.path.exists(full_path):
+    if not extracted_root.is_dir():
+        raise HTTPException(status_code=404, detail="Extracted files not found")
+
+    # Resolve requested path and ensure it stays inside extracted root.
+    try:
+        candidate_path = (extracted_root / file_path).resolve(strict=True)
+    except Exception:
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        with open(full_path, "r", encoding="utf-8") as f:
+        in_root = os.path.commonpath([str(extracted_root), str(candidate_path)]) == str(extracted_root)
+    except Exception:
+        in_root = False
+    if not in_root:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not candidate_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        with open(candidate_path, "r", encoding="utf-8") as f:
             content = f.read()
         return FileContentResponse(content=content, file_path=file_path)
     except UnicodeDecodeError as exc:
