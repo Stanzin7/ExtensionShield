@@ -520,7 +520,7 @@ const ScannerPage = () => {
         "name": "Is there a free Chrome extension scanner?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. ExtensionShield offers a free extension scanner: paste any Chrome Web Store URL or extension ID to get an instant security audit, risk score, permissions check, and malware scan—no signup required."
+          "text": "Yes. ExtensionShield offers a free extension scanner: paste any Chrome Web Store URL to get an instant security audit, risk score, permissions check, and malware scan—no signup required."
         }
       },
       {
@@ -528,7 +528,7 @@ const ScannerPage = () => {
         "name": "Can I scan extensions before installing them?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes! ExtensionShield allows you to scan any Chrome extension from the Chrome Web Store before installing it. Simply paste the extension URL or Chrome Web Store ID to get an instant security analysis."
+          "text": "Yes! ExtensionShield allows you to scan any Chrome extension from the Chrome Web Store before installing it. Simply paste the Chrome Web Store URL to get an instant security analysis."
         }
       },
       {
