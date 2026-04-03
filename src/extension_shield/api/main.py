@@ -1105,6 +1105,38 @@ def _extension_icon_file_response(icon_file_path: str) -> FileResponse:
     )
 
 
+def _resolve_extracted_root_path(extracted_path: Optional[str]) -> Optional[Path]:
+    """Resolve extracted root path safely, including relative storage paths."""
+    if not extracted_path:
+        return None
+    root = Path(extracted_path)
+    if not root.is_absolute():
+        root = Path(get_settings().extension_storage_path) / root
+    try:
+        root = root.resolve(strict=True)
+    except Exception:
+        return None
+    return root if root.is_dir() else None
+
+
+def _resolve_icon_candidate_path(extracted_root: Path, icon_path: str) -> Optional[Path]:
+    """Resolve icon candidate and ensure it remains within extracted root."""
+    candidate = Path(icon_path)
+    if not candidate.is_absolute():
+        candidate = extracted_root / candidate
+    try:
+        resolved = candidate.resolve(strict=True)
+    except Exception:
+        return None
+    try:
+        in_root = os.path.commonpath([str(extracted_root), str(resolved)]) == str(extracted_root)
+    except Exception:
+        in_root = False
+    if not in_root or not resolved.is_file():
+        return None
+    return resolved
+
+
 def _load_icon_record_from_db(extension_id: str) -> Dict[str, Optional[str]]:
     """
     Load icon-related fields for an extension from DB.
@@ -1157,21 +1189,16 @@ def _extract_icon_blob_for_storage(
     if not icon_path or not extracted_path:
         return None, None
     try:
-        abs_extracted_path = os.path.abspath(extracted_path)
-        candidate_path = (
-            os.path.abspath(icon_path)
-            if os.path.isabs(icon_path)
-            else os.path.abspath(os.path.join(extracted_path, icon_path))
-        )
+        extracted_root = _resolve_extracted_root_path(extracted_path)
+        if not extracted_root:
+            return None, None
 
-        # Security check: icon must stay inside extracted extension dir.
-        if os.path.commonpath([abs_extracted_path, candidate_path]) != abs_extracted_path:
+        candidate = _resolve_icon_candidate_path(extracted_root, icon_path)
+        if not candidate:
             logger.warning("[ICON] Refusing out-of-bounds icon path for persistence: %s", icon_path)
             return None, None
-        if not os.path.isfile(candidate_path):
-            return None, None
 
-        with open(candidate_path, "rb") as icon_file:
+        with open(candidate, "rb") as icon_file:
             icon_bytes = icon_file.read()
         if not icon_bytes:
             return None, None
@@ -1179,12 +1206,12 @@ def _extract_icon_blob_for_storage(
             logger.warning(
                 "[ICON] Skipping icon persistence for oversized icon (%s bytes): %s",
                 len(icon_bytes),
-                candidate_path,
+                candidate,
             )
             return None, None
 
         icon_b64 = base64.b64encode(icon_bytes).decode("ascii")
-        guessed_media_type, _ = mimetypes.guess_type(candidate_path)
+        guessed_media_type, _ = mimetypes.guess_type(str(candidate))
         media_type = _normalize_image_media_type(guessed_media_type)
         return icon_b64, media_type
     except Exception as exc:
@@ -3984,30 +4011,19 @@ async def get_extension_icon(extension_id: str, http_request: Request):
         logger.debug(f"[ICON] No extracted_path for {extension_id}, returning placeholder")
         return _extension_icon_placeholder_response()
     
-    # Convert to absolute path if it's relative
-    # extracted_path is relative to extension_storage_path, not RESULTS_DIR
-    if not os.path.isabs(extracted_path):
-        settings = get_settings()
-        storage_path = Path(settings.extension_storage_path)
-        # If extracted_path is just a directory name, join with storage_path
-        if os.path.basename(extracted_path) == extracted_path:
-            extracted_path = os.path.join(str(storage_path), extracted_path)
-        else:
-            # Already has path components, resolve relative to storage_path
-            extracted_path = os.path.join(str(storage_path), extracted_path)
-    
-    # Verify the path exists
-    if not os.path.exists(extracted_path):
+    extracted_root = _resolve_extracted_root_path(extracted_path)
+    if not extracted_root:
         logger.warning(f"Extracted path does not exist: {extracted_path}")
         # Try alternative: search in storage_path for matching directory
         settings = get_settings()
         storage_path = Path(settings.extension_storage_path)
         if storage_path.exists():
             # Look for directory matching the basename
-            basename = os.path.basename(extracted_path)
+            basename = os.path.basename(extracted_path) if extracted_path else ""
             for item in storage_path.iterdir():
                 if item.is_dir() and (item.name == basename or item.name.startswith(basename)):
                     extracted_path = str(item)
+                    extracted_root = _resolve_extracted_root_path(extracted_path)
                     logger.debug(f"Found extracted extension at: {extracted_path}")
                     break
             else:
@@ -4024,26 +4040,30 @@ async def get_extension_icon(extension_id: str, http_request: Request):
                 return persisted_response
             logger.debug(f"[ICON] Storage path missing for {extension_id}, returning placeholder")
             return _extension_icon_placeholder_response()
+
+    if not extracted_root:
+        persisted_response = _persisted_icon_response()
+        if persisted_response:
+            logger.debug("[ICON] Served persisted icon blob for %s", extension_id)
+            return persisted_response
+        logger.debug(f"[ICON] Extracted root unresolved for {extension_id}, returning placeholder")
+        return _extension_icon_placeholder_response()
     
-    logger.debug(f"[ICON] extracted_path={extracted_path}, icon_path={icon_path}")
+    logger.debug(f"[ICON] extracted_path={extracted_root}, icon_path={icon_path}")
     
     # First, try using icon_path from database if available
     if icon_path:
-        full_icon_path = os.path.join(extracted_path, icon_path)
-        # Security check: ensure icon_path is within extracted_path
-        abs_icon_path = os.path.abspath(full_icon_path)
-        abs_extracted_path = os.path.abspath(extracted_path)
-        
-        logger.debug(f"[ICON] Trying stored icon_path: {full_icon_path}")
-        if abs_icon_path.startswith(abs_extracted_path) and os.path.exists(full_icon_path):
-            logger.info(f"[ICON] Found icon using stored icon_path: {full_icon_path}")
-            return _extension_icon_file_response(full_icon_path)
+        candidate = _resolve_icon_candidate_path(extracted_root, icon_path)
+        logger.debug(f"[ICON] Trying stored icon_path: {icon_path}")
+        if candidate:
+            logger.info(f"[ICON] Found icon using stored icon_path: {candidate}")
+            return _extension_icon_file_response(str(candidate))
         else:
-            logger.warning(f"[ICON] Stored icon_path {icon_path} not found at {full_icon_path}, falling back to search")
+            logger.warning(f"[ICON] Stored icon_path {icon_path} is invalid or out of bounds, falling back to search")
     
     # Fallback: Try common icon sizes in order of preference
     icon_sizes = ["128", "64", "48", "32", "16", "96", "256"]
-    icons_dir = os.path.join(extracted_path, "icons")
+    icons_dir = os.path.join(str(extracted_root), "icons")
     
     # First try icons directory
     if os.path.exists(icons_dir):
@@ -4055,18 +4075,18 @@ async def get_extension_icon(extension_id: str, http_request: Request):
     
     # Try root directory
     for size in icon_sizes:
-        test_icon_path = os.path.join(extracted_path, f"icon{size}.png")
+        test_icon_path = os.path.join(str(extracted_root), f"icon{size}.png")
         if os.path.exists(test_icon_path):
             logger.debug(f"Found icon at: {test_icon_path}")
             return _extension_icon_file_response(test_icon_path)
         
-        test_icon_path = os.path.join(extracted_path, f"{size}.png")
+        test_icon_path = os.path.join(str(extracted_root), f"{size}.png")
         if os.path.exists(test_icon_path):
             logger.debug(f"Found icon at: {test_icon_path}")
             return _extension_icon_file_response(test_icon_path)
     
     # Try images directory (common for many extensions)
-    images_dir = os.path.join(extracted_path, "images")
+    images_dir = os.path.join(str(extracted_root), "images")
     if os.path.exists(images_dir):
         # Look for icon files in images directory
         for icon_name in ["icon128.png", "icon.png", "icon64.png", "icon48.png", "icon32.png", "icon16.png", "logo.png"]:
@@ -4076,7 +4096,7 @@ async def get_extension_icon(extension_id: str, http_request: Request):
                 return _extension_icon_file_response(icon_path)
     
     # Try checking manifest for icon paths
-    manifest_path = os.path.join(extracted_path, "manifest.json")
+    manifest_path = os.path.join(str(extracted_root), "manifest.json")
     if os.path.exists(manifest_path):
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
@@ -4088,16 +4108,11 @@ async def get_extension_icon(extension_id: str, http_request: Request):
                 # Get the largest icon
                 largest_size = max(manifest_icons.keys(), key=lambda x: int(x))
                 icon_rel_path = manifest_icons[largest_size]
-                manifest_icon_path = os.path.join(extracted_path, icon_rel_path)
-                
-                # Security check
-                abs_icon_path = os.path.abspath(manifest_icon_path)
-                abs_extracted_path = os.path.abspath(extracted_path)
-                
-                if abs_icon_path.startswith(abs_extracted_path):
-                    if os.path.exists(manifest_icon_path):
+                if isinstance(icon_rel_path, str):
+                    manifest_icon_path = _resolve_icon_candidate_path(extracted_root, icon_rel_path)
+                    if manifest_icon_path:
                         logger.debug(f"Found icon from manifest at: {manifest_icon_path}")
-                        return _extension_icon_file_response(manifest_icon_path)
+                        return _extension_icon_file_response(str(manifest_icon_path))
         except Exception as e:
             logger.warning(f"Failed to read manifest for icons: {e}")
     

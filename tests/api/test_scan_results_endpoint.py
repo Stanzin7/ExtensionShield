@@ -125,3 +125,36 @@ def test_scan_file_blocks_path_traversal(client: TestClient, tmp_path) -> None:
     scan_results.pop(extension_id, None)
 
 
+def test_scan_icon_blocks_manifest_path_escape(client: TestClient, tmp_path) -> None:
+  """/api/scan/icon should not serve out-of-root files via manifest icon path."""
+  extension_id = "iconpathtest1234567890123456789012"
+
+  extracted_dir = tmp_path / "icon-extracted"
+  extracted_dir.mkdir()
+  (extracted_dir / "manifest.json").write_text(
+    '{"icons": {"128": "../../outside-secret.png"}}',
+    encoding="utf-8",
+  )
+
+  outside_file = tmp_path / "outside-secret.png"
+  outside_file.write_bytes(b"OUTSIDE_SECRET_BYTES")
+
+  scan_results[extension_id] = {
+    "extension_id": extension_id,
+    "status": "completed",
+    "visibility": "public",
+    "extracted_path": str(extracted_dir),
+    "icon_path": "../../outside-secret.png",
+    "icon_base64": None,
+    "icon_media_type": None,
+  }
+
+  try:
+    response = client.get(f"/api/scan/icon/{extension_id}")
+    assert response.status_code == 200
+    assert response.headers.get("X-Extension-Icon-Source") != "filesystem"
+    assert response.content != b"OUTSIDE_SECRET_BYTES"
+  finally:
+    scan_results.pop(extension_id, None)
+
+
