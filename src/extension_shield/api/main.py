@@ -62,6 +62,14 @@ from extension_shield.scoring.engine import ScoringEngine
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+
+def _parse_trusted_proxy_hosts() -> list[str]:
+    """Return the explicit proxy hosts allowed to send forwarded headers."""
+    raw_hosts = os.getenv("TRUSTED_PROXY_HOSTS", "").strip()
+    if raw_hosts:
+        return [host.strip() for host in raw_hosts.split(",") if host.strip()]
+    return ["127.0.0.1", "localhost", "::1"]
+
 # Import safe JSON utilities from shared module
 from extension_shield.utils.json_encoder import (
     safe_json_dumps,
@@ -361,8 +369,9 @@ else:
     print(f"✅ CSP: Production mode detected (STATIC_DIR={STATIC_DIR}, index.html exists)")
 app.add_middleware(CSPMiddleware, is_dev=_is_dev)
 
-# Trust X-Forwarded-Proto / X-Forwarded-For from Railway/Cloudflare so request.url.scheme is correct
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+# Trust forwarded headers only from explicitly allowed proxy hosts.
+# Set TRUSTED_PROXY_HOSTS to your actual reverse proxy / CDN hop(s).
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_parse_trusted_proxy_hosts())
 
 # In-memory state lives in shared.py; import references here so existing
 # code in this file (and tests) can continue using module-level names.
@@ -408,20 +417,9 @@ def _get_client_ip(request: Request) -> str:
     """
     Get the client's IP address for rate limiting anonymous users.
     
-    Handles proxied requests via X-Forwarded-For and X-Real-IP headers.
-    Falls back to client host if no headers present.
+    Relies on ProxyHeadersMiddleware to rewrite request.client only when the
+    request came from a trusted proxy host.
     """
-    # Check X-Forwarded-For header (from reverse proxy/load balancer)
-    x_forwarded_for = request.headers.get("x-forwarded-for")
-    if x_forwarded_for:
-        # Take the first IP (original client)
-        return x_forwarded_for.split(",")[0].strip()
-    
-    # Check X-Real-IP header (from nginx)
-    x_real_ip = request.headers.get("x-real-ip")
-    if x_real_ip:
-        return x_real_ip.strip()
-    
     # Fall back to direct client IP
     if request.client:
         return request.client.host
