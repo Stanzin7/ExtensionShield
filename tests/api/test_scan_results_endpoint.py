@@ -95,3 +95,66 @@ class TestGetScanResultsUpgrade:
       assert isinstance(rvm["consumer_insights"], dict)
 
 
+def test_scan_file_blocks_path_traversal(client: TestClient, tmp_path) -> None:
+  """/api/scan/file should block traversal outside extracted root."""
+  extension_id = "pathtraversaltest1234567890123456"
+
+  extracted_dir = tmp_path / "extracted"
+  extracted_dir.mkdir()
+  inside_file = extracted_dir / "manifest.json"
+  inside_file.write_text('{"name": "safe"}', encoding="utf-8")
+
+  outside_file = tmp_path / "outside.txt"
+  outside_file.write_text("secret", encoding="utf-8")
+
+  scan_results[extension_id] = {
+    "extension_id": extension_id,
+    "status": "completed",
+    "visibility": "public",
+    "extracted_path": str(extracted_dir),
+  }
+
+  try:
+    ok = client.get(f"/api/scan/file/{extension_id}/manifest.json")
+    assert ok.status_code == 200
+    assert "safe" in ok.json()["content"]
+
+    blocked = client.get(f"/api/scan/file/{extension_id}/../outside.txt")
+    assert blocked.status_code == 403
+  finally:
+    scan_results.pop(extension_id, None)
+
+
+def test_scan_icon_blocks_manifest_path_escape(client: TestClient, tmp_path) -> None:
+  """/api/scan/icon should not serve out-of-root files via manifest icon path."""
+  extension_id = "iconpathtest1234567890123456789012"
+
+  extracted_dir = tmp_path / "icon-extracted"
+  extracted_dir.mkdir()
+  (extracted_dir / "manifest.json").write_text(
+    '{"icons": {"128": "../../outside-secret.png"}}',
+    encoding="utf-8",
+  )
+
+  outside_file = tmp_path / "outside-secret.png"
+  outside_file.write_bytes(b"OUTSIDE_SECRET_BYTES")
+
+  scan_results[extension_id] = {
+    "extension_id": extension_id,
+    "status": "completed",
+    "visibility": "public",
+    "extracted_path": str(extracted_dir),
+    "icon_path": "../../outside-secret.png",
+    "icon_base64": None,
+    "icon_media_type": None,
+  }
+
+  try:
+    response = client.get(f"/api/scan/icon/{extension_id}")
+    assert response.status_code == 200
+    assert response.headers.get("X-Extension-Icon-Source") != "filesystem"
+    assert response.content != b"OUTSIDE_SECRET_BYTES"
+  finally:
+    scan_results.pop(extension_id, None)
+
+
