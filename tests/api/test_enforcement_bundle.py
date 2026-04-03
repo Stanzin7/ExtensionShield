@@ -118,6 +118,38 @@ class TestEnforcementBundleEndpoint:
         
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
+
+    def test_private_scan_artifact_requires_owner(self, client, tmp_path):
+        """Private scan artifacts should not be readable without the owning user."""
+        ext_id = "privateartifact1234567890123456"
+        extracted = tmp_path / ext_id
+        extracted.mkdir()
+
+        scan_results[ext_id] = {
+            "extension_id": ext_id,
+            "extension_name": "Private Extension",
+            "status": "completed",
+            "visibility": "private",
+            "user_id": "owner-user-1",
+            "governance_bundle": {"decision": {"verdict": "ALLOW"}},
+            "extracted_path": str(extracted),
+        }
+
+        try:
+            endpoints = [
+                f"/api/scan/enforcement_bundle/{ext_id}",
+                f"/api/scan/report/{ext_id}",
+                f"/api/scan/files/{ext_id}",
+                f"/api/scan/file/{ext_id}/manifest.json",
+                f"/api/scan/icon/{ext_id}",
+            ]
+
+            for endpoint in endpoints:
+                response = client.get(endpoint)
+                assert response.status_code == 404
+                assert "not found" in response.json()["detail"].lower()
+        finally:
+            scan_results.pop(ext_id, None)
     
     def test_get_enforcement_bundle_no_governance_data(self, client):
         """Test 404 when governance bundle not available."""
