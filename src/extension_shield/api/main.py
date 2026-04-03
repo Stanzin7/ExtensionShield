@@ -62,6 +62,14 @@ from extension_shield.scoring.engine import ScoringEngine
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+
+def _parse_trusted_proxy_hosts() -> list[str]:
+    """Return the explicit proxy hosts allowed to send forwarded headers."""
+    raw_hosts = os.getenv("TRUSTED_PROXY_HOSTS", "").strip()
+    if raw_hosts:
+        return [host.strip() for host in raw_hosts.split(",") if host.strip()]
+    return ["127.0.0.1", "localhost", "::1"]
+
 # Import safe JSON utilities from shared module
 from extension_shield.utils.json_encoder import (
     safe_json_dumps,
@@ -361,8 +369,9 @@ else:
     print(f"✅ CSP: Production mode detected (STATIC_DIR={STATIC_DIR}, index.html exists)")
 app.add_middleware(CSPMiddleware, is_dev=_is_dev)
 
-# Trust X-Forwarded-Proto / X-Forwarded-For from Railway/Cloudflare so request.url.scheme is correct
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+# Trust forwarded headers only from explicitly allowed proxy hosts.
+# Set TRUSTED_PROXY_HOSTS to your actual reverse proxy / CDN hop(s).
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_parse_trusted_proxy_hosts())
 
 # In-memory state lives in shared.py; import references here so existing
 # code in this file (and tests) can continue using module-level names.
@@ -408,20 +417,9 @@ def _get_client_ip(request: Request) -> str:
     """
     Get the client's IP address for rate limiting anonymous users.
     
-    Handles proxied requests via X-Forwarded-For and X-Real-IP headers.
-    Falls back to client host if no headers present.
+    Relies on ProxyHeadersMiddleware to rewrite request.client only when the
+    request came from a trusted proxy host.
     """
-    # Check X-Forwarded-For header (from reverse proxy/load balancer)
-    x_forwarded_for = request.headers.get("x-forwarded-for")
-    if x_forwarded_for:
-        # Take the first IP (original client)
-        return x_forwarded_for.split(",")[0].strip()
-    
-    # Check X-Real-IP header (from nginx)
-    x_real_ip = request.headers.get("x-real-ip")
-    if x_real_ip:
-        return x_real_ip.strip()
-    
     # Fall back to direct client IP
     if request.client:
         return request.client.host
@@ -502,6 +500,27 @@ def _require_admin_or_telemetry_key(request: Request) -> None:
             status_code=403,
             detail="Invalid admin API key"
         )
+
+
+def _require_private_scan_artifact_access(
+    request: Request,
+    extension_id: str,
+    payload: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Block access to private scan artifacts unless the requester owns the scan."""
+    requester_id = getattr(getattr(request, "state", None), "user_id", None)
+    if isinstance(payload, dict):
+        is_private = payload.get("visibility") == "private" or payload.get("source") == "upload"
+        owner_id = payload.get("user_id") or scan_user_ids.get(extension_id)
+    else:
+        is_private = scan_source.get(extension_id) == "upload"
+        owner_id = scan_user_ids.get(extension_id)
+
+    if not is_private:
+        return
+
+    if not requester_id or not owner_id or requester_id != owner_id:
+        raise HTTPException(status_code=404, detail="Scan results not found")
 
 
 def _deep_scan_limit_status(rate_limit_key: str) -> Dict[str, Any]:
@@ -2888,7 +2907,7 @@ async def batch_scan_status(req: BatchStatusRequest, request: Request):
 
 
 @app.get("/api/scan/enforcement_bundle/{extension_id}")
-async def get_enforcement_bundle(extension_id: str):
+async def get_enforcement_bundle(extension_id: str, http_request: Request):
     """
     Get the governance enforcement bundle for an analyzed extension.
     
@@ -2926,6 +2945,8 @@ async def get_enforcement_bundle(extension_id: str):
     
     if not results:
         raise HTTPException(status_code=404, detail="Scan results not found")
+
+    _require_private_scan_artifact_access(http_request, extension_id, results)
     
     # Check if governance analysis was run
     governance_bundle = results.get("governance_bundle")
@@ -2959,7 +2980,7 @@ async def get_enforcement_bundle(extension_id: str):
 
 
 @app.get("/api/scan/report/{extension_id}")
-async def generate_pdf_report(extension_id: str) -> Response:
+async def generate_pdf_report(extension_id: str, http_request: Request) -> Response:
     """
     Generate a PDF security report for an analyzed extension.
 
@@ -2988,6 +3009,8 @@ async def generate_pdf_report(extension_id: str) -> Response:
 
     if not results:
         raise HTTPException(status_code=404, detail="Scan results not found")
+
+    _require_private_scan_artifact_access(http_request, extension_id, results)
 
     # Generate PDF report
     try:
@@ -3038,6 +3061,8 @@ async def get_file_list(extension_id: str, http_request: Request) -> FileListRes
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
 
+    _require_private_scan_artifact_access(http_request, extension_id, results)
+
     extracted_path = results.get("extracted_path")
     if not extracted_path or not os.path.exists(extracted_path):
         raise HTTPException(status_code=404, detail="Extracted files not found")
@@ -3068,6 +3093,8 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     results = scan_results.get(extension_id)
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    _require_private_scan_artifact_access(http_request, extension_id, results)
 
     extracted_path = results.get("extracted_path")
     if not extracted_path:
@@ -3824,7 +3851,7 @@ async def database_health_check(request: Request):
 
 
 @app.get("/api/scan/icon/{extension_id}")
-async def get_extension_icon(extension_id: str):
+async def get_extension_icon(extension_id: str, http_request: Request):
     """
     Get extension icon from the extracted extension folder.
     Uses icon_path from storage when available, and falls back to persisted icon bytes.
@@ -3850,6 +3877,9 @@ async def get_extension_icon(extension_id: str):
         icon_media_type = results.get("icon_media_type")
     else:
         db_icon_record = _load_icon_record_from_db(extension_id)
+        results = db.get_scan_result(extension_id)
+        if results:
+            scan_results[extension_id] = results
         extracted_path = db_icon_record.get("extracted_path")
         icon_path = db_icon_record.get("icon_path")
         icon_base64 = db_icon_record.get("icon_base64")
@@ -3893,6 +3923,7 @@ async def get_extension_icon(extension_id: str):
 
     # Best practice: if we have a persisted icon blob, serve it immediately.
     # This avoids relying on filesystem state (ephemeral/persistent) and prevents slow fallbacks.
+    _require_private_scan_artifact_access(http_request, extension_id, results)
     persisted = _extension_icon_response_from_base64(icon_base64, icon_media_type)
     if persisted:
         return persisted
