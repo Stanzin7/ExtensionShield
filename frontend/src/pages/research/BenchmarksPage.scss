@@ -904,9 +904,9 @@
 }
 
 .light .sources-box {
-  background: var(--extensionshield-surface-card);
+  background: var(--extensionshield-bg-primary);
   border: 1px solid var(--extensionshield-border);
-  box-shadow: 0 4px 20px rgba(38, 35, 31, 0.06);
+  box-shadow: none;
 }
 
 .light .sources-box__title {
