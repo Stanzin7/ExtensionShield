@@ -562,7 +562,9 @@ class SummaryGenerator:
                         score_label=score_label,
                         host_scope_label=host_scope_label,
                     )
-            
+
+                summary.setdefault("model_version", model_name)
+
             logger.info("Executive summary generated successfully")
             return summary
         except Exception as exc:
