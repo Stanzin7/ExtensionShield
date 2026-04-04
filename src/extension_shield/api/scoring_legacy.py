@@ -17,6 +17,12 @@ from extension_shield.workflow.state import WorkflowState
 
 
 # ── Permission-Purpose Alignment (context-aware model) ──────────────────
+def is_third_party_api(check_id: str) -> bool:
+    if not check_id:
+        return False
+    check_id = check_id.lower()
+    keywords = ["third_party", "external_api", "api_call", "network"]
+    return any(keyword in check_id for keyword in keywords)
 
 def _calculate_permission_alignment_penalty(
     manifest: Dict,
@@ -116,12 +122,12 @@ def _calculate_permission_alignment_penalty(
         for findings_list in sast_findings.values():
             for finding in findings_list:
                 check_id = finding.get("check_id", "")
-                if "third_party" in check_id.lower() or "external_api" in check_id.lower():
+                if check_id and any(keyword in check_id.lower() for keyword in ["third_party", "external_api", "api_call", "network"]): #Change1
                     has_third_party_api = True
                     break
             if has_third_party_api:
                 break
-
+    covert_multiplier = 1.0        
     if has_cookies or has_history or has_clipboard:
         covert_multiplier = 2.0
 
@@ -173,7 +179,7 @@ def calculate_security_score(state: WorkflowState) -> int:
         for findings_list in sast_findings.values():
             for finding in findings_list:
                 check_id = finding.get("check_id", "")
-                if "third_party" in check_id.lower() or "external_api" in check_id.lower():
+                if is_third_party_api(check_id):
                     continue
                 severity = finding.get("extra", {}).get("severity", "INFO").upper()
                 if severity in ("CRITICAL", "HIGH"):
@@ -256,11 +262,7 @@ def calculate_security_score(state: WorkflowState) -> int:
         for findings_list in sast_findings.values():
             for finding in findings_list:
                 check_id = finding.get("check_id", "")
-                if check_id and (
-                    "banking.third_party.external_api_calls" in check_id
-                    or "third_party" in check_id.lower()
-                    or "external_api" in check_id.lower()
-                ):
+                if is_third_party_api(check_id):
                     third_party_detected = True
                     break
             if third_party_detected:
