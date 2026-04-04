@@ -602,7 +602,23 @@
         evHtml = '<div class="evidence-cell"><span class="finding-count" style="color:var(--high)">—</span></div>';
       }
 
-      tr.innerHTML = '<td>' + extHtml + '</td><td style="text-align:center">' + pillHtml + '</td><td>' + evHtml + '</td>';
+      
+      
+      const td1 = document.createElement('td');
+td1.textContent = extHtml;
+
+const td2 = document.createElement('td');
+td2.style.textAlign = "center";
+td2.textContent = pillHtml;
+
+const td3 = document.createElement('td');
+td3.textContent = evHtml;
+
+tr.appendChild(td1);
+tr.appendChild(td2);
+tr.appendChild(td3);
+
+      
       rows.appendChild(tr);
     }
 
