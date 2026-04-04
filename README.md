@@ -115,3 +115,80 @@ We build ExtensionShield in the open so security tools stay transparent and easy
 Feedback, issue reports, docs fixes, tests, and rule improvements are welcome. If ExtensionShield helps you, consider opening a PR, sharing your use case, or supporting the project.
 
 **Acknowledgments**: ExtensionShield is our own design. We took inspiration from <a href="https://github.com/barvhaim/ThreatXtension" style="color:#2ea043;">ThreatXtension</a> in the extension scanning space.
+
+## 🔐 Security Analysis & Recommendations (Contribution)
+
+> Contribution by @Akki908 as part of NSoC Hackathon
+
+### 1. Over-Privileged Permission: `management`
+
+The extension requests the `"management"` permission, which allows:
+
+* Enabling/disabling extensions
+* Uninstalling extensions
+* Accessing metadata of all installed extensions
+
+⚠️ **Risk:**
+
+* Can disable security extensions
+* Can enable malicious extensions
+* Full control over browser extension environment
+
+✅ **Recommendation:**
+
+* Follow **Principle of Least Privilege**
+* Request only when absolutely required
+* Use scoped alternatives if possible
+
+---
+
+### 2. Broad Host Permission
+
+```json
+"host_permissions": ["https://extensionshield.com/*"]
+```
+
+⚠️ **Risk:**
+
+* Access to all endpoints under the domain
+* Increased attack surface
+* Possible unintended data exposure
+
+✅ **Recommendation:**
+
+* Restrict to specific endpoints
+* Validate API requests
+* Apply strict Content Security Policy (CSP)
+
+---
+
+### 3. Transparency Gap
+
+The extension states: *No data collection*
+
+⚠️ **Concern:**
+
+* Host permissions imply possible network communication
+* Lack of explicit data flow documentation
+
+✅ **Recommendation:**
+
+* Clearly document:
+
+  * Data accessed
+  * Data transmitted
+  * Purpose of communication
+
+---
+
+### 🔎 Summary
+
+| Issue                                     | Severity |
+| ----------------------------------------- | -------- |
+| Over-privileged permission (`management`) | High     |
+| Broad host permissions                    | Medium   |
+| Transparency gap                          | Medium   |
+
+### 💡 Final Note
+
+These issues do not necessarily indicate malicious intent, but reducing permissions and improving transparency will significantly lower security risk and increase user trust.
