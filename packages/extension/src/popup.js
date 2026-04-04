@@ -4,6 +4,15 @@
 
   var API = 'https://extensionshield.com';
   var CACHE_TTL = 6 * 3600 * 1000;
+  function fetchWithTimeout(url, options = {}, timeout = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  return fetch(url, {
+    ...options,
+    signal: controller.signal
+  }).finally(() => clearTimeout(id));
+}
   var WEBSTORE_URL_PREFIX = 'https://chromewebstore.google.com/detail/x/';
   var SCAN_POLL_INTERVAL = 3000;
   var SCAN_POLL_MAX = 60;
@@ -426,7 +435,7 @@
 
   function fetchResults(extId) {
     var url = API + '/api/scan/results/' + encodeURIComponent(extId);
-    return fetch(url).then(function (res) {
+  return fetchWithTimeout(url).then(function (res) {
       if (res.status === 404) return { _st: 'not_found' };
       if (!res.ok) return { _st: 'error' };
       return res.json().then(function (j) { j._st = 'ok'; return j; });
@@ -435,7 +444,7 @@
 
   function triggerScan(extId) {
     var webstoreUrl = WEBSTORE_URL_PREFIX + encodeURIComponent(extId);
-    return fetch(API + '/api/scan/trigger', {
+  return fetchWithTimeout(API + '/api/scan/trigger', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: webstoreUrl })
@@ -446,7 +455,7 @@
   }
 
   function pollScanStatus(extId) {
-    return fetch(API + '/api/scan/status/' + encodeURIComponent(extId))
+    return fetchWithTimeout(API + '/api/scan/status/' + encodeURIComponent(extId))
       .then(function (res) {
         if (!res.ok) return { status: 'unknown' };
         return res.json();
