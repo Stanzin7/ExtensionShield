@@ -15,26 +15,12 @@ function buildDropletConfig(count, durationMin, durationMax, opacityMin, opacity
     id: i,
     left: 5 + (i * 5.5) % 90,
     delay: (i * 0.4) % 5,
-    duration: durationMin + (i % 3) * ((durationMax - durationMin) / 3),
+    duration: durationMin + Math.random() * (durationMax - durationMin), // ✅ improved
     size: 4 + (i % 3) * 2,
     opacity: opacityMin + (i % 4) * ((opacityMax - opacityMin) / 4),
   }));
 }
 
-/**
- * RainfallDroplets – reusable falling-droplets background animation.
- * Renders a layer of animated droplets falling from top to bottom.
- *
- * @param {Object} props
- * @param {number} [props.count=18] - Number of droplets
- * @param {string} [props.color] - CSS color for droplets (default: accent green)
- * @param {string} [props.className] - Extra class for the wrapper
- * @param {number} [props.zIndex=0] - z-index of the layer
- * @param {number} [props.durationMin=3.5] - Min animation duration (s)
- * @param {number} [props.durationMax=5.9] - Max animation duration (s)
- * @param {number} [props.opacityMin=0.4] - Min droplet opacity
- * @param {number} [props.opacityMax=0.85] - Max droplet opacity
- */
 const RainfallDroplets = ({
   count = DEFAULT_COUNT,
   color,
@@ -59,7 +45,7 @@ const RainfallDroplets = ({
     <div
       className={`rainfall-droplets ${className}`.trim()}
       style={wrapperStyle}
-      aria-hidden
+      aria-hidden="true" // ✅ fixed
     >
       {config.map(({ id, left, delay, duration, size, opacity }) => (
         <span
