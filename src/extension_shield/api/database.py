@@ -420,7 +420,10 @@ class Database:
                 (day, path),
             )
             row = cursor.fetchone()
-            return int(row["count"]) if row else 0
+            try:
+                return int(row["count"]) if row else 0
+            except (TypeError, ValueError):
+                return 0
 
     def get_page_view_summary(self, days: int = 14) -> Dict[str, Any]:
         """
@@ -708,7 +711,7 @@ class Database:
                             "high_risk_extensions": row["high_risk"] or 0,
                             "total_files_analyzed": row["total_files"] or 0,
                             "total_vulnerabilities": row["total_findings"] or 0,
-                            "avg_security_score": int(row["avg_security_score"] or 0),
+                            "avg_security_score": int(row["avg_security_score"] or 0) if row["avg_security_score"] is None or isinstance(row["avg_security_score"], (int, float)) else 0,
                         }
                     )
 
