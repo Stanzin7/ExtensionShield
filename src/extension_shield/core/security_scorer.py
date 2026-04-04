@@ -363,9 +363,9 @@ class SecurityScorer:
         mv_risk = 0
         manifest_version = manifest.get('manifest_version')
         if manifest_version == 2:
-            mv_risk = 2  # MV2 is deprecated
-            risk += 2
-            issues.append('Using deprecated Manifest V2')
+            mv_risk = 5  # MV2 is deprecated and actively being removed by Chrome
+            risk += 5
+            issues.append('Using deprecated Manifest V2 (Chrome is removing MV2 support; extension should migrate to MV3)')
 
         details = {
             'manifest_version': manifest_version,
