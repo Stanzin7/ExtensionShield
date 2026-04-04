@@ -115,3 +115,5 @@ We build ExtensionShield in the open so security tools stay transparent and easy
 Feedback, issue reports, docs fixes, tests, and rule improvements are welcome. If ExtensionShield helps you, consider opening a PR, sharing your use case, or supporting the project.
 
 **Acknowledgments**: ExtensionShield is our own design. We took inspiration from <a href="https://github.com/barvhaim/ThreatXtension" style="color:#2ea043;">ThreatXtension</a> in the extension scanning space.
+
+I am making my first contribution!!!
