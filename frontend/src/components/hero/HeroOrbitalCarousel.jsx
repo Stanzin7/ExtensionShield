@@ -78,7 +78,12 @@ function getOverallStatus(scan) {
  * Checks if extensionId looks like a real Chrome extension ID (32 lowercase a-p).
  */
 function isRealExtensionId(id) {
-  return id && id.length === 32 && /^[a-p]+$/.test(id);
+  if (!id || typeof id !== "string") return false;
+
+  const isValidFormat = id.length === 32 && /^[a-p]+$/.test(id);
+
+  // Optional: stricter check
+  return isValidFormat && !id.includes("aaaa"); // example basic filter
 }
 
 /**
@@ -89,10 +94,23 @@ function isRealExtensionId(id) {
  */
 function getIconSrc(scan) {
   // 1. DB provides icon_base64 → use data URL (instant, no network)
-  if (scan?.icon_base64) {
-    const mediaType = scan.icon_media_type || "image/png";
-    return `data:${mediaType};base64,${scan.icon_base64}`;
+if (scan?.icon_base64) {
+  const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+  const mediaType = scan.icon_media_type || "image/png";
+
+  // Validate MIME type
+  if (!allowedTypes.includes(mediaType)) {
+    return EXTENSION_ICON_PLACEHOLDER;
   }
+
+  // Basic base64 validation
+  const base64Regex = /^[A-Za-z0-9+/=]+$/;
+  if (!base64Regex.test(scan.icon_base64)) {
+    return EXTENSION_ICON_PLACEHOLDER;
+  }
+
+  return `data:${mediaType};base64,${scan.icon_base64}`;
+}
   
   const extensionId = scan?.extensionId || scan?.extension_id;
   
@@ -480,33 +498,46 @@ export default function HeroOrbitalCarousel() {
 
   useEffect(() => {
     if (reducedMotion) return;
-    const tick = (time) => {
-      lastTimeRef.current ??= time;
-      const delta = (time - lastTimeRef.current) / 1000;
-      lastTimeRef.current = time;
-      if (!isPaused) {
-        setPrimaryAngle((prev) => (prev + (360 / PRIMARY_DURATION) * delta) % 360);
-        setSecondaryAngle((prev) => (prev - (360 / SECONDARY_DURATION) * delta + 360) % 360);
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
+   const tick = (time) => {
+  if (lastTimeRef.current === null) {
+    lastTimeRef.current = time; // reset correctly after unpause
+    rafRef.current = requestAnimationFrame(tick);
+    return;
+  }
+  const delta = (time - lastTimeRef.current) / 1000;
+  lastTimeRef.current = time;
+  if (!isPaused) {
+    setPrimaryAngle(prev => (prev + (360 / PRIMARY_DURATION) * delta) % 360);
+    setSecondaryAngle(prev => (prev - (360 / SECONDARY_DURATION) * delta + 360) % 360);
+  }
+  rafRef.current = requestAnimationFrame(tick);
+};
+
+// Also reset on unpause:
+const handleHover = (index) => {
+  setHoveredIndex(index);
+  if (index === null) lastTimeRef.current = null; // reset on unpause
+  setIsPaused(index !== null);
+};
+
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [isPaused, reducedMotion]);
 
-  const scansToShow = useMemo(() => {
-    const arr = scans.length > 0 ? scans : PLACEHOLDER_SCANS;
-    return arr.slice(0, MAX_SCANS);
-  }, [scans]);
+const scansToShow = useMemo(() => {
+  const arr = scans.length > 0 ? scans : PLACEHOLDER_SCANS;
+  return arr.slice(0, MAX_SCANS);
+}, [scans, iconCacheVersion]); // add iconCacheVersion
+
 
   const primaryScans = useMemo(() => scansToShow.slice(0, PRIMARY_ICON_COUNT), [scansToShow]);
   const secondaryScans = useMemo(() => scansToShow.slice(PRIMARY_ICON_COUNT, PRIMARY_ICON_COUNT + SECONDARY_ICON_COUNT), [scansToShow]);
-
-  useEffect(() => {
-    if (focusedIndex >= scansToShow.length) setFocusedIndex(0);
-  }, [focusedIndex, scansToShow.length]);
-
-  const focusScan = scansToShow[focusedIndex] || scansToShow[0];
+  
+const safeFocusedIndex = Math.min(
+  focusedIndex,
+  Math.max(0, scansToShow.length - 1)
+);
+const focusScan = scansToShow[safeFocusedIndex] ?? scansToShow[0];
 
   useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${VIEWPORT_COMPACT}px)`);
