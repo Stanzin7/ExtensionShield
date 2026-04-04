@@ -241,7 +241,7 @@ def extract_extension_crx(file_path: str) -> Optional[str]:
                     target_path = os.path.join(extract_dir, member.filename)
                     abs_target = os.path.abspath(target_path)
                     abs_extract = os.path.abspath(extract_dir)
-                    if not abs_target.startswith(abs_extract):
+                    if os.path.commonpath([abs_extract, abs_target]) != abs_extract:
                         raise ValueError(f"Zip-slip attempt detected: {member.filename}")
                     zip_ref.extract(member, extract_dir)
 
@@ -262,7 +262,7 @@ def extract_extension_crx(file_path: str) -> Optional[str]:
                     target_path = os.path.join(extract_dir, member.filename)
                     abs_target = os.path.abspath(target_path)
                     abs_extract = os.path.abspath(extract_dir)
-                    if not abs_target.startswith(abs_extract):
+                    if os.path.commonpath([abs_extract, abs_target]) != abs_extract:
                         raise ValueError(f"Zip-slip attempt detected: {member.filename}")
                     zip_ref.extract(member, extract_dir)
 
