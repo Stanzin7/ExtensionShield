@@ -4037,6 +4037,7 @@ async def get_extension_icon(extension_id: str):
             if manifest_icons:
                 # Get the largest icon - only consider numeric keys (e.g. "128", "64")
                 # Some extensions use non-numeric keys like "48x48" which would cause ValueError
+                # isinstance guard handles edge cases where manifest was parsed outside of json.load
                 numeric_keys = [k for k in manifest_icons.keys() if isinstance(k, str) and k.isdigit()]
                 if not numeric_keys:
                     raise ValueError(f"No numeric icon size keys found in manifest: {list(manifest_icons.keys())}")
