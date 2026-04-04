@@ -4035,19 +4035,22 @@ async def get_extension_icon(extension_id: str):
             # Check icons object in manifest
             manifest_icons = manifest.get("icons", {})
             if manifest_icons:
-                # Get the largest icon
-                largest_size = max(manifest_icons.keys(), key=lambda x: int(x))
-                icon_rel_path = manifest_icons[largest_size]
-                manifest_icon_path = os.path.join(extracted_path, icon_rel_path)
-                
-                # Security check
-                abs_icon_path = os.path.abspath(manifest_icon_path)
-                abs_extracted_path = os.path.abspath(extracted_path)
-                
-                if abs_icon_path.startswith(abs_extracted_path):
-                    if os.path.exists(manifest_icon_path):
-                        logger.debug(f"Found icon from manifest at: {manifest_icon_path}")
-                        return _extension_icon_file_response(manifest_icon_path)
+                # Get the largest icon - only consider numeric size keys (e.g. "128", "64")
+                # Some extensions use non-numeric keys like "48x48" which cause int() to raise ValueError
+                numeric_keys = [k for k in manifest_icons if k.isdigit()]
+                if numeric_keys:
+                    largest_size = max(numeric_keys, key=int)
+                    icon_rel_path = manifest_icons[largest_size]
+                    manifest_icon_path = os.path.join(extracted_path, icon_rel_path)
+                    
+                    # Security check
+                    abs_icon_path = os.path.abspath(manifest_icon_path)
+                    abs_extracted_path = os.path.abspath(extracted_path)
+                    
+                    if abs_icon_path.startswith(abs_extracted_path):
+                        if os.path.exists(manifest_icon_path):
+                            logger.debug(f"Found icon from manifest at: {manifest_icon_path}")
+                            return _extension_icon_file_response(manifest_icon_path)
         except Exception as e:
             logger.warning(f"Failed to read manifest for icons: {e}")
     
