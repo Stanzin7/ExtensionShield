@@ -66,8 +66,12 @@
 
   if (tabExtensions) {
     tabExtensions.addEventListener('click', function () { 
-      chrome.permissions.request({ permissions: ["management"] }, function(granted) {
-          if (granted) scan(true);
+      chrome.permissions.contains({ permissions: ["management"] }, function(hasPerm) {
+        if (!hasPerm) {
+          chrome.permissions.request({ permissions: ["management"] }, function(granted) {
+            if (granted) scan(false);
+          });
+        }
       });
       switchTab('extensions'); 
     });
