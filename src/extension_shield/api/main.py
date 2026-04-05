@@ -994,6 +994,62 @@ class FeedbackRequest(BaseModel):
         return self
 
 
+def _coerce_json_dict(value: Any) -> Dict[str, Any]:
+    """Convert JSON-ish values to a dict for metadata lookups."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _extract_feedback_versions(payload: Optional[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
+    """Extract model and ruleset versions from a scan payload when available."""
+    if not isinstance(payload, dict):
+        return None, None
+
+    metadata = _coerce_json_dict(payload.get("metadata"))
+    summary = _coerce_json_dict(payload.get("summary"))
+    report_view_model = _coerce_json_dict(payload.get("report_view_model"))
+    report_meta = _coerce_json_dict(report_view_model.get("meta"))
+
+    scoring_v2 = _coerce_json_dict(payload.get("scoring_v2"))
+    if not scoring_v2:
+        scoring_v2 = _coerce_json_dict(summary.get("scoring_v2"))
+
+    model_version = (
+        summary.get("model_version")
+        or metadata.get("model_version")
+        or report_meta.get("model_version")
+        or summary.get("llm_model")
+        or metadata.get("llm_model")
+    )
+
+    ruleset_version = (
+        summary.get("ruleset_version")
+        or metadata.get("ruleset_version")
+        or report_meta.get("ruleset_version")
+        or scoring_v2.get("weights_version")
+        or scoring_v2.get("scoring_version")
+    )
+
+    return model_version, ruleset_version
+
+
+def _resolve_feedback_versions(scan_id: str) -> tuple[Optional[str], Optional[str]]:
+    """Look up the related scan payload and extract version metadata safely."""
+    payload = scan_results.get(scan_id)
+    if isinstance(payload, dict):
+        return _extract_feedback_versions(payload)
+
+    db_payload = db.get_scan_result(scan_id)
+    return _extract_feedback_versions(db_payload)
+
+
 class ReviewQueueClaimRequest(BaseModel):
     """Request body for claiming a review queue item."""
     queue_item_id: str
@@ -1514,6 +1570,16 @@ async def run_analysis_workflow(url: str, extension_id: str):
             if scoring_result.coverage_cap_reason is not None:
                 scoring_v2_payload["coverage_cap_reason"] = scoring_result.coverage_cap_reason
 
+            executive_summary = final_state.get("executive_summary") or {}
+            if isinstance(executive_summary, dict):
+                executive_summary = dict(executive_summary)
+            else:
+                executive_summary = {}
+            executive_summary.setdefault(
+                "ruleset_version",
+                scoring_v2_payload.get("weights_version") or scoring_v2_payload.get("scoring_version"),
+            )
+
             # Build scan results - sanitize complex objects to prevent circular references
             raw_results = {
                 "extension_id": extension_id,
@@ -1528,7 +1594,7 @@ async def run_analysis_workflow(url: str, extension_id: str):
                 "webstore_analysis": analysis_results.get("webstore_analysis") or {},
                 "virustotal_analysis": analysis_results.get("virustotal_analysis") or {},
                 "entropy_analysis": analysis_results.get("entropy_analysis") or {},
-                "summary": final_state.get("executive_summary") or {},
+                "summary": executive_summary,
                 "impact_analysis": analysis_results.get("impact_analysis") or {},
                 "privacy_compliance": analysis_results.get("privacy_compliance") or {},
                 "extracted_path": _storage_relative_extracted_path(final_state.get("extension_dir")),
@@ -2214,6 +2280,7 @@ async def submit_feedback(feedback: FeedbackRequest, http_request: Request):
     reason = None if feedback.helpful else (feedback.reason.value if feedback.reason else None)
     suggested_score = None if feedback.helpful else feedback.suggested_score
     comment = None if feedback.helpful else feedback.comment
+    model_version, ruleset_version = _resolve_feedback_versions(feedback.scan_id)
     
     # Save feedback to database (SQLite or Supabase)
     db.save_feedback(
@@ -2223,8 +2290,8 @@ async def submit_feedback(feedback: FeedbackRequest, http_request: Request):
         suggested_score=suggested_score,
         comment=comment,
         user_id=user_id,
-        model_version=None,  # TODO: Extract from scan result metadata
-        ruleset_version=None,  # TODO: Extract from scan result metadata
+        model_version=model_version,
+        ruleset_version=ruleset_version,
     )
     
     return {"ok": True}
