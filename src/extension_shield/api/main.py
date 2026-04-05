@@ -42,7 +42,48 @@ from extension_shield.core.chromestats_downloader import ChromeStatsDownloader
 
 from extension_shield.workflow.graph import build_graph
 from extension_shield.workflow.state import WorkflowState, WorkflowStatus
-from extension_shield.api.database import db, SupabaseDatabase, _is_extension_id
+from extension_shield.storage.utils import _is_extension_id
+from extension_shield.storage.supabase import SupabaseDatabase
+
+def _create_db():
+    from extension_shield.core.config import get_settings
+    from extension_shield.utils.mode import get_feature_flags
+    import logging
+    _logger = logging.getLogger(__name__)
+
+    flags = get_feature_flags()
+    settings = get_settings()
+
+    if settings.db_backend == "supabase":
+        try:
+            from extension_shield.storage.supabase import SupabaseDatabase
+            _db = SupabaseDatabase()
+            _logger.info("DB backend: supabase")
+            print(f"✓ DB backend: supabase  |  mode={flags.mode}  |  env={settings.env}")
+            return _db
+        except Exception as e:
+            _logger.warning("Supabase enabled but failed to initialize. Falling back to SQLite. Error: %s", e)
+            print(f"⚠️  Supabase init failed, falling back to SQLite. Error: {e}")
+            from extension_shield.storage.sqlite import SQLiteDatabase
+            _db = SQLiteDatabase()
+            _logger.info("DB backend: sqlite (fallback)")
+            print(f"✓ DB backend: sqlite (fallback)  |  mode={flags.mode}")
+            return _db
+
+    if settings.db_backend == "sqlite":
+        from extension_shield.storage.sqlite import SQLiteDatabase
+        _db = SQLiteDatabase()
+        _logger.info("DB backend: sqlite")
+        print(f"✓ DB backend: sqlite  |  mode={flags.mode}")
+        return _db
+
+    from extension_shield.storage.sqlite import SQLiteDatabase
+    _db = SQLiteDatabase()
+    _logger.info("DB backend: sqlite (default)")
+    print(f"✓ DB backend: sqlite (default)  |  mode={flags.mode}")
+    return _db
+
+db = _create_db()
 from extension_shield.api.supabase_auth import get_current_user_id as _get_current_user_id
 from extension_shield.core.config import get_settings
 from extension_shield.utils.mode import require_cloud, get_feature_flags, is_oss_telemetry_allowed, require_cloud_dep
@@ -454,7 +495,7 @@ def _require_admin_key(request: Request) -> None:
             status_code=403,
             detail="Admin API key is not configured"
         )
- provided_key = request.headers.get("X-Admin-Key") or request.headers.get("x-admin-key")
+    provided_key = request.headers.get("X-Admin-Key") or request.headers.get("x-admin-key")
     if not provided_key:
         raise HTTPException(
             status_code=403,
