@@ -12,6 +12,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  RAILWAY_PROJECT_ID: 24ef50c1-9906-4ade-b25e-92e65aba8aa8
+  RAILWAY_SERVICE: ExtensionShield
+  RAILWAY_ENVIRONMENT: production
 
 jobs:
   # =============================================================================
@@ -110,7 +113,7 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
-        run: railway up --detach
+        run: railway up --ci --detach --project "$RAILWAY_PROJECT_ID" --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
