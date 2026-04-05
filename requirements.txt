@@ -16,3 +16,4 @@ langchain
 openai
 python-dateutil
 python-multipart
+cachetools

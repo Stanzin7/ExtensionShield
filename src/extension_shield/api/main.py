@@ -454,7 +454,7 @@ def _require_admin_key(request: Request) -> None:
             status_code=403,
             detail="Admin API key is not configured"
         )
- provided_key = request.headers.get("X-Admin-Key") or request.headers.get("x-admin-key")
+    provided_key = request.headers.get("X-Admin-Key") or request.headers.get("x-admin-key")
     if not provided_key:
         raise HTTPException(
             status_code=403,

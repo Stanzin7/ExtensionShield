@@ -8,20 +8,21 @@ imports between ``main.py`` and route routers.
 
 from typing import Any, Dict, Optional
 from pydantic import BaseModel
+import cachetools
 
 
 # ── In-memory state (process-local, not persisted) ──────────────────────
 
-scan_results: Dict[str, Dict[str, Any]] = {}
+scan_results: cachetools.TTLCache = cachetools.TTLCache(maxsize=10000, ttl=3600)
 """extension_id → full scan payload (in-flight + recently completed)."""
 
-scan_status: Dict[str, str] = {}
+scan_status: cachetools.TTLCache = cachetools.TTLCache(maxsize=10000, ttl=3600)
 """extension_id → scan lifecycle status string."""
 
-scan_user_ids: Dict[str, Optional[str]] = {}
+scan_user_ids: cachetools.TTLCache = cachetools.TTLCache(maxsize=10000, ttl=3600)
 """extension_id → authenticated user_id (Supabase ``sub``) at trigger time."""
 
-scan_source: Dict[str, Optional[str]] = {}
+scan_source: cachetools.TTLCache = cachetools.TTLCache(maxsize=10000, ttl=3600)
 """extension_id → 'upload' for private builds; None/webstore for public."""
 
 
