@@ -188,7 +188,7 @@ class TestLayerDetailsGenerator:
                 "one_liner": "Low governance risk with good policy compliance.",
                 "key_points": [
                     "WebStoreTrust: 50,000 users indicates established extension",
-                    "No policy violations detected"
+                    "WebStoreTrust and store metadata show no policy violations detected."
                 ],
                 "what_to_watch": [
                     "Monitor WebStoreTrust changes and store policy updates."
