@@ -423,7 +423,7 @@ function AppHeader() {
         </div>
 
         {/* Group ThemeToggle and Hamburger in one wrapper on mobile so space-between aligns properly */}
-        <div className="header-actions-mobile-wrapper" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div className="header-actions-mobile-wrapper">
           <div className="header-actions header-actions-mobile">
             <ThemeToggle />
           </div>
