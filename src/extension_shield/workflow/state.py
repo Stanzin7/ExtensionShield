@@ -45,6 +45,9 @@ class WorkflowState(TypedDict):
         start_time (Optional[str]): ISO 8601 formatted start time of the workflow,
             if available.
         end_time (Optional[str]): ISO 8601 formatted end time of the workflow, if available.
+        llm_warnings (Optional[list]): Warning messages collected when LLM nodes fail
+            partially (e.g. summary or impact analysis unavailable). Each entry is a
+            human-readable string suitable for surfacing to the user.
         error (Optional[str]): Error message if the workflow has failed, otherwise None.
     """
 
@@ -64,6 +67,8 @@ class WorkflowState(TypedDict):
     governance_verdict: Optional[str]
     governance_report: Optional[Dict]
     governance_error: Optional[str]
+    # Partial-failure warnings accumulated by LLM nodes
+    llm_warnings: Optional[list]
     # Status fields
     status: WorkflowStatus
     start_time: Optional[str]

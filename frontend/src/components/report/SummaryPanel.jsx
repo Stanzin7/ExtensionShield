@@ -29,6 +29,11 @@ const SummaryPanel = ({
   // Fallback: highlights (keyPoints) and SAST/engine keyFindings for concerns
   const { oneLiner, keyPoints } = normalizeHighlights(rawScanResult);
 
+  // Partial-failure warnings surfaced from backend LLM nodes
+  const partialFailures = Array.isArray(rawScanResult?.partial_failures)
+    ? rawScanResult.partial_failures
+    : [];
+
   // SAST/engine keyFindings – use for Quick Summary concerns when they add value
   const engineConcerns = (keyFindings || [])
     .filter(f => f.severity === 'high' || f.severity === 'medium')
@@ -59,6 +64,17 @@ const SummaryPanel = ({
     );
   };
 
+  const partialFailureBanner = partialFailures.length > 0 ? (
+    <div className="summary-partial-failures" role="alert" aria-label="Partial analysis warnings">
+      {partialFailures.map((msg, idx) => (
+        <div key={idx} className="summary-partial-failure-item">
+          <span className="summary-partial-failure-icon">⚠️</span>
+          <span className="summary-partial-failure-text">{msg}</span>
+        </div>
+      ))}
+    </div>
+  ) : null;
+
   if (showPlaceholder) {
     return (
       <section className="summary-panel summary-panel--unified">
@@ -69,6 +85,7 @@ const SummaryPanel = ({
           </h2>
           {getDecisionBadge()}
         </div>
+        {partialFailureBanner}
         <div className="summary-content">
           <div className="summary-placeholder-wrapper">
             <p className="summary-placeholder-line">Review this extension before installing.</p>
@@ -94,6 +111,20 @@ const SummaryPanel = ({
   }
 
   if (!hasAnySummary) {
+    if (partialFailures.length > 0) {
+      return (
+        <section className="summary-panel summary-panel--unified">
+          <div className="summary-header">
+            <h2 className="summary-title">
+              <span className="title-icon">✨</span>
+              Quick Summary
+            </h2>
+            {getDecisionBadge()}
+          </div>
+          {partialFailureBanner}
+        </section>
+      );
+    }
     return null;
   }
 
@@ -113,6 +144,7 @@ const SummaryPanel = ({
           </h2>
           {getDecisionBadge()}
         </div>
+        {partialFailureBanner}
 
         <div className="summary-content">
           {/* Headline – short takeaway */}
@@ -189,6 +221,7 @@ const SummaryPanel = ({
           </h2>
           {getDecisionBadge()}
         </div>
+        {partialFailureBanner}
 
         <div className="summary-content">
           {/* Verdict - the headline */}
@@ -272,6 +305,7 @@ const SummaryPanel = ({
         </h2>
         {getDecisionBadge()}
       </div>
+      {partialFailureBanner}
 
       <div className="summary-content">
         {/* One-liner summary */}
