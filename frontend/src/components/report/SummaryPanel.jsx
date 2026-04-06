@@ -65,7 +65,7 @@ const SummaryPanel = ({
   };
 
   const partialFailureBanner = partialFailures.length > 0 ? (
-    <div className="summary-partial-failures" role="alert" aria-label="Partial analysis warnings">
+    <div className="summary-partial-failures" role="alert" aria-label="Some analysis features are temporarily unavailable">
       {partialFailures.map((msg, idx) => (
         <div key={idx} className="summary-partial-failure-item">
           <span className="summary-partial-failure-icon">⚠️</span>

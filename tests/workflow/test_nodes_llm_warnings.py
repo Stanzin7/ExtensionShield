@@ -38,7 +38,7 @@ def base_state():
         },
         "extension_metadata": {"title": "Test Extension"},
         "extension_dir": "/tmp/test_ext",
-        "llm_warnings": None,
+        "llm_warnings": [],
     }
 
 
@@ -94,7 +94,8 @@ class TestSummaryGenerationNodeWarnings:
 
     def test_warning_accumulates_with_existing_warnings(self, base_state):
         """Warnings from prior nodes are preserved when summary also fails."""
-        base_state["llm_warnings"] = ["Impact analysis unavailable — LLM service temporarily failed"]
+        prior_warning = "Impact analysis unavailable — LLM service temporarily failed"
+        base_state["llm_warnings"] = [prior_warning]
 
         with patch(
             "extension_shield.workflow.nodes.SummaryGenerator"
@@ -104,7 +105,7 @@ class TestSummaryGenerationNodeWarnings:
 
         warnings = cmd.update.get("llm_warnings", [])
         assert len(warnings) == 2
-        assert any("Impact analysis" in w for w in warnings)
+        assert warnings[0] == prior_warning, "Pre-existing warning must be preserved unchanged"
         assert any("Summary unavailable" in w for w in warnings)
 
 
