@@ -134,9 +134,10 @@ const HomePage = () => {
     "name": "ExtensionShield",
     "url": "https://extensionshield.com",
     "logo": "https://extensionshield.com/logo.png",
-    "description": "Chrome extension scanner — safety reports in seconds.",
+    "description": "Free, open-source Chrome extension security scanner. Transparent risk scoring with SAST, VirusTotal, and governance analysis. The best Spin.AI and CRXcavator alternative for developers and security teams.",
     "sameAs": [
-      "https://github.com/Stanzin7/ExtensionShield"
+      "https://github.com/Stanzin7/ExtensionShield",
+      "https://chromewebstore.google.com/detail/extensionshield/"
     ]
   };
 
@@ -147,11 +148,20 @@ const HomePage = () => {
     "applicationCategory": "SecurityApplication",
     "operatingSystem": "Web",
     "offers": [
-      { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free public extension scan by Chrome Web Store URL" },
-      { "@type": "Offer", "description": "Pro: private CRX/ZIP security audit and vulnerability scan" }
+      { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free public extension scan by Chrome Web Store URL — no signup required" },
+      { "@type": "Offer", "description": "Pro: private CRX/ZIP security audit, vulnerability scan, and fix guidance" },
+      { "@type": "Offer", "description": "Enterprise: allowlist governance, monitoring, and audit-ready reports" }
     ],
-    "description": "Chrome extension security scanner. Scan by Chrome Web Store URL for free. Upload private CRX/ZIP for pre-release security audit, vulnerability scanning, and fix suggestions.",
-    "url": "https://extensionshield.com/scan"
+    "description": "Best free, open-source Chrome extension security scanner. Transparent three-layer risk scoring (Security, Privacy, Governance) with SAST, VirusTotal, and evidence per finding. The best alternative to Spin.AI and CRXcavator for developers and lean security teams.",
+    "url": "https://extensionshield.com/scan",
+    "downloadUrl": "https://extensionshield.com",
+    "softwareVersion": "2026",
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "5",
+      "ratingCount": "1",
+      "bestRating": "5"
+    }
   };
 
   const faqSchema = {
@@ -190,11 +200,11 @@ const HomePage = () => {
     <>
       <SEOHead
         title="Free Chrome Extension Scanner & Security Audit | ExtensionShield"
-        description="Free Chrome extension scanner and security audit for developers. Scan any extension by URL—get risk score, permissions & malware check. Audit CRX/ZIP builds before release."
+        description="Free open-source Chrome extension security scanner. Scan any extension by URL — get transparent risk score, permissions analysis, SAST & malware check. Best Spin.AI alternative for developers and security teams. Audit CRX/ZIP builds before release."
         pathname="/"
         ogType="website"
         schema={[organizationSchema, softwareAppSchema, faqSchema]}
-        keywords="free extension scanner, free extension audit, Chrome extension scanner, Chrome extension security, extension security audit, developer extension audit, scan Chrome extension"
+        keywords="free chrome extension scanner, chrome extension security scanner, best extension scanner 2026, Spin.AI alternative, CRXcavator alternative, extension security audit, open source extension scanner, browser extension risk assessment, chrome extension risk score, extension permissions checker"
       />
       
       <div className="home-page">

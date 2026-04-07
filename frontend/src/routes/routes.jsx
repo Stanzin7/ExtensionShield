@@ -37,6 +37,7 @@ const CompareIndexPage = React.lazy(() => import("../pages/compare/CompareIndexP
 const CompareCrxcavatorPage = React.lazy(() => import("../pages/compare/CompareCrxcavatorPage"));
 const CompareCrxplorerPage = React.lazy(() => import("../pages/compare/CompareCrxplorerPage"));
 const CompareExtensionAuditorPage = React.lazy(() => import("../pages/compare/CompareExtensionAuditorPage"));
+const CompareSpinAIPage = React.lazy(() => import("../pages/compare/CompareSpinAIPage"));
 
 // SEO keyword landing pages (high-intent) + educational hub
 const IsThisChromeExtensionSafePage = React.lazy(() => import("../pages/landing/IsThisChromeExtensionSafePage"));
@@ -44,6 +45,7 @@ const ChromeExtensionPermissionsPage = React.lazy(() => import("../pages/landing
 const ChromeExtensionSecurityScannerPage = React.lazy(() => import("../pages/landing/ChromeExtensionSecurityScannerPage"));
 const BrowserExtensionRiskAssessmentPage = React.lazy(() => import("../pages/landing/BrowserExtensionRiskAssessmentPage"));
 const CrxcavatorAlternativePage = React.lazy(() => import("../pages/landing/CrxcavatorAlternativePage"));
+const SpinAIAlternativePage = React.lazy(() => import("../pages/landing/SpinAIAlternativePage"));
 
 // Blog (SEO long-tail)
 const BlogIndexPage = React.lazy(() => import("../pages/blog/BlogIndexPage"));
@@ -277,14 +279,25 @@ export const routes = [
     priority: 0.8,
     changefreq: "monthly"
   },
+  {
+    path: "/spin-ai-alternative",
+    element: <SpinAIAlternativePage />,
+    seo: {
+      title: "Best Spin.AI Alternative | Free Open-Source Chrome Extension Scanner | ExtensionShield",
+      description: "Looking for a Spin.AI alternative? ExtensionShield is the best free, open-source chrome extension security scanner with transparent risk scoring, SAST, VirusTotal, and governance.",
+      canonical: "/spin-ai-alternative"
+    },
+    priority: 0.85,
+    changefreq: "monthly"
+  },
 
   // ============ COMPARE ROUTES (SEO: best scanner, alternatives) ============
   {
     path: "/compare",
     element: <CompareIndexPage />,
     seo: {
-      title: "Best Chrome Extension Security Scanner | CRXcavator Alternatives",
-      description: "Compare the best chrome extension security scanner tools. ExtensionShield vs CRXcavator, CRXplorer, ExtensionAuditor. Chrome extension risk score tool with security, privacy, and governance.",
+      title: "Best Chrome Extension Security Scanner 2026 | Spin.AI & CRXcavator Alternatives",
+      description: "Compare the best chrome extension security scanners. ExtensionShield vs Spin.AI, ExtensionAuditor, CRXcavator, CRXplorer. Free open-source extension risk scanner with transparent scoring, SAST, and governance.",
       canonical: "/compare"
     },
     priority: 0.8,
@@ -316,11 +329,22 @@ export const routes = [
     path: "/compare/extension-auditor",
     element: <CompareExtensionAuditorPage />,
     seo: {
-      title: "ExtensionShield vs ExtensionAuditor | Chrome Extension Security Comparison",
-      description: "ExtensionShield vs ExtensionAuditor: compare chrome extension security scanners. Risk score, permissions checker, governance, and audit chrome extension security for enterprise.",
+      title: "ExtensionShield vs Extension Auditor | Best Chrome Extension Security Scanner Comparison",
+      description: "ExtensionShield vs Extension Auditor: compare chrome extension security scanners. Open-source transparent scoring vs closed methodology. Free extension scanner with SAST, VirusTotal, and governance.",
       canonical: "/compare/extension-auditor"
     },
     priority: 0.7,
+    changefreq: "monthly"
+  },
+  {
+    path: "/compare/spin-ai",
+    element: <CompareSpinAIPage />,
+    seo: {
+      title: "ExtensionShield vs Spin.AI SpinCRX | Best Open-Source Chrome Extension Scanner",
+      description: "Compare ExtensionShield vs Spin.AI SpinCRX for chrome extension security. Open-source transparent scoring vs enterprise ML platform. Free extension scanner alternative to Spin.AI.",
+      canonical: "/compare/spin-ai"
+    },
+    priority: 0.8,
     changefreq: "monthly"
   },
 
@@ -394,6 +418,50 @@ export const routes = [
       canonical: "/blog/how-to-detect-malicious-chrome-extensions"
     },
     priority: 0.6,
+    changefreq: "monthly"
+  },
+  {
+    path: "/blog/best-chrome-extension-security-scanner-2026",
+    element: <BlogPostPage />,
+    seo: {
+      title: "Best Chrome Extension Security Scanner in 2026 | ExtensionShield",
+      description: "Comparing the best chrome extension security scanners in 2026: ExtensionShield vs Spin.AI vs CRXcavator vs Extension Auditor vs CRXplorer. Free, open-source scanner with transparent risk scoring.",
+      canonical: "/blog/best-chrome-extension-security-scanner-2026"
+    },
+    priority: 0.75,
+    changefreq: "monthly"
+  },
+  {
+    path: "/blog/chrome-extension-security-for-developers",
+    element: <BlogPostPage />,
+    seo: {
+      title: "Chrome Extension Security for Developers: Pre-Release Audit Guide | ExtensionShield",
+      description: "How to audit chrome extensions before release. Developer guide to pre-release CRX/ZIP security audit, CI pipeline scanning, and fixing vulnerabilities before Chrome Web Store submission.",
+      canonical: "/blog/chrome-extension-security-for-developers"
+    },
+    priority: 0.7,
+    changefreq: "monthly"
+  },
+  {
+    path: "/blog/extension-monitoring-permission-changes",
+    element: <BlogPostPage />,
+    seo: {
+      title: "Chrome Extension Monitoring: Track Permission Changes & Updates | ExtensionShield",
+      description: "How to monitor chrome extension permission changes, ownership transfers, and security updates. Continuous extension monitoring for IT teams, developers, and security professionals.",
+      canonical: "/blog/extension-monitoring-permission-changes"
+    },
+    priority: 0.7,
+    changefreq: "monthly"
+  },
+  {
+    path: "/blog/open-source-extension-scanner-vs-proprietary",
+    element: <BlogPostPage />,
+    seo: {
+      title: "Open Source vs Proprietary Chrome Extension Scanners | ExtensionShield",
+      description: "Why open-source chrome extension scanners like ExtensionShield deliver better security than proprietary tools like Spin.AI and Extension Auditor. Transparent scoring and reproducible results.",
+      canonical: "/blog/open-source-extension-scanner-vs-proprietary"
+    },
+    priority: 0.7,
     changefreq: "monthly"
   },
 

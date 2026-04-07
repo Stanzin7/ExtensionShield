@@ -5,6 +5,18 @@ User-agent: *
 Allow: /
 Disallow: /settings
 Disallow: /reports
+Disallow: /auth/
+Disallow: /debug/
+
+# Explicitly allow high-value pages for crawling
+Allow: /scan
+Allow: /compare/
+Allow: /blog/
+Allow: /research/
+Allow: /spin-ai-alternative
+Allow: /crxcavator-alternative
+Allow: /chrome-extension-security-scanner
+Allow: /is-this-chrome-extension-safe
 
 # Sitemap
 Sitemap: https://extensionshield.com/sitemap.xml

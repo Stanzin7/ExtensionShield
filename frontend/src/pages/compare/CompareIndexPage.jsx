@@ -9,10 +9,11 @@ const CompareIndexPage = () => {
   return (
     <>
       <SEOHead
-        title="Best Chrome Extension Security Scanner | CRXcavator Alternatives"
-        description="Compare the best chrome extension security scanner tools. ExtensionShield vs CRXcavator, CRXplorer, ExtensionAuditor. Chrome extension risk score tool with security, privacy, and governance."
+        title="Best Chrome Extension Security Scanner 2026 | Spin.AI & CRXcavator Alternatives"
+        description="Compare the best chrome extension security scanners. ExtensionShield vs Spin.AI, ExtensionAuditor, CRXcavator, CRXplorer. Free open-source extension risk scanner with transparent scoring, SAST, and governance."
         pathname="/compare"
         ogType="website"
+        keywords="best chrome extension scanner, Spin.AI alternative, CRXcavator alternative, Extension Auditor alternative, chrome extension security scanner comparison, browser extension risk assessment tool"
       />
 
       <div className="compare-page">
@@ -36,16 +37,17 @@ const CompareIndexPage = () => {
             </p>
 
             <p>
-              Looking for <strong>CRXcavator alternatives</strong>? CRXcavator is a legacy enterprise tool; ExtensionShield offers transparent scoring, SAST + VirusTotal, and extension governance. Below we compare ExtensionShield to other popular options.
+              Looking for <strong>Spin.AI alternatives</strong> or <strong>CRXcavator alternatives</strong>? ExtensionShield is the only <strong>open-source chrome extension scanner</strong> with production-grade risk scoring. Unlike Spin.AI's opaque ML-based scoring or Extension Auditor's closed methodology, our analysis is fully transparent — every finding links to evidence, and the scoring engine is <a href="https://github.com/Stanzin7/ExtensionShield" target="_blank" rel="noopener noreferrer">open source on GitHub</a>. Below we compare ExtensionShield to every major competitor.
             </p>
           </div>
 
           <div className="compare-links">
             <h3>ExtensionShield vs competitors</h3>
             <ul>
+              <li><Link to="/compare/spin-ai">ExtensionShield vs Spin.AI (SpinCRX)</Link></li>
+              <li><Link to="/compare/extension-auditor">ExtensionShield vs ExtensionAuditor</Link></li>
               <li><Link to="/compare/crxcavator">ExtensionShield vs CRXcavator</Link></li>
               <li><Link to="/compare/crxplorer">ExtensionShield vs CRXplorer</Link></li>
-              <li><Link to="/compare/extension-auditor">ExtensionShield vs ExtensionAuditor</Link></li>
             </ul>
           </div>
 
