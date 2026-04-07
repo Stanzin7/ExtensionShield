@@ -308,6 +308,15 @@ class ManifestParser:
 
         logger.info("Parsing manifest from: %s", manifest_path)
 
+        # Guard against malformed or malicious manifests that are unreasonably large.
+        _MAX_MANIFEST_BYTES = 512 * 1024  # 512 KB
+        manifest_size = manifest_path.stat().st_size
+        if manifest_size > _MAX_MANIFEST_BYTES:
+            raise ValueError(
+                f"manifest.json is too large ({manifest_size} bytes). "
+                f"Maximum allowed size is {_MAX_MANIFEST_BYTES} bytes."
+            )
+
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 raw_manifest = json.load(f)
