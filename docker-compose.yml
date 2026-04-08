@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: extension-shield
     ports:
-      - "8007:8007"
+      - "127.0.0.1:8007:8007"  # Localhost only — not accessible from the local network
     volumes:
       # Persist downloaded extensions
       - ./extensions_storage:/app/extensions_storage
