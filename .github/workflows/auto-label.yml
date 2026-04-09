@@ -400,7 +400,6 @@ jobs:
           python <<'PY'
           import json
           import os
-          import re
           import urllib.error
           import urllib.parse
           import urllib.request
@@ -410,7 +409,7 @@ jobs:
           token = os.environ["GITHUB_TOKEN"]
           owner, name = repo.split("/", 1)
           api_root = f"https://api.github.com/repos/{owner}/{name}"
-          managed_area_labels = {
+          managed_labels = {
               "area: backend",
               "area: frontend",
               "area: extension",
@@ -419,25 +418,6 @@ jobs:
               "area: infra",
               "area: tests",
           }
-          managed_keyword_labels = {
-              "bug",
-              "feature",
-              "documentation",
-              "question",
-              "security",
-              "kind: bug",
-              "kind: feature",
-              "kind: documentation",
-              "kind: question",
-              "kind: security",
-          }
-          keyword_rules = [
-              ("security", [r"\bsecurity\b", r"\bvulnerability\b", r"\bxss\b", r"\bcsrf\b", r"\binjection\b", r"\bmalware\b", r"\bcve\b"]),
-              ("bug", [r"\bbug\b", r"\bbugfix\b", r"\bfix\b", r"\bfixes\b", r"\bfixed\b", r"\bregression\b", r"\berror\b", r"\bcrash\b", r"\bbroken\b", r"\bfailing\b", r"\bfailed\b"]),
-              ("documentation", [r"\bdocs?\b", r"\breadme\b", r"\bdocumentation\b", r"\bguide\b"]),
-              ("feature", [r"\bfeature\b", r"\benhancement\b", r"\brequest\b", r"\bidea\b", r"\bproposal\b", r"\badd\b", r"\bintroduce\b", r"\bimplement\b"]),
-              ("question", [r"\bquestion\b", r"\bhow do i\b", r"\bhow to\b", r"\bhelp\b"]),
-          ]
 
           def request_json(url, method="GET", data=None):
               payload = None if data is None else json.dumps(data).encode("utf-8")
@@ -496,14 +476,6 @@ jobs:
                           break
               return labels
 
-          def compute_keyword_labels(text):
-              labels = set()
-              normalized = (text or "").lower()
-              for label, patterns in keyword_rules:
-                  if any(re.search(pattern, normalized) for pattern in patterns):
-                      labels.add(label)
-              return labels
-
           rules = load_label_patterns()
           pulls = list(paginate(f"{api_root}/pulls?state=open"))
           print(f"Found {len(pulls)} open pull requests to backfill.")
@@ -515,11 +487,8 @@ jobs:
                   for item in paginate(f"{api_root}/pulls/{number}/files?")
                   if item.get("filename")
               ]
-              expected = compute_labels(files, rules) | compute_keyword_labels(
-                  f"{pull.get('title', '')}\n{pull.get('body', '')}"
-              )
+              expected = compute_labels(files, rules)
               existing = {label["name"] for label in pull.get("labels", [])}
-              managed_labels = managed_area_labels | managed_keyword_labels
 
               to_remove = sorted((existing & managed_labels) - expected)
               to_add = sorted(expected - existing)
