@@ -76,7 +76,7 @@ class Database:
                      Used only when DB_BACKEND=sqlite (dev fallback).
         """
         if db_path is None:
-            db_path = get_settings().database_path
+            db_path = Path.cwd() / "data" / "db.sqlite3"
         self.db_path = Path(db_path)
         # Ensure parent directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

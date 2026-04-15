@@ -375,6 +375,11 @@ const ScanResultsPageV2 = () => {
     permissions: {},
     evidenceIndex: {}
   };
+  
+  const hasAnyScore =
+  scores?.security?.score ||
+  scores?.privacy?.score ||
+  scores?.governance?.score;
 
   // Extract all findings by layer from raw scan results (includes SAST, factors, gates, etc.)
   const findingsByLayer = extractFindingsByLayer(scanResults);
@@ -478,6 +483,11 @@ const ScanResultsPageV2 = () => {
   }
 
   const overallBand = scores?.overall?.band || scores?.security?.band || 'NA';
+  const isPartialReport =
+  scanResults?.status === "failed" ||
+  (scanResults?.error &&
+    typeof scanResults.error === "string" &&
+    scanResults.error.toLowerCase().includes("download"));
   const overallScore = scores?.overall?.score ?? scores?.security?.score ?? 0;
 
   const extensionName = meta?.name || null;
@@ -758,11 +768,18 @@ const ScanResultsPageV2 = () => {
                   })()}
                 </div>
                 <div className="extension-card-score">
-                  <DonutScore
+                  {isPartialReport && !hasAnyScore ? (
+                  <div className="partial-warning">
+                    ⚠️ Partial Report  
+                    <p>No reliable data available</p>
+                    </div>
+                  ) : (
+                    <DonutScore
                     score={overallScore}
                     band={overallBand}
                     size={donutSize}
-                  />
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -791,27 +808,32 @@ const ScanResultsPageV2 = () => {
               </div>
             )}
             <div className="results-v2-sidebar">
-            <ResultsSidebarTile
-              title="Security"
-              score={scores?.security?.score}
-              band={scores?.security?.band || 'NA'}
-              findingsCount={securityIssueCount}
-              onClick={() => openLayerModal('security')}
-            />
-            <ResultsSidebarTile
-              title="Privacy"
-              score={scores?.privacy?.score ?? null}
-              band={scores?.privacy?.band || 'NA'}
-              findingsCount={privacyIssueCount}
-              onClick={() => openLayerModal('privacy')}
-            />
-            <ResultsSidebarTile
-              title="Governance"
-              score={scores?.governance?.score ?? null}
-              band={scores?.governance?.band || 'NA'}
-              findingsCount={governanceIssueCount}
-              onClick={() => openLayerModal('governance')}
-            />
+            {/* Security */}
+<ResultsSidebarTile
+  title="Security"
+  score={scores?.security?.score ?? null}
+  band={scores?.security?.band || 'NA'}
+  findingsCount={securityIssueCount}
+  onClick={!isPartialReport ? () => openLayerModal('security') : undefined}
+/>
+
+{/* Privacy */}
+<ResultsSidebarTile
+  title="Privacy"
+  score={scores?.privacy?.score ?? null}
+  band={scores?.privacy?.band || 'NA'}
+  findingsCount={privacyIssueCount} 
+  onClick={!isPartialReport ? () => openLayerModal('privacy') : undefined}
+/>
+
+{/* Governance */}
+<ResultsSidebarTile
+  title="Governance"
+  score={scores?.governance?.score ?? null}
+  band={scores?.governance?.band || 'NA'}
+  findingsCount={governanceIssueCount}
+  onClick={!isPartialReport ? () => openLayerModal('governance') : undefined}
+/>
             </div>
           </div>
         </div>

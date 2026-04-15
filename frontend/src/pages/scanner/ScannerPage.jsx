@@ -399,13 +399,28 @@ const ScannerPage = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state, setUrl]);
+  
 
+  
   const handleScanClick = useCallback(() => {
-    if (!url.trim()) {
-      setError("Please enter a Chrome Web Store URL");
-      return;
-    }
-    startScan(url);
+  const input = url.trim();
+
+  if (!input) {
+    setError(" Please enter a Chrome Web Store URL");
+    return;
+  }
+
+  const extensionId = realScanService.extractExtensionId(input);
+
+  if (!extensionId) {
+    setError("❌ Invalid Chrome Web Store URL");
+    return;
+  }
+
+  setError(null);
+
+  // it send id instead of full url
+  startScan(extensionId);
   }, [url, startScan, setError]);
 
   const deepScanLimitReached = deepScanLimit && deepScanLimit.remaining <= 0;

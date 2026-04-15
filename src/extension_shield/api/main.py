@@ -1016,7 +1016,8 @@ load_existing_results()
 # Use centralized config (maps current behavior)
 _settings = get_settings()
 STORAGE_PATH = _settings.extension_storage_path
-RESULTS_DIR = _settings.paths.results_dir  # Convert to absolute path
+from pathlib import Path
+RESULTS_DIR = Path.cwd() / "data" / "extensions_storage"  # Convert to absolute path
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Base64 SVG placeholder for extension icons when local file is missing (e.g. ephemeral storage on Railway)

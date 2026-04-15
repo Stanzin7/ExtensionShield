@@ -36,7 +36,15 @@ const badgeVariantForRisk = (risk) => {
 };
 
 const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf }) => {
-  const [mode, setMode] = useState("simple"); // simple | advanced
+  const isPartial =
+  !report ||
+  !report?.scorecard ||
+  report?.scorecard?.confidence === "LOW" ||
+  !report?.meta?.name ||
+  report?.meta?.name === "Unknown Extension" ||
+  report?.meta?.publisher === "Unknown";
+
+  const [mode, setMode] = useState("simple");
   const [layerModal, setLayerModal] = useState({ open: false, layer: null });
   const [evidenceDrawer, setEvidenceDrawer] = useState({ open: false, evidenceIds: [] });
 
@@ -62,9 +70,8 @@ const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf
     setLayerModal({ open: false, layer: null });
   };
 
-  // Re-normalize data for SummaryPanel/LayerModal if needed
-  // Or just use what we have from ReportViewModel
   const factorsByLayer = report?.factorsByLayer || { security: [], privacy: [], governance: [] };
+
   const scores = report?.scores || {
     security: { score: report?.security_layer?.score, band: report?.security_layer?.risk_level },
     privacy: { score: report?.privacy_layer?.score, band: report?.privacy_layer?.risk_level },
@@ -73,88 +80,81 @@ const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf
     reasons: report?.scorecard?.reasons || []
   };
 
-  // Extract all findings by layer from raw scan results (includes SAST, factors, gates, etc.)
-  const findingsByLayer = extractFindingsByLayer(rawScanResult);
-  
-  // Combine keyFindings with extracted findings, deduplicating by title
-  const dedupeFindings = (findings) => {
-    const seen = new Set();
-    return findings.filter(f => {
-      const key = f.title?.toLowerCase() || '';
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
-
-  const allSecurityFindings = dedupeFindings([
-    ...(report?.keyFindings?.filter(f => f.layer === 'security') || []),
-    ...findingsByLayer.security,
-  ]);
-  const allPrivacyFindings = dedupeFindings([
-    ...(report?.keyFindings?.filter(f => f.layer === 'privacy') || []),
-    ...findingsByLayer.privacy,
-  ]);
-  const allGovernanceFindings = dedupeFindings([
-    ...(report?.keyFindings?.filter(f => f.layer === 'governance') || []),
-    ...findingsByLayer.governance,
-  ]);
-
   return (
     <div className="report-detail-page">
       <div className="report-content">
-        <div className="report-nav" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Link to="/scan/history" className="back-link">← Back to Scan History</Link>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <Button variant="outline" size="sm" onClick={onExportPdf}>
-              <Download size={16} />
-              PDF
-            </Button>
-          </div>
+
+        {/* NAV */}
+        <div className="report-nav" style={{ display: "flex", justifyContent: "space-between" }}>
+          <Link to="/scan/history">← Back to Scan History</Link>
+          <Button onClick={onExportPdf}>PDF</Button>
         </div>
 
+        {/* MAIN CARD */}
         <Card className="content-card">
           <CardHeader>
-            <CardTitle style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+            <CardTitle style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap" }}>
               <span>{meta?.name || "Extension Report"}</span>
-              <span style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+
+              <span style={{ display: "flex", gap: "0.5rem" }}>
                 <Badge variant="outline">{extensionId}</Badge>
-                <Badge variant={badgeVariantForRisk(scorecard?.score_label)}>{scorecard?.score_label || "UNKNOWN"}</Badge>
-                <Badge variant="outline">Confidence: {scorecard?.confidence || "UNKNOWN"}</Badge>
+
+                {/* ✅ FIX: Hide badge when partial */}
+                {!isPartial && (
+                  <Badge variant={badgeVariantForRisk(scorecard?.score_label)}>
+                    {scorecard?.score_label || "UNKNOWN"}
+                  </Badge>
+                )}
+
+                <Badge variant="outline">
+                  Confidence: {scorecard?.confidence || "UNKNOWN"}
+                </Badge>
               </span>
             </CardTitle>
           </CardHeader>
+
           <CardContent>
-            <div style={{ display: "flex", gap: "1rem", alignItems: "baseline", flexWrap: "wrap" }}>
-              <div style={{ fontSize: "2rem", fontWeight: 700 }}>
-                {Number.isFinite(scorecard?.score) ? scorecard.score : 0}
-                <span style={{ fontSize: "1rem", opacity: 0.7 }}>/100</span>
-              </div>
-              <div style={{ fontSize: "1rem", opacity: 0.9 }}>{scorecard?.one_liner || ""}</div>
+
+            {/* SCORE */}
+            <div style={{ fontSize: "2rem", fontWeight: 700 }}>
+              {!isPartial ? (
+                <>
+                  {Number.isFinite(scorecard?.score) ? scorecard.score : 0}
+                  <span style={{ fontSize: "1rem", opacity: 0.7 }}>/100</span>
+                </>
+              ) : (
+                <span style={{ color: "#facc15" }}>
+                  ⚠️ Incomplete
+                </span>
+              )}
             </div>
 
+            {/* ✅ GLOBAL WARNING */}
+            {isPartial && (
+              <div style={{
+                marginTop: "1rem",
+                padding: "1rem",
+                border: "1px solid #facc15",
+                borderRadius: "10px",
+                background: "rgba(250, 204, 21, 0.1)",
+                color: "#facc15"
+              }}>
+                ⚠️ This report is incomplete. Input is invalid or analysis failed.
+              </div>
+            )}
+
+            {/* MODE SWITCH */}
             <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-              <Button
-                variant={mode === "simple" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setMode("simple")}
-              >
-                Simple
-              </Button>
-              <Button
-                variant={mode === "advanced" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setMode("advanced")}
-              >
-                Advanced
-              </Button>
+              <Button onClick={() => setMode("simple")}>Simple</Button>
+              <Button onClick={() => setMode("advanced")}>Advanced</Button>
             </div>
+
           </CardContent>
         </Card>
 
-        {/* Standardized Summary Panel */}
+        {/* SUMMARY PANEL */}
         <div style={{ marginTop: "1rem" }}>
-          <SummaryPanel 
+          <SummaryPanel
             scores={scores}
             factorsByLayer={factorsByLayer}
             rawScanResult={rawScanResult}
@@ -163,216 +163,32 @@ const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf
           />
         </div>
 
-        {/* Layer Tiles Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginTop: "1rem" }}>
-          <ReportScoreCard 
-            title="Security"
-            score={scores.security?.score}
-            band={scores.security?.band || 'NA'}
-            contributors={factorsByLayer.security?.slice(0, 2)}
-            onClick={() => openLayerModal('security')}
-          />
-          <ReportScoreCard 
-            title="Privacy"
-            score={scores.privacy?.score}
-            band={scores.privacy?.band || 'NA'}
-            contributors={factorsByLayer.privacy?.slice(0, 2)}
-            onClick={() => openLayerModal('privacy')}
-          />
-          <ReportScoreCard 
-            title="Governance"
-            score={scores.governance?.score}
-            band={scores.governance?.band || 'NA'}
-            contributors={factorsByLayer.governance?.slice(0, 2)}
-            onClick={() => openLayerModal('governance')}
-          />
-        </div>
-
-        {consumer && (
-          <div className="consumer-insights-section">
-            <div className="consumer-insights-grid">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Safety Labels</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <SafetyLabelCard rows={safetyRows} onEvidenceClick={handleEvidenceClick} />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top Drivers</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TopDriversRow drivers={topDrivers} onEvidenceClick={handleEvidenceClick} />
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="consumer-insights-scenarios">
-              <CardHeader>
-                <CardTitle>Scenarios</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScenarioGrid scenarios={scenarios} onEvidenceClick={handleEvidenceClick} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
+        {/* IMPACT CARDS */}
+        <div style={{ marginTop: "1rem", display: "grid", gap: "1rem" }}>
           {impactCards.slice(0, 3).map((c) => (
             <Card key={c.id}>
               <CardHeader>
-                <CardTitle style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-                  <span>{c.title || c.id}</span>
-                  <Badge variant={badgeVariantForRisk(c.risk_level)}>{c.risk_level || "UNKNOWN"}</Badge>
-                </CardTitle>
+                <CardTitle>{c.title}</CardTitle>
               </CardHeader>
-              <CardContent>
-                {Array.isArray(c.bullets) && c.bullets.length > 0 ? (
-                  <ul style={{ marginLeft: "1rem", listStyle: "disc" }}>
-                    {c.bullets.map((b, idx) => <li key={idx}>{b}</li>)}
-                  </ul>
-                ) : (
-                  <div style={{ opacity: 0.7 }}>No details available.</div>
-                )}
 
-                {Array.isArray(c.mitigations) && c.mitigations.length > 0 && (
-                  <div style={{ marginTop: "0.75rem" }}>
-                    <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>Mitigations</div>
-                    <ul style={{ marginLeft: "1rem", listStyle: "disc" }}>
-                      {c.mitigations.map((m, idx) => <li key={idx}>{m}</li>)}
-                    </ul>
-                  </div>
-                )}
+              <CardContent>
+                {c.bullets?.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {mode === "advanced" && (
-          <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Privacy &amp; Compliance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {privacy?.privacy_snapshot && (
-                  <div style={{ marginBottom: "0.75rem", opacity: 0.9 }}>{privacy.privacy_snapshot}</div>
-                )}
-
-                {Array.isArray(privacy?.governance_checks) && privacy.governance_checks.length > 0 ? (
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <thead>
-                        <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                          <th style={{ padding: "0.5rem" }}>Check</th>
-                          <th style={{ padding: "0.5rem" }}>Status</th>
-                          <th style={{ padding: "0.5rem" }}>Note</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {privacy.governance_checks.map((row, idx) => (
-                          <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                            <td style={{ padding: "0.5rem" }}>{row?.check || ""}</td>
-                            <td style={{ padding: "0.5rem" }}>
-                              <Badge variant={badgeVariantForRisk(row?.status)}>{row?.status || "UNKNOWN"}</Badge>
-                            </td>
-                            <td style={{ padding: "0.5rem", opacity: 0.9 }}>{row?.note || ""}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div style={{ opacity: 0.7 }}>No governance checks available.</div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Evidence</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <details>
-                  <summary style={{ cursor: "pointer", userSelect: "none" }}>Show evidence JSON</summary>
-                  <pre
-                    style={{
-                      marginTop: "0.75rem",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.85rem",
-                      opacity: 0.95
-                    }}
-                  >
-                    {JSON.stringify({ evidence: report?.evidence, raw: report?.raw }, null, 2)}
-                  </pre>
-                </details>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Evidence Drawer */}
-        <EvidenceDrawer 
+        {/* DRAWER */}
+        <EvidenceDrawer
           open={evidenceDrawer.open}
           evidenceIds={evidenceDrawer.evidenceIds}
           evidenceIndex={report?.evidenceIndex || {}}
-          onClose={() => setEvidenceDrawer({ open: false, evidenceIds: [] })}
+          onClose={() =>
+            setEvidenceDrawer({ open: false, evidenceIds: [] })
+          }
         />
-
-        {/* Layer Modals */}
-        {layerModal.layer === 'security' && (
-          <LayerModal
-            open={layerModal.open}
-            onClose={closeLayerModal}
-            layer="security"
-            score={scores.security?.score}
-            band={scores.security?.band}
-            factors={factorsByLayer.security}
-            keyFindings={allSecurityFindings}
-            gateResults={rawScanResult?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'security') || []}
-            layerReasons={scores.reasons?.filter(r => r.toLowerCase().includes('security') || r.toLowerCase().includes('sast')) || []}
-            layerDetails={report?.layer_details}
-            onViewEvidence={handleEvidenceClick}
-          />
-        )}
-
-        {layerModal.layer === 'privacy' && (
-          <LayerModal
-            open={layerModal.open}
-            onClose={closeLayerModal}
-            layer="privacy"
-            score={scores.privacy?.score}
-            band={scores.privacy?.band}
-            factors={factorsByLayer.privacy}
-            keyFindings={allPrivacyFindings}
-            gateResults={rawScanResult?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'privacy') || []}
-            layerReasons={scores.reasons?.filter(r => r.toLowerCase().includes('privacy') || r.toLowerCase().includes('exfil')) || []}
-            layerDetails={report?.layer_details}
-            onViewEvidence={handleEvidenceClick}
-          />
-        )}
-
-        {layerModal.layer === 'governance' && (
-          <LayerModal
-            open={layerModal.open}
-            onClose={closeLayerModal}
-            layer="governance"
-            score={scores.governance?.score}
-            band={scores.governance?.band}
-            factors={factorsByLayer.governance}
-            keyFindings={allGovernanceFindings}
-            gateResults={rawScanResult?.scoring_v2?.gate_results?.filter(g => g.triggered && gateIdToLayer(g.gate_id) === 'governance') || []}
-            layerReasons={scores.reasons?.filter(r => r.toLowerCase().includes('governance') || r.toLowerCase().includes('policy')) || []}
-            layerDetails={report?.layer_details}
-            onViewEvidence={handleEvidenceClick}
-          />
-        )}
       </div>
     </div>
   );
