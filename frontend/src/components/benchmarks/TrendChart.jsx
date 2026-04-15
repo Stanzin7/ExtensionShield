@@ -3,6 +3,17 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 
 const TrendChart = ({ data, dataKey, title, color = "#22c55e", height = 350, theme = "dark" }) => {
   const isLight = theme === "light";
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== "undefined" ? window.innerWidth < 480 : false
+  );
+
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 480);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Format data for Recharts
   const formattedData = data.map(item => ({
     date: new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
@@ -36,7 +47,7 @@ const TrendChart = ({ data, dataKey, title, color = "#22c55e", height = 350, the
   };
 
   return (
-    <div className="trend-chart" style={{ width: '100%', height }}>
+    <div className="trend-chart" style={{ width: '100%' }}>
       <h4 className="trend-chart__title" style={{ 
         fontSize: '0.9375rem', 
         fontWeight: 600, 
@@ -44,19 +55,30 @@ const TrendChart = ({ data, dataKey, title, color = "#22c55e", height = 350, the
       }}>
         {title}
       </h4>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={formattedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border-subtle)" />
-          <XAxis 
-            dataKey="date" 
-            stroke="var(--theme-text-subtle)"
-            style={{ fontSize: '0.75rem' }}
-          />
-          <YAxis 
-            stroke="var(--theme-text-subtle)"
-            style={{ fontSize: '0.75rem' }}
-          />
-          <Tooltip content={<CustomTooltip />} />
+      <div style={{ width: '100%', height: height - 40, minHeight: 250 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={formattedData} margin={{ 
+            top: 5, 
+            right: isMobile ? 10 : 30, 
+            left: isMobile ? -15 : 20, 
+            bottom: isMobile ? 25 : 5 
+          }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border-subtle)" />
+            <XAxis 
+              dataKey="date" 
+              stroke="var(--theme-text-subtle)"
+              style={{ fontSize: isMobile ? '0.65rem' : '0.75rem' }}
+              angle={isMobile ? -45 : 0}
+              textAnchor={isMobile ? "end" : "middle"}
+              height={isMobile ? 50 : 30}
+              tickMargin={isMobile ? 5 : 5}
+            />
+            <YAxis 
+              stroke="var(--theme-text-subtle)"
+              style={{ fontSize: isMobile ? '0.65rem' : '0.75rem' }}
+              width={isMobile ? 35 : 60}
+            />
+            <Tooltip content={<CustomTooltip />} />
           <Line 
             type="monotone" 
             dataKey="value" 
@@ -69,7 +91,8 @@ const TrendChart = ({ data, dataKey, title, color = "#22c55e", height = 350, the
             animationEasing="ease-out"
           />
         </LineChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };
