@@ -38,6 +38,14 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 6rem 2rem 4rem;
+
+  @media (max-width: 768px) {
+    padding: 4rem 1.5rem 3rem;
+  }
+
+  @media (max-width: 480px) {
+    padding: 3rem 1rem 2rem;
+  }
 }
 
 /* Header */
@@ -130,6 +138,12 @@
   
   @media (max-width: 480px) {
     grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .highlights-grid .highlight-tile {
+    padding: 1rem;
+    min-height: 120px;
   }
 }
 
@@ -261,17 +275,21 @@
   
   @media (max-width: 968px) {
     grid-template-columns: 1fr;
+    gap: 2rem;
   }
 }
 
 .trends-disclaimer {
   margin-top: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   padding: 0.75rem 1rem;
   background: rgba(148, 163, 184, 0.05);
   border-left: 2px solid rgba(148, 163, 184, 0.2);
   border-radius: 4px;
-  
+  @media (max-width: 480px) {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
   p {
     margin: 0;
     font-size: 0.8125rem;
@@ -288,8 +306,22 @@
   padding: 1.5rem;
   transition: all 0.3s ease;
 
+  @media (max-width: 480px) {
+    padding: 1rem 0.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 320px;
+  }
+
   .trend-chart__title {
     color: var(--extensionshield-text-primary, #f8fafc);
+    
+    @media (max-width: 480px) {
+      font-size: 0.875rem !important;
+      margin-bottom: 0.75rem !important;
+    }
   }
 
   &:hover {
@@ -937,6 +969,10 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+
+  @media (max-width: 480px) {
+    font-size: 0.75rem;
+  }
 }
 
 .scanner-comparison-table th,
@@ -944,6 +980,10 @@
   padding: 0.75rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--extensionshield-border, rgba(148, 163, 184, 0.15));
+
+  @media (max-width: 480px) {
+    padding: 0.5rem 0.75rem;
+  }
 }
 
 .scanner-comparison-table th {
