@@ -92,9 +92,6 @@
     },
     "tinyglobby": {
       "picomatch": "4.0.4"
-    },
-    "vite@*": {
-      "picomatch": "4.0.4"
     }
   }
 }
