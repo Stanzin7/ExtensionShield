@@ -1562,6 +1562,8 @@ async def run_analysis_workflow(url: str, extension_id: str):
                 "publisher_disclosures": build_publisher_disclosures(
                     metadata, final_state.get("governance_bundle")
                 ),
+                # Partial-failure warnings from LLM nodes (empty list = all LLM analyses succeeded)
+                "partial_failures": final_state.get("llm_warnings") or [],
             }
 
             # Final sanitization pass to ensure JSON-serializability

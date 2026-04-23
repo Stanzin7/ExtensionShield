@@ -432,9 +432,13 @@ def summary_generation_node(state: WorkflowState) -> Command:
             logger.warning("Summary generation failed, using fallback: %s", exc)
         executive_summary = None
 
+    warnings = list(state.get("llm_warnings") or [])
+    if executive_summary is None:
+        warnings.append("Summary unavailable — LLM service temporarily failed")
+
     return Command(
         goto=IMPACT_ANALYSIS_NODE,
-        update={"executive_summary": executive_summary},
+        update={"executive_summary": executive_summary, "llm_warnings": warnings},
     )
 
 
@@ -481,11 +485,16 @@ def impact_analysis_node(state: WorkflowState) -> Command:
     updated_results = dict(analysis_results)
     updated_results["impact_analysis"] = impact_analysis
 
+    warnings = list(state.get("llm_warnings") or [])
+    if impact_analysis is None:
+        warnings.append("Impact analysis unavailable — LLM service temporarily failed")
+
     return Command(
         goto=PRIVACY_COMPLIANCE_NODE,
         update={
             "analysis_results": updated_results,
             "impact_analysis": impact_analysis,
+            "llm_warnings": warnings,
         },
     )
 
@@ -528,11 +537,16 @@ def privacy_compliance_node(state: WorkflowState) -> Command:
     updated_results = dict(analysis_results)
     updated_results["privacy_compliance"] = privacy_compliance
 
+    warnings = list(state.get("llm_warnings") or [])
+    if privacy_compliance is None:
+        warnings.append("Privacy compliance unavailable — LLM service temporarily failed")
+
     return Command(
         goto=GOVERNANCE_NODE,
         update={
             "analysis_results": updated_results,
             "privacy_compliance": privacy_compliance,
+            "llm_warnings": warnings,
         },
     )
 
