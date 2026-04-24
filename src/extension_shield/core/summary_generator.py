@@ -65,7 +65,7 @@ def _attach_model_version(summary: Dict[str, Any], model_version: Optional[str])
     """Return a shallow copy of a summary with model_version attached when known."""
     normalized = dict(summary) if isinstance(summary, dict) else {}
     if model_version:
-        normalized.setdefault("model_version", model_version)
+        normalized["model_version"] = model_version
     return normalized
 
 

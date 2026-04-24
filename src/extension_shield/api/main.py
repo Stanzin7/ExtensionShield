@@ -2268,6 +2268,8 @@ async def submit_feedback(feedback: FeedbackRequest, http_request: Request):
     provide details about why it wasn't (false positive, score issues, etc.).
     """
     user_id = _get_user_id(http_request)
+    if user_id == "anon":
+        user_id = None
     
     # If helpful=true, ignore reason/suggested_score/comment
     reason = None if feedback.helpful else (feedback.reason.value if feedback.reason else None)
