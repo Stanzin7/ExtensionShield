@@ -65,7 +65,18 @@
     }
   }
 
-  if (tabExtensions) tabExtensions.addEventListener('click', function () { switchTab('extensions'); });
+  if (tabExtensions) {
+    tabExtensions.addEventListener('click', function () { 
+      chrome.permissions.contains({ permissions: ["management"] }, function(hasPerm) {
+        if (!hasPerm) {
+          chrome.permissions.request({ permissions: ["management"] }, function(granted) {
+            if (granted) scan(false);
+          });
+        }
+      });
+      switchTab('extensions'); 
+    });
+  }
   if (tabScanUrl) tabScanUrl.addEventListener('click', function () { switchTab('scanurl'); });
 
   var scanUrlInput = document.getElementById('scanUrlInput');
@@ -153,6 +164,23 @@
 
   function handleScanUrlSubmit() {
     var raw = scanUrlInput && scanUrlInput.value ? scanUrlInput.value.trim() : '';
+
+    if (raw) {
+      var isIdOnly = /^[a-z]{32}$/i.test(raw);
+      if (!isIdOnly) {
+        // If not a simple ID, validate as URL
+        if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+          raw = 'https://' + raw;
+        }
+        try {
+          new URL(raw);
+        } catch {
+          alert("Invalid URL");
+          return;
+        }
+      }
+    }
+
     var extId = extractExtensionIdFromInput(raw);
   if (!extId) {
   setScanUrlMessage('Please enter a valid Chrome Web Store URL or Extension ID.', 'error');
