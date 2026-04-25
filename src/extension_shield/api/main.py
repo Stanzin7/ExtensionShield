@@ -8,6 +8,7 @@ and retrieve results.
 import base64
 import mimetypes
 import os
+import hmac
 from pathlib import Path
 
 # Load .env from project root so DB_BACKEND, SUPABASE_*, etc. are set before config/database init
@@ -362,7 +363,12 @@ else:
 app.add_middleware(CSPMiddleware, is_dev=_is_dev)
 
 # Trust X-Forwarded-Proto / X-Forwarded-For from Railway/Cloudflare so request.url.scheme is correct
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+TRUSTED_PROXIES = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "10.0.0.0/8",
+]
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=TRUSTED_PROXIES)
 
 # In-memory state lives in shared.py; import references here so existing
 # code in this file (and tests) can continue using module-level names.
@@ -408,24 +414,11 @@ def _get_client_ip(request: Request) -> str:
     """
     Get the client's IP address for rate limiting anonymous users.
     
-    Handles proxied requests via X-Forwarded-For and X-Real-IP headers.
-    Falls back to client host if no headers present.
+    Relies on ProxyHeadersMiddleware to properly set request.client.host
+    based on trusted reverse proxies, preventing header spoofing.
     """
-    # Check X-Forwarded-For header (from reverse proxy/load balancer)
-    x_forwarded_for = request.headers.get("x-forwarded-for")
-    if x_forwarded_for:
-        # Take the first IP (original client)
-        return x_forwarded_for.split(",")[0].strip()
-    
-    # Check X-Real-IP header (from nginx)
-    x_real_ip = request.headers.get("x-real-ip")
-    if x_real_ip:
-        return x_real_ip.strip()
-    
-    # Fall back to direct client IP
-    if request.client:
+    if request.client and request.client.host:
         return request.client.host
-    
     return "unknown"
 
 
@@ -461,7 +454,6 @@ def _require_admin_key(request: Request) -> None:
             status_code=403,
             detail="Admin API key is not configured"
         )
-    
     provided_key = request.headers.get("X-Admin-Key") or request.headers.get("x-admin-key")
     if not provided_key:
         raise HTTPException(
@@ -469,7 +461,10 @@ def _require_admin_key(request: Request) -> None:
             detail="X-Admin-Key header is required"
         )
     
-    if provided_key != admin_key:
+    if not hmac.compare_digest(
+        provided_key.encode("utf-8"),
+        admin_key.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=403,
             detail="Invalid admin API key"
@@ -496,7 +491,16 @@ def _require_admin_or_telemetry_key(request: Request) -> None:
             status_code=403,
             detail="X-Admin-Key header is required"
         )
-    valid = (admin_key and provided == admin_key) or (telemetry_key and provided == telemetry_key)
+    valid = (
+        (admin_key and hmac.compare_digest(
+            provided.encode("utf-8"),
+            admin_key.encode("utf-8")
+        )) or
+        (telemetry_key and hmac.compare_digest(
+            provided.encode("utf-8"),
+            telemetry_key.encode("utf-8")
+        ))
+    )
     if not valid:
         raise HTTPException(
             status_code=403,
@@ -982,6 +986,65 @@ class FeedbackRequest(BaseModel):
         if not self.helpful and self.reason is None:
             raise ValueError("reason is required when helpful=false")
         return self
+
+
+def _coerce_json_dict(value: Any) -> Dict[str, Any]:
+    """Convert JSON-ish values to a dict for metadata lookups."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _extract_feedback_versions(payload: Optional[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
+    """Extract model and ruleset versions from a scan payload when available."""
+    if not isinstance(payload, dict):
+        return None, None
+
+    metadata = _coerce_json_dict(payload.get("metadata"))
+    summary = _coerce_json_dict(payload.get("summary"))
+    report_view_model_source = payload.get("report_view_model")
+    if not report_view_model_source:
+        report_view_model_source = summary.get("report_view_model")
+    report_view_model = _coerce_json_dict(report_view_model_source)
+    report_meta = _coerce_json_dict(report_view_model.get("meta"))
+
+    scoring_v2 = _coerce_json_dict(payload.get("scoring_v2"))
+    if not scoring_v2:
+        scoring_v2 = _coerce_json_dict(summary.get("scoring_v2"))
+
+    model_version = (
+        summary.get("model_version")
+        or metadata.get("model_version")
+        or report_meta.get("model_version")
+        or summary.get("llm_model")
+        or metadata.get("llm_model")
+    )
+
+    ruleset_version = (
+        summary.get("ruleset_version")
+        or metadata.get("ruleset_version")
+        or report_meta.get("ruleset_version")
+        or scoring_v2.get("weights_version")
+        or scoring_v2.get("scoring_version")
+    )
+
+    return model_version, ruleset_version
+
+
+def _resolve_feedback_versions(scan_id: str) -> tuple[Optional[str], Optional[str]]:
+    """Look up the related scan payload and extract version metadata safely."""
+    payload = scan_results.get(scan_id)
+    if isinstance(payload, dict):
+        return _extract_feedback_versions(payload)
+
+    db_payload = db.get_scan_result(scan_id)
+    return _extract_feedback_versions(db_payload)
 
 
 class ReviewQueueClaimRequest(BaseModel):
@@ -1504,6 +1567,16 @@ async def run_analysis_workflow(url: str, extension_id: str):
             if scoring_result.coverage_cap_reason is not None:
                 scoring_v2_payload["coverage_cap_reason"] = scoring_result.coverage_cap_reason
 
+            executive_summary = final_state.get("executive_summary") or {}
+            if isinstance(executive_summary, dict):
+                executive_summary = dict(executive_summary)
+            else:
+                executive_summary = {}
+            executive_summary.setdefault(
+                "ruleset_version",
+                scoring_v2_payload.get("weights_version") or scoring_v2_payload.get("scoring_version"),
+            )
+
             # Build scan results - sanitize complex objects to prevent circular references
             raw_results = {
                 "extension_id": extension_id,
@@ -1518,7 +1591,7 @@ async def run_analysis_workflow(url: str, extension_id: str):
                 "webstore_analysis": analysis_results.get("webstore_analysis") or {},
                 "virustotal_analysis": analysis_results.get("virustotal_analysis") or {},
                 "entropy_analysis": analysis_results.get("entropy_analysis") or {},
-                "summary": final_state.get("executive_summary") or {},
+                "summary": executive_summary,
                 "impact_analysis": analysis_results.get("impact_analysis") or {},
                 "privacy_compliance": analysis_results.get("privacy_compliance") or {},
                 "extracted_path": _storage_relative_extracted_path(final_state.get("extension_dir")),
@@ -2199,11 +2272,14 @@ async def submit_feedback(feedback: FeedbackRequest, http_request: Request):
     provide details about why it wasn't (false positive, score issues, etc.).
     """
     user_id = _get_user_id(http_request)
+    if user_id == "anon":
+        user_id = None
     
     # If helpful=true, ignore reason/suggested_score/comment
     reason = None if feedback.helpful else (feedback.reason.value if feedback.reason else None)
     suggested_score = None if feedback.helpful else feedback.suggested_score
     comment = None if feedback.helpful else feedback.comment
+    model_version, ruleset_version = _resolve_feedback_versions(feedback.scan_id)
     
     # Save feedback to database (SQLite or Supabase)
     db.save_feedback(
@@ -2213,8 +2289,8 @@ async def submit_feedback(feedback: FeedbackRequest, http_request: Request):
         suggested_score=suggested_score,
         comment=comment,
         user_id=user_id,
-        model_version=None,  # TODO: Extract from scan result metadata
-        ruleset_version=None,  # TODO: Extract from scan result metadata
+        model_version=model_version,
+        ruleset_version=ruleset_version,
     )
     
     return {"ok": True}

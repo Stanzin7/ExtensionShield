@@ -150,10 +150,10 @@ body {
   width: 100%;
   max-width: var(--layout-max-width);
   height: var(--extensionshield-header-height);
-  padding: 0 clamp(0.75rem, 2.5vw, 1.75rem);
-  display: flex;
+  padding: 10px clamp(0.75rem, 2.5vw, 1.75rem) 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 1.5rem;
   /* Motion handles maxWidth, margin, background, border, shadow, borderRadius when solid */
 }
@@ -208,6 +208,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.125rem;
+  justify-content: center;
 }
 
 
@@ -729,6 +730,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  justify-content: flex-end;
 }
 
 /* Get Extension – icon + text, site theme (green) */
@@ -779,14 +781,21 @@ body {
 /* Theme toggle styles live in components/ThemeToggle.scss */
 
 .action-signin {
-  padding: 0.5rem 1.25rem;
+  padding: 0.4rem 1rem;
   font-size: 0.9375rem;
   font-weight: 500;
   color: #fff;
   text-decoration: none;
   background: var(--extensionshield-accent-cta, var(--extensionshield-accent));
   border: 1px solid var(--extensionshield-accent-cta, var(--extensionshield-accent));
-  border-radius: 8px;
+  
+  border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   font-family: inherit;
@@ -1111,25 +1120,25 @@ body {
   width: 100%;
   max-width: var(--layout-max-width);
   margin: 0 auto;
-  padding: clamp(4rem, 8vh, 6rem) var(--layout-padding-x) !important;
+  padding: calc(var(--extensionshield-header-offset) + clamp(2rem, 4vh, 3rem)) var(--layout-padding-x) clamp(4rem, 8vh, 6rem) var(--layout-padding-x) !important;
   animation: pageEnter 0.4s ease-out;
 }
 
 @media (max-width: 1024px) {
   .page-container {
-    padding: clamp(3rem, 6vh, 4rem) var(--layout-padding-x) !important;
+    padding: calc(var(--extensionshield-header-offset) + clamp(1.5rem, 3vh, 2rem)) var(--layout-padding-x) clamp(3rem, 6vh, 4rem) var(--layout-padding-x) !important;
   }
 }
 
 @media (max-width: 768px) {
   .page-container {
-    padding: clamp(2.5rem, 5vh, 3rem) var(--layout-padding-x) !important;
+    padding: calc(var(--extensionshield-header-offset) + clamp(1rem, 2vh, 1.5rem)) var(--layout-padding-x) clamp(2.5rem, 5vh, 3rem) var(--layout-padding-x) !important;
   }
 }
 
 @media (max-width: 480px) {
   .page-container {
-    padding: 2rem var(--layout-padding-x) !important;
+    padding: calc(var(--extensionshield-header-offset) + 1rem) var(--layout-padding-x) 2rem var(--layout-padding-x) !important;
   }
 }
 
@@ -1219,6 +1228,7 @@ body {
   cursor: pointer;
   flex-direction: column;
   gap: 5px;
+  flex-shrink: 0;
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
@@ -1370,7 +1380,8 @@ body {
    ============================================================================ */
 @media (max-width: 1024px) {
   .header-container {
-    padding: 0 1.5rem;
+    padding: 10px 1rem 0;
+    gap: 0.75rem;
   }
 
   .header-nav-desktop {
@@ -1380,6 +1391,11 @@ body {
   .nav-item {
     padding: 0.5rem 0.875rem;
     font-size: 0.875rem;
+  }
+
+  .action-signin {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
   }
 
   .megamenu-dropdown {
@@ -1394,7 +1410,7 @@ body {
 /* Tablet: keep full nav but tighter layout; megamenu dropdown full width when open */
 @media (max-width: 768px) {
   .header-container {
-    padding: 0 1rem;
+    padding: 10px 1rem 0;
   }
 
   .megamenu-dropdown {
@@ -1411,7 +1427,9 @@ body {
   }
 
   .header-container {
-    padding: 0 1rem;
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 1.25rem 0;
   }
 
   .header-nav-desktop,
@@ -1448,7 +1466,7 @@ body {
   }
 
   .header-container {
-    padding: 0 0.75rem;
+    padding: 4px 1rem 0;
   }
 
   .header-logo-img {
@@ -1471,6 +1489,36 @@ body {
 
   .page-container {
     padding: 48px 1rem 2rem !important;
+  }
+}
+
+/* Extra small devices (iPhone 12/13/14/15 Pro: 390px, SE: 375px) */
+@media (max-width: 400px) {
+  .header-container {
+    padding: 0px 0.75rem 0;
+    gap: 0.5rem;
+  }
+
+  .header-logo-shield {
+    width: 40px;
+    height: 40px;
+  }
+
+  .header-logo-img {
+    height: 32px;
+  }
+
+  .logo-text {
+    font-size: 0.875rem;
+  }
+
+  .header-mobile-toggle {
+    width: 32px;
+    height: 32px;
+    
+    .hamburger-bar {
+      width: 18px;
+    }
   }
 }
 

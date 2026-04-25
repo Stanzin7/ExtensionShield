@@ -422,22 +422,24 @@ function AppHeader() {
           )}
         </div>
 
-        {/* Theme toggler next to hamburger (not inside): one-tap access without opening menu */}
-        <div className="header-actions header-actions-mobile">
-          <ThemeToggle />
-        </div>
+        {/* Group ThemeToggle and Hamburger in one wrapper on mobile so space-between aligns properly */}
+        <div className="header-actions-mobile-wrapper" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div className="header-actions header-actions-mobile">
+            <ThemeToggle />
+          </div>
 
-        <button
-          type="button"
-          className="header-mobile-toggle"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileMenuOpen}
-        >
-          <span className="hamburger-bar" />
-          <span className="hamburger-bar" />
-          <span className="hamburger-bar" />
-        </button>
+          <button
+            type="button"
+            className="header-mobile-toggle"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className="hamburger-bar" />
+            <span className="hamburger-bar" />
+            <span className="hamburger-bar" />
+          </button>
+        </div>
       </div>
 
       {createPortal(
@@ -516,6 +518,7 @@ function getRouteSegment(pathname) {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/scan")) return "scan";
   if (pathname.startsWith("/research")) return "research";
+  if (pathname.startsWith("/extension-")) return "resources";
   if (pathname.startsWith("/open-source") || pathname.startsWith("/contribute") || pathname.startsWith("/glossary") || pathname.startsWith("/gsoc") || pathname.startsWith("/community") || pathname.startsWith("/about") || pathname.startsWith("/blog") || pathname.startsWith("/compare")) return "resources";
   return "default";
 }
