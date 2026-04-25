@@ -34,11 +34,7 @@ echo "=============================================="
 echo "Supabase: $ENV_LABEL (ref: $REF)"
 echo "=============================================="
 
-# Prefer npx so it works without global supabase CLI
-SUPABASE_CMD="npx supabase"
-if command -v supabase >/dev/null 2>&1; then
-  SUPABASE_CMD="supabase"
-fi
+SUPABASE_CMD="./scripts/run-supabase.sh"
 
 echo "→ Linking project..."
 $SUPABASE_CMD link --project-ref "$REF"

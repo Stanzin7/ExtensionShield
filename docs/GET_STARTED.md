@@ -135,6 +135,8 @@ See [OPEN_CORE_BOUNDARIES.md](OPEN_CORE_BOUNDARIES.md) for how the boundary is e
 <details>
 <summary><strong>Use Supabase, auth, history, and other cloud features</strong></summary>
 
+If you want to run local Supabase CLI commands such as `npm run db:push` or `npm run db:start`, install the Supabase CLI separately on your machine first.
+
 **In project root `.env`:**
 
 ```bash
