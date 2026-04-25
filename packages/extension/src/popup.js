@@ -1,6 +1,7 @@
 /* ExtensionShield – popup (self-contained, no service worker needed) */
 (function () {
   'use strict';
+  document.addEventListener("DOMContentLoaded", () => {
 
   var API = 'https://extensionshield.com';
   var CACHE_TTL = 6 * 3600 * 1000;
@@ -181,13 +182,15 @@
     }
 
     var extId = extractExtensionIdFromInput(raw);
-    if (!extId) {
-      setScanUrlMessage('Enter a Chrome Web Store URL.', 'error');
-      return;
-    }
-
+  if (!extId) {
+  setScanUrlMessage('Please enter a valid Chrome Web Store URL or Extension ID.', 'error');
+  return;
+}
     setScanUrlMessage('Scanning…', '');
     setScanSearchLoading(true);
+    if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = true;
+}
     if (scanResultsContent) scanResultsContent.hidden = true;
 
     renderScanResult({
@@ -205,6 +208,9 @@
         renderScanResult(result);
         setScanUrlMessage('', '');
         setScanSearchLoading(false);
+        if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
         return;
       }
 
@@ -214,6 +220,9 @@
           if (triggerResult.status === 'error') {
             setScanUrlMessage('Could not start scan. Try on the website.', 'error');
             setScanSearchLoading(false);
+            if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
             return;
           }
           if (triggerResult.status === 'completed' || triggerResult.already_scanned) {
@@ -222,11 +231,17 @@
               renderScanResult(result);
               setScanUrlMessage('', '');
               setScanSearchLoading(false);
+              if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
             });
           }
           setScanUrlMessage('Scan in progress…', '');
           return waitForScan(extId).then(function (p2) {
             setScanSearchLoading(false);
+            if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
             if (p2._st === 'timeout') {
               setScanUrlMessage('Scan is taking longer. Check again soon.', 'error');
               renderScanResult({
@@ -249,9 +264,15 @@
 
       setScanUrlMessage('Could not fetch results.', 'error');
       setScanSearchLoading(false);
+      if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
     }).catch(function () {
       setScanUrlMessage('Network error. Check your connection.', 'error');
       setScanSearchLoading(false);
+      if (scanUrlSubmit) {
+  scanUrlSubmit.disabled = false;
+}
     });
   }
 
@@ -303,11 +324,16 @@
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
-  function esc(s) {
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  try {
     var d = document.createElement('div');
-    d.textContent = s;
+    d.textContent = String(s);
     return d.innerHTML;
+  } catch (e) {
+    return '';
   }
+}
 
   function getIconUrl(ext) {
     var icons = ext && ext.icons;
@@ -647,44 +673,37 @@
     }
   }
 
-  function scan(force) {
-    chrome.permissions.contains({ permissions: ["management"] }, function(hasPerm) {
-      if (!hasPerm) {
-        showError("Management permission required. Click Extensions tab to grant.");
-        render([]);
+ function scan(force) {
+  showStatus('Getting extensions…');
+
+  try {
+    chrome.management.getAll(function (all) {
+      if (chrome.runtime.lastError || !all) {
+        hideStatus();
+        showError('Cannot access extensions');
         return;
       }
 
-      showStatus('Getting extensions…');
+      var selfId = chrome.runtime.id;
+      var exts = [];
 
-      chrome.runtime.sendMessage({ action: 'getAllExtensions' }, function (all) {
-        if (chrome.runtime.lastError || !all) {
-          chrome.management.getAll(function (fallbackAll) {
-            if (chrome.runtime.lastError) {
-              hideStatus();
-              showError('Cannot access extensions: ' + (chrome.runtime.lastError.message || 'unknown'));
-              return;
-            }
-            var selfId = chrome.runtime.id;
-            var filtered = [];
-            for (var j = 0; j < fallbackAll.length; j++) {
-              if (!fallbackAll[j].permissions) fallbackAll[j].permissions = [];
-              if (fallbackAll[j].type === 'extension' && fallbackAll[j].id !== selfId && fallbackAll[j].enabled) filtered.push(fallbackAll[j]);
-            }
-            runScanWithExtensions(filtered, force);
-          });
-          return;
+      for (var i = 0; i < all.length; i++) {
+        if (
+          all[i].type === 'extension' &&
+          all[i].id !== selfId &&
+          all[i].enabled
+        ) {
+          exts.push(all[i]);
         }
+      }
 
-        var exts = [];
-        for (var i = 0; i < all.length; i++) {
-          if (!all[i].permissions) all[i].permissions = [];
-          if (all[i].enabled) exts.push(all[i]);
-        }
-        runScanWithExtensions(exts, force);
-      });
+      runScanWithExtensions(exts, force);
     });
+  } catch (e) {
+    hideStatus();
+    showError('Unexpected error while scanning');
   }
+}
 
   function runScanWithExtensions(exts, force) {
     if (!exts || exts.length === 0) {
@@ -769,6 +788,7 @@
       nextExt();
   }
 
-  initTheme();
-  scan(false);
+ initTheme();
+scan(false);
+});
 })();
