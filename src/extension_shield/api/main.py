@@ -3020,6 +3020,18 @@ async def generate_pdf_report(extension_id: str) -> Response:
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 
 
+def _can_view_scan_files(request_user_id: str | None, results: dict[str, Any]) -> bool:
+    """Allow file access for public scans and the owning user for private scans."""
+    if not isinstance(results, dict):
+        return False
+    if results.get("visibility") != "private":
+        return True
+    owner_user_id = results.get("user_id")
+    if not owner_user_id or not request_user_id:
+        return False
+    return str(owner_user_id) == str(request_user_id)
+
+
 @app.get("/api/scan/files/{extension_id}")
 async def get_file_list(extension_id: str, http_request: Request) -> FileListResponse:
     """
@@ -3041,6 +3053,9 @@ async def get_file_list(extension_id: str, http_request: Request) -> FileListRes
     results = scan_results.get(extension_id)
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    if not _can_view_scan_files(user_id, results):
+        raise HTTPException(status_code=404, detail="Scan results not found")
 
     extracted_path = results.get("extracted_path")
     if not extracted_path or not os.path.exists(extracted_path):
@@ -3072,6 +3087,9 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     results = scan_results.get(extension_id)
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    if not _can_view_scan_files(user_id, results):
+        raise HTTPException(status_code=404, detail="Scan results not found")
 
     extracted_path = results.get("extracted_path")
     if not extracted_path:
