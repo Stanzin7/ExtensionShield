@@ -40,6 +40,7 @@ const CompareExtensionAuditorPage = React.lazy(() => import("../pages/compare/Co
 const CompareSpinAiPage = React.lazy(() => import("../pages/compare/CompareSpinAiPage"));
 
 // SEO keyword landing pages (high-intent) + educational hub
+const FreeExtensionScannerPage = React.lazy(() => import("../pages/landing/FreeExtensionScannerPage"));
 const IsThisChromeExtensionSafePage = React.lazy(() => import("../pages/landing/IsThisChromeExtensionSafePage"));
 const ChromeExtensionPermissionsPage = React.lazy(() => import("../pages/landing/ChromeExtensionPermissionsPage"));
 const ChromeExtensionSecurityScannerPage = React.lazy(() => import("../pages/landing/ChromeExtensionSecurityScannerPage"));
@@ -86,8 +87,8 @@ export const routes = [
     path: "/",
     element: <HomePage />,
     seo: {
-      title: "Browser Extension Security & Governance Platform | ExtensionShield",
-      description: "Open-source browser extension security and governance platform. Scan Chrome extensions before install, audit private CRX/ZIP builds, and get evidence-backed risk scores.",
+      title: "Free Chrome Extension Scanner — Security, Privacy & Risk Score | ExtensionShield",
+      description: "Free Chrome extension scanner. Paste a Web Store URL to check permissions, privacy risks, malware signals, and a 0–100 risk score before you install—no signup. Open-source security & governance.",
       canonical: "/"
     },
     priority: 1.0,
@@ -228,6 +229,17 @@ export const routes = [
 
   // ============ SEO KEYWORD LANDING PAGES + EDUCATIONAL HUB ============
   {
+    path: "/free-extension-scanner",
+    element: <FreeExtensionScannerPage />,
+    seo: {
+      title: "Free Chrome Extension Scanner — Check Any Extension | ExtensionShield",
+      description: "Free Chrome extension scanner. Paste a Web Store URL to check permissions, privacy risks, malware signals, and a 0–100 risk score before you install. No signup. Open-source.",
+      canonical: "/free-extension-scanner"
+    },
+    priority: 0.95,
+    changefreq: "weekly"
+  },
+  {
     path: "/is-this-chrome-extension-safe",
     element: <IsThisChromeExtensionSafePage />,
     seo: {
@@ -320,7 +332,7 @@ export const routes = [
     element: <CrxcavatorAlternativePage />,
     seo: {
       title: "CRXcavator Alternative | Chrome Extension Risk Score & Security | ExtensionShield",
-      description: "Looking for a CRXcavator alternative? ExtensionShield offers transparent chrome extension risk scoring, SAST, VirusTotal, and governance. Compare features and try free scans.",
+      description: "Looking for a CRXcavator alternative? Compare Chrome extension risk scoring, SAST, private build audits, and governance evidence with ExtensionShield.",
       canonical: "/crxcavator-alternative"
     },
     priority: 0.8,
@@ -343,8 +355,8 @@ export const routes = [
     path: "/compare/crxcavator",
     element: <CompareCrxcavatorPage />,
     seo: {
-      title: "ExtensionShield vs CRXcavator | Best CRXcavator Alternative",
-      description: "Compare ExtensionShield vs CRXcavator: chrome extension risk score, security audit, and governance. CRXcavator alternatives with transparent scoring and enterprise extension security.",
+      title: "CRXcavator Alternative | CRXcavator vs ExtensionShield",
+      description: "Compare CRXcavator and ExtensionShield for Chrome extension risk scores, permission analysis, SAST, pre-install scanning, private CRX/ZIP audits, and governance evidence.",
       canonical: "/compare/crxcavator"
     },
     priority: 0.7,
@@ -354,8 +366,8 @@ export const routes = [
     path: "/compare/crxplorer",
     element: <CompareCrxplorerPage />,
     seo: {
-      title: "ExtensionShield vs CRXplorer | Chrome Extension Security Scanner Comparison",
-      description: "ExtensionShield vs CRXplorer: compare chrome extension security scanners. Transparent risk score, SAST, VirusTotal, and extension governance vs AI-only scoring.",
+      title: "CRXplorer Alternative | CRXplorer vs ExtensionShield",
+      description: "Compare CRXplorer and ExtensionShield for Chrome extension security analysis, risk scores, code review, pre-install scanning, private audits, and governance workflows.",
       canonical: "/compare/crxplorer"
     },
     priority: 0.7,
@@ -365,8 +377,8 @@ export const routes = [
     path: "/compare/extension-auditor",
     element: <CompareExtensionAuditorPage />,
     seo: {
-      title: "ExtensionShield vs ExtensionAuditor | Chrome Extension Security Comparison",
-      description: "ExtensionShield vs ExtensionAuditor: compare chrome extension security scanners. Risk score, permissions checker, governance, and audit chrome extension security for enterprise.",
+      title: "Extension Auditor Alternative | Extension Auditor vs ExtensionShield",
+      description: "Compare Extension Auditor and ExtensionShield for browser extension security, risk scores, permission analysis, monitoring, API workflows, private audits, and governance.",
       canonical: "/compare/extension-auditor"
     },
     priority: 0.7,
