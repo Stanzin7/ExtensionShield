@@ -520,6 +520,12 @@ class ScoringResult(BaseModel):
             "is_blocked": self.is_blocked,
             "needs_review": self.needs_review,
             "reasons": self.reasons,
+            # Audit fields preserved so rebuild/upgrade paths stay consistent
+            # with freshly-scanned payloads (see ADR 0001).
+            "decision_reasons": self.reasons,
+            "overall_confidence": self.overall_confidence,
+            "insufficient_data": self.insufficient_data,
+            "decision_authority": self.decision_authority,
             "explanation": self.explanation,
             "hard_gates_triggered": self.hard_gates_triggered,
             "security_layer": self.security_layer.model_dump_for_api() if self.security_layer else None,
@@ -538,5 +544,7 @@ class ScoringResult(BaseModel):
             out["coverage_cap_applied"] = self.coverage_cap_applied
         if self.coverage_cap_reason is not None:
             out["coverage_cap_reason"] = self.coverage_cap_reason
+        if self.insufficient_data_reason is not None:
+            out["insufficient_data_reason"] = self.insufficient_data_reason
         return out
 
