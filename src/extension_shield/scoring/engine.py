@@ -337,6 +337,14 @@ class ScoringEngine:
         insufficient_data = (not sast_ran) and (not vt_available) and (not network_ran)
         insufficient_data_reason: Optional[str] = None
 
+        # Partial-coverage guard (audit finding #11): even when SAST ran, an
+        # extension whose malware scan (VirusTotal) AND network/exfiltration
+        # analysis BOTH did not run must not be cleared as a confident high-score
+        # ALLOW. SAST finding nothing is not evidence of safety when the two
+        # highest-signal analyzers are absent. This is distinct from the
+        # all-or-nothing insufficient_data case above.
+        threat_coverage_missing = (not vt_available) and (not network_ran)
+
         if insufficient_data:
             insufficient_data_reason = (
                 "Insufficient analysis coverage (no SAST, VirusTotal, or network signals)"
@@ -344,6 +352,18 @@ class ScoringEngine:
             if overall_score > INSUFFICIENT_DATA_SCORE_CAP:
                 overall_score = INSUFFICIENT_DATA_SCORE_CAP
             extra_review_reasons.append(insufficient_data_reason)
+        elif threat_coverage_missing:
+            # SAST ran, but neither VirusTotal nor network analysis did. Cap into
+            # the review band and force NEEDS_REVIEW so a clean SAST pass alone
+            # cannot produce a high-score ALLOW without malware/exfil coverage.
+            if overall_score > INSUFFICIENT_DATA_SCORE_CAP:
+                overall_score = INSUFFICIENT_DATA_SCORE_CAP
+            coverage_cap_applied = True
+            coverage_cap_reason = (
+                "Limited threat coverage: neither VirusTotal nor network analysis "
+                "ran; cannot clear as safe without malware/exfiltration coverage"
+            )
+            extra_review_reasons.append(coverage_cap_reason)
         elif sast_missing_coverage and overall_score > 80:
             # SAST-only coverage gap (other analyzers present): cap at 80 + review.
             overall_score = 80

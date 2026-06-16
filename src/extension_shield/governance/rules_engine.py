@@ -66,6 +66,23 @@ def validate_rulepack(rulepack: Any) -> List[str]:
         cond = rule.get("condition")
         if not cond or not isinstance(cond, str) or not cond.strip():
             errors.append(f"{where} ('{rid}'): missing or empty 'condition'")
+        else:
+            # Dry-run parse/evaluate the condition so malformed, unevaluable, or
+            # non-round-trippable conditions FAIL VALIDATION here instead of
+            # silently degrading an intended BLOCK to NEEDS_REVIEW at runtime
+            # (audit finding #1). A well-formed condition evaluates to a bool
+            # against an empty context without raising; only a parse/operator
+            # error raises RuleConditionError. Eager evaluation (see _parse_or)
+            # guarantees every sub-branch is parsed even when it short-circuits.
+            try:
+                ConditionEvaluator().evaluate(cond, {})
+            except RuleConditionError as exc:
+                errors.append(f"{where} ('{rid}'): unevaluable condition: {exc}")
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append(
+                    f"{where} ('{rid}'): condition raised "
+                    f"{type(exc).__name__}: {exc}"
+                )
         verdict = rule.get("verdict")
         if verdict not in VALID_VERDICTS:
             errors.append(
@@ -121,15 +138,22 @@ class ConditionEvaluator:
         # Split on OR that's not inside parentheses
         parts = self._split_on_operator(expr, "OR")
         if len(parts) > 1:
-            return any(self._parse_and(part.strip()) for part in parts)
+            # Evaluate every branch eagerly (no short-circuit) so a malformed
+            # sub-condition always raises RuleConditionError instead of being
+            # skipped by short-circuiting — this lets validate_rulepack catch it
+            # and the engine fail closed (audit finding #1).
+            results = [self._parse_and(part.strip()) for part in parts]
+            return any(results)
         return self._parse_and(expr)
-    
+
     def _parse_and(self, expr: str) -> bool:
         """Parse AND expressions."""
         # Split on AND that's not inside parentheses
         parts = self._split_on_operator(expr, "AND")
         if len(parts) > 1:
-            return all(self._parse_and(part.strip()) for part in parts)
+            # Eager evaluation (no short-circuit) — see _parse_or for rationale.
+            results = [self._parse_and(part.strip()) for part in parts]
+            return all(results)
         return self._parse_comparison(expr)
     
     def _parse_comparison(self, expr: str) -> bool:
@@ -175,33 +199,91 @@ class ConditionEvaluator:
         raise RuleConditionError(f"Unknown comparison operator in: {expr}")
     
     def _split_on_operator(self, expr: str, operator: str) -> List[str]:
-        """Split expression on operator, respecting parentheses."""
-        parts = []
+        """Split an expression on a logical operator (``AND`` / ``OR``).
+
+        Only splits on a *standalone* operator token. The operator must be:
+        - at parenthesis depth 0 (not inside a sub-expression),
+        - NOT inside a quoted string, and
+        - bounded by a non-word character (or a string boundary) on both sides.
+
+        This prevents the historical bug (audit finding #1) where the operator
+        was matched as a bare substring and split inside quoted signal names or
+        larger words — e.g. the ``OR`` in ``type="COMPETITOR_SABOTAGE"`` or in
+        the domain ``"*.NORTON.com"``, and the ``AND`` in any quoted value —
+        which silently downgraded intended BLOCK rules to NEEDS_REVIEW.
+        """
+        parts: List[str] = []
         current = ""
         paren_depth = 0
-        
+        quote_char: Optional[str] = None  # the ' or " we are currently inside
+        op_len = len(operator)
+
         i = 0
-        while i < len(expr):
-            if expr[i] == "(":
+        n = len(expr)
+        while i < n:
+            ch = expr[i]
+
+            # Inside a quoted string: copy verbatim until the matching close quote.
+            if quote_char is not None:
+                current += ch
+                if ch == quote_char:
+                    quote_char = None
+                i += 1
+                continue
+
+            if ch in ('"', "'"):
+                quote_char = ch
+                current += ch
+                i += 1
+                continue
+
+            if ch == "(":
                 paren_depth += 1
-                current += expr[i]
-            elif expr[i] == ")":
+                current += ch
+                i += 1
+                continue
+
+            if ch == ")":
                 paren_depth -= 1
-                current += expr[i]
-            elif paren_depth == 0 and expr[i:i+len(operator)] == operator:
-                # Found operator at top level
+                current += ch
+                i += 1
+                continue
+
+            if (
+                paren_depth == 0
+                and expr[i:i + op_len] == operator
+                and self._is_standalone_operator(expr, i, op_len)
+            ):
+                # Found a real top-level logical operator.
                 if current.strip():
                     parts.append(current)
                 current = ""
-                i += len(operator) - 1
-            else:
-                current += expr[i]
+                i += op_len
+                continue
+
+            current += ch
             i += 1
-        
+
         if current.strip():
             parts.append(current)
-        
+
         return parts
+
+    @staticmethod
+    def _is_standalone_operator(expr: str, start: int, op_len: int) -> bool:
+        """True if the substring at ``expr[start:start+op_len]`` is a standalone
+        token (bounded by a non-word character or a string boundary on each side).
+
+        A "word" character is alphanumeric or underscore, so ``OR`` inside
+        ``COMPETITOR`` / ``NORTON`` and ``AND`` inside e.g. ``BRAND`` are not
+        treated as operators.
+        """
+        before = expr[start - 1] if start > 0 else " "
+        after_idx = start + op_len
+        after = expr[after_idx] if after_idx < len(expr) else " "
+        before_is_word = before.isalnum() or before == "_"
+        after_is_word = after.isalnum() or after == "_"
+        return not before_is_word and not after_is_word
     
     def _get_value(self, path: str) -> Any:
         """Get value from context using dot notation.
