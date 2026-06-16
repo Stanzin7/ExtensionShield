@@ -93,14 +93,19 @@ class TestScoringResolution:
         
         All findings same severity, but different counts.
         """
+        # Both packs get clean VT coverage so the partial-coverage guard
+        # (audit #11: missing VT AND missing network caps into the review band)
+        # does not fire — this test isolates SAST-count -> score resolution.
         # Few findings
         pack_few = make_min_signal_pack(scan_id="few-findings")
         add_sast_findings(pack_few, n=2, severity="HIGH")
+        add_vt_detections(pack_few, malicious_count=0, total_engines=70)
         add_webstore_stats(pack_few, installs=5000)
-        
+
         # Many findings
         pack_many = make_min_signal_pack(scan_id="many-findings")
         add_sast_findings(pack_many, n=20, severity="HIGH")
+        add_vt_detections(pack_many, malicious_count=0, total_engines=70)
         add_webstore_stats(pack_many, installs=5000)
         
         result_few = engine.calculate_scores(pack_few, manifest, user_count=5000)

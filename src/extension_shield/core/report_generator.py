@@ -83,6 +83,95 @@ class ReportGenerator:
         }
         return risk_colors.get(risk_level.lower(), colors.HexColor('#6b7280'))
 
+    # -- Authoritative verdict ------------------------------------------------
+    # The PDF MUST display the single authoritative verdict (BLOCK / NEEDS_REVIEW
+    # / ALLOW) produced by scoring.decision.resolve() and surfaced as
+    # governance_bundle.decision.final_verdict. It must never recompute a verdict
+    # from the score. See ADR 0001 and audit finding #14.
+
+    _VERDICT_COLORS = {
+        "BLOCK": '#dc2626',
+        "NEEDS_REVIEW": '#f59e0b',
+        "ALLOW": '#22c55e',
+    }
+    _VERDICT_LABELS = {
+        "BLOCK": "BLOCK — Do not install",
+        "NEEDS_REVIEW": "NEEDS REVIEW — Manual review required",
+        "ALLOW": "ALLOW — No blocking issues found",
+    }
+
+    @staticmethod
+    def _resolve_authoritative_verdict(scan_results: Dict) -> Dict[str, Any]:
+        """Extract the authoritative verdict/reasons from scan results.
+
+        Prefers the governance bundle's Decision Authority output
+        (``governance_bundle.decision.final_verdict`` / ``final_reasons``) and
+        falls back to the top-level ``governance_verdict``. Never derived from the
+        numeric score.
+        """
+        bundle = scan_results.get("governance_bundle") or {}
+        decision = bundle.get("decision") or {}
+        verdict = decision.get("final_verdict") or scan_results.get("governance_verdict")
+        reasons = decision.get("final_reasons") or []
+        authority = decision.get("final_authority")
+        return {
+            "verdict": (verdict or "").upper() or None,
+            "reasons": list(reasons) if isinstance(reasons, (list, tuple)) else [],
+            "authority": authority,
+        }
+
+    def _create_verdict_section(self, scan_results: Dict) -> List:
+        """Create the authoritative verdict banner (headline of the report)."""
+        elements: List = []
+        info = self._resolve_authoritative_verdict(scan_results)
+        verdict = info["verdict"]
+
+        if not verdict:
+            # No governance verdict available (e.g. governance did not run). Be
+            # explicit rather than implying a passing verdict.
+            elements.append(Paragraph(
+                "<b>Verdict:</b> Not available (governance decision did not run). "
+                "This report is informational only.",
+                self.styles['BodyTextCustom'],
+            ))
+            elements.append(Spacer(1, 20))
+            return elements
+
+        color = colors.HexColor(self._VERDICT_COLORS.get(verdict, '#6b7280'))
+        label = self._VERDICT_LABELS.get(verdict, verdict)
+
+        banner = Table(
+            [[Paragraph(
+                f"<b>{label}</b>",
+                ParagraphStyle('VerdictStyle', fontSize=18, textColor=colors.white,
+                               alignment=TA_CENTER, leading=22),
+            )]],
+            colWidths=[6.5 * inch],
+        )
+        banner.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), color),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
+        ]))
+        elements.append(banner)
+        elements.append(Spacer(1, 10))
+
+        # Reasons that justify the verdict (from the Decision Authority).
+        reasons = info["reasons"]
+        if reasons:
+            elements.append(Paragraph("Why this verdict:", self.styles['BodyTextCustom']))
+            for reason in reasons[:8]:
+                elements.append(Paragraph(f"  - {reason}", self.styles['SmallText']))
+        if info["authority"]:
+            elements.append(Spacer(1, 4))
+            elements.append(Paragraph(
+                f"Deciding authority: {info['authority']}", self.styles['SmallText']
+            ))
+        elements.append(Spacer(1, 20))
+        return elements
+
     def _create_header(self, extension_name: str, extension_id: str, timestamp: str) -> List:
         """Create report header elements."""
         elements = []
@@ -454,6 +543,9 @@ class ReportGenerator:
         # Build document elements
         elements = []
         elements.extend(self._create_header(extension_name, extension_id, timestamp))
+        # Authoritative verdict banner FIRST (the headline). Sourced from the
+        # single Decision Authority, never recomputed from the score.
+        elements.extend(self._create_verdict_section(scan_results))
         elements.extend(self._create_score_section(security_score, risk_level))
         elements.extend(self._create_executive_summary(summary))
         elements.extend(self._create_virustotal_section(vt_analysis))

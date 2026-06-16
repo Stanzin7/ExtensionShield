@@ -35,6 +35,29 @@ const badgeVariantForRisk = (risk) => {
   return "outline";
 };
 
+// The headline badge / one-liner must reflect the single authoritative verdict
+// (governance Decision Authority), never a score-derived label. (Audit Fix #3.)
+const decisionLabel = (decision) => {
+  const u = String(decision || "").toUpperCase();
+  if (u === "BLOCK") return "BLOCK";
+  if (u === "WARN" || u === "NEEDS_REVIEW") return "NEEDS REVIEW";
+  if (u === "ALLOW") return "ALLOW";
+  return null;
+};
+const decisionVariant = (decision) => {
+  const u = String(decision || "").toUpperCase();
+  if (u === "BLOCK") return "destructive";
+  if (u === "WARN" || u === "NEEDS_REVIEW") return "secondary";
+  if (u === "ALLOW") return "default";
+  return "outline";
+};
+const decisionOneLiner = (decision) => {
+  const u = String(decision || "").toUpperCase();
+  if (u === "BLOCK") return "This extension was blocked by automated security checks.";
+  if (u === "WARN" || u === "NEEDS_REVIEW") return "This extension requires manual review before use.";
+  return null;
+};
+
 const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf }) => {
   const [mode, setMode] = useState("simple"); // simple | advanced
   const [layerModal, setLayerModal] = useState({ open: false, layer: null });
@@ -72,6 +95,11 @@ const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf
     overall: { score: report?.scorecard?.score, band: report?.scorecard?.score_label },
     reasons: report?.scorecard?.reasons || []
   };
+
+  // Authoritative verdict for the headline badge / one-liner (falls back to the
+  // legacy score label only when no decision is available).
+  const authVerdictLabel = decisionLabel(scores?.decision);
+  const headlineOneLiner = decisionOneLiner(scores?.decision) || scorecard?.one_liner || "";
 
   // Extract all findings by layer from raw scan results (includes SAST, factors, gates, etc.)
   const findingsByLayer = extractFindingsByLayer(rawScanResult);
@@ -119,7 +147,9 @@ const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf
               <span>{meta?.name || "Extension Report"}</span>
               <span style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                 <Badge variant="outline">{extensionId}</Badge>
-                <Badge variant={badgeVariantForRisk(scorecard?.score_label)}>{scorecard?.score_label || "UNKNOWN"}</Badge>
+                <Badge variant={authVerdictLabel ? decisionVariant(scores?.decision) : badgeVariantForRisk(scorecard?.score_label)}>
+                  {authVerdictLabel || scorecard?.score_label || "UNKNOWN"}
+                </Badge>
                 <Badge variant="outline">Confidence: {scorecard?.confidence || "UNKNOWN"}</Badge>
               </span>
             </CardTitle>
@@ -130,7 +160,7 @@ const ReportViewModelDetail = ({ report, rawScanResult, extensionId, onExportPdf
                 {Number.isFinite(scorecard?.score) ? scorecard.score : 0}
                 <span style={{ fontSize: "1rem", opacity: 0.7 }}>/100</span>
               </div>
-              <div style={{ fontSize: "1rem", opacity: 0.9 }}>{scorecard?.one_liner || ""}</div>
+              <div style={{ fontSize: "1rem", opacity: 0.9 }}>{headlineOneLiner}</div>
             </div>
 
             <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>

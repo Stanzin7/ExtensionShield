@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from scoring.utils import (
     make_min_signal_pack,
     add_webstore_stats,
+    add_network_analysis,
     make_test_manifest,
 )
 from extension_shield.scoring.engine import ScoringEngine
@@ -121,6 +122,10 @@ class TestMissingVTDoesNotDrasticallyReduceScore:
         # Both packs have SAST coverage so we isolate VT's *marginal* effect.
         # (Zero-coverage behavior is covered by the insufficient-data tests; a pack
         # whose only signal is VT is not a realistic baseline for this comparison.)
+        # Both packs also have network coverage so the partial-coverage guard
+        # (audit #11: missing VT AND missing network -> cap into review band) does
+        # NOT fire here — this test isolates VT's marginal *formula weight*, not
+        # the coverage policy (which is covered by test_partial_coverage_matrix).
         from extension_shield.governance.signal_pack import SastSignalPack
 
         # Pack with VT enabled and clean
@@ -132,14 +137,16 @@ class TestMissingVTDoesNotDrasticallyReduceScore:
             suspicious_count=0,
             total_engines=70,
         )
+        add_network_analysis(pack_with_vt, domains=[], confidence=0.7)
         add_webstore_stats(pack_with_vt, installs=10000, rating_avg=4.5)
 
         result_with_vt = engine.calculate_scores(pack_with_vt, manifest, user_count=10000)
 
-        # Pack with VT disabled (missing) but SAST coverage present
+        # Pack with VT disabled (missing) but SAST + network coverage present
         pack_missing_vt = make_min_signal_pack(scan_id="missing-vt")
         pack_missing_vt.sast = SastSignalPack(deduped_findings=[], files_scanned=12, confidence=0.9)
         pack_missing_vt.virustotal = VirusTotalSignalPack(enabled=False)
+        add_network_analysis(pack_missing_vt, domains=[], confidence=0.7)
         add_webstore_stats(pack_missing_vt, installs=10000, rating_avg=4.5)
         
         result_missing_vt = engine.calculate_scores(pack_missing_vt, manifest, user_count=10000)

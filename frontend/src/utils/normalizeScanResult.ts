@@ -1018,6 +1018,14 @@ export function normalizeScanResult(raw: RawScanResult): ReportViewModel {
   const securityEffectiveBand = computeEffectiveBand(securityScoreBand, gateBandsByLayer.security);
   const privacyEffectiveBand = computeEffectiveBand(privacyScoreBand, gateBandsByLayer.privacy);
   const governanceEffectiveBand = computeEffectiveBand(governanceScoreBand, gateBandsByLayer.governance);
+
+  // The headline (overall) gauge MUST reflect the authoritative verdict, never
+  // just the score. A BLOCK or NEEDS_REVIEW with a high score must not render as
+  // a green "Safe" gauge. Map the final decision to a band and take the more
+  // severe of (score band, verdict band). ALLOW maps to null (no override) so a
+  // genuinely-clean extension still uses its score band. (Audit Fix #3.)
+  const verdictBand = gateDecisionToBand(decision);
+  const overallEffectiveBand = computeEffectiveBand(overallScoreBand, verdictBand);
   
   const scores: ScoresVM = {
     security: {
@@ -1037,7 +1045,7 @@ export function normalizeScanResult(raw: RawScanResult): ReportViewModel {
     },
     overall: {
       score: overallScore,
-      band: overallScoreBand, // Overall doesn't get gate override (it's a composite)
+      band: overallEffectiveBand, // headline gauge reflects the authoritative verdict
       confidence: overallConfidence,
     },
     decision,

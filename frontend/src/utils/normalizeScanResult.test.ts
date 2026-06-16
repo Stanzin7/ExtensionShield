@@ -266,6 +266,68 @@ describe('normalizeScanResult', () => {
       expect(result.permissions.unreasonablePermissions).toContain('scripting');
     });
 
+    // -------------------------------------------------------------------------
+    // Audit Fix #3: the overall (headline) band must reflect the authoritative
+    // verdict, never just the score. A high-scoring BLOCK/NEEDS_REVIEW must not
+    // render as a green "Safe" gauge.
+    // -------------------------------------------------------------------------
+    it('high-scoring BLOCK must produce a BAD overall band (not green/Safe)', () => {
+      const raw: RawScanResult = {
+        extension_id: 'blockhigh',
+        extension_name: 'High Score Blocked',
+        scoring_v2: {
+          security_score: 92,
+          privacy_score: 95,
+          governance_score: 90,
+          overall_score: 92, // would be GOOD by score alone
+          overall_confidence: 0.9,
+          decision: 'BLOCK',
+          decision_reasons: ['Visa-slot automation detected'],
+        },
+      };
+      const result = normalizeScanResult(raw);
+      expect(result.scores.decision).toBe('BLOCK');
+      expect(result.scores.overall.band).toBe('BAD');
+    });
+
+    it('high-scoring NEEDS_REVIEW must produce at least a WARN overall band', () => {
+      const raw: RawScanResult = {
+        extension_id: 'reviewhigh',
+        extension_name: 'High Score Review',
+        scoring_v2: {
+          security_score: 88,
+          privacy_score: 90,
+          governance_score: 85,
+          overall_score: 88, // GOOD by score alone
+          overall_confidence: 0.6,
+          decision: 'NEEDS_REVIEW',
+          decision_reasons: ['Insufficient analysis coverage'],
+        },
+      };
+      const result = normalizeScanResult(raw);
+      expect(result.scores.decision).toBe('WARN');
+      expect(result.scores.overall.band).toBe('WARN');
+    });
+
+    it('high-scoring ALLOW keeps its score band (no verdict downgrade)', () => {
+      const raw: RawScanResult = {
+        extension_id: 'allowhigh',
+        extension_name: 'High Score Allow',
+        scoring_v2: {
+          security_score: 95,
+          privacy_score: 95,
+          governance_score: 95,
+          overall_score: 95,
+          overall_confidence: 0.9,
+          decision: 'ALLOW',
+          decision_reasons: ['All checks passed'],
+        },
+      };
+      const result = normalizeScanResult(raw);
+      expect(result.scores.decision).toBe('ALLOW');
+      expect(result.scores.overall.band).toBe('GOOD');
+    });
+
     it('should handle legacy raw result without scoring_v2', () => {
       const result = normalizeScanResult(legacyRawResult);
       
@@ -363,28 +425,29 @@ describe('normalizeScanResult', () => {
   });
 
   describe('band calculation', () => {
-    it('should use score-based bands (decision does not affect band)', () => {
-      // Score 40 in 0-49, so band is BAD regardless of decision
+    it('overall band reflects the authoritative verdict (Fix #3)', () => {
+      // ALLOW does not downgrade: score 40 is already BAD by score.
       const allowResult = normalizeScanResult({
         extension_id: 'test',
         scoring_v2: { decision: 'ALLOW', overall_score: 40 },
       });
       expect(allowResult.scores.overall.band).toBe('BAD');
-      expect(allowResult.scores.decision).toBe('ALLOW'); // Decision is separate
+      expect(allowResult.scores.decision).toBe('ALLOW');
 
-      // Score 70 in 50-74, so band is WARN
+      // NEEDS_REVIEW with a mid score stays WARN.
       const warnResult = normalizeScanResult({
         extension_id: 'test',
         scoring_v2: { decision: 'NEEDS_REVIEW', overall_score: 70 },
       });
       expect(warnResult.scores.overall.band).toBe('WARN');
 
-      // Score 80 >= 75, so band is GOOD (even if decision is BLOCK - gate override would apply to layer, not overall)
+      // A high-scoring BLOCK must NOT render green/Safe: the verdict forces BAD.
+      // (Previously this returned GOOD — the audit #3 "green Safe BLOCK" bug.)
       const blockResult = normalizeScanResult({
         extension_id: 'test',
         scoring_v2: { decision: 'BLOCK', overall_score: 80 },
       });
-      expect(blockResult.scores.overall.band).toBe('GOOD');
+      expect(blockResult.scores.overall.band).toBe('BAD');
     });
 
     it('should use score-based bands when no decision exists', () => {
