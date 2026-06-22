@@ -2281,9 +2281,9 @@
     }
   }
 
-  /* Collapse hero to just the card on tablet */
+  /* hero-mobile-message already clears the fixed header; hero-section follows in DOM order so it doesn't need its own header offset */
   .hero-section {
-    padding: calc(var(--extensionshield-header-height, 60px) + 1rem) var(--hp-px) 1.5rem;
+    padding: 0.5rem var(--hp-px) 1.5rem;
   }
 
   .hero-inner {
