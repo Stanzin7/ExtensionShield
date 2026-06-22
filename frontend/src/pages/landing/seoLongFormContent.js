@@ -50,7 +50,7 @@ export const extensionSecurityContent = {
       paragraphs: [
         "Browser extension security starts with a simple question: what does this extension need to do, and what browser access does it request to do it? A password manager, ad blocker, translator, coupon tool, meeting assistant, or developer utility may all request powerful access for legitimate reasons. The risk comes from whether that access is excessive, hidden, poorly disclosed, or paired with behavior that does not match the listed purpose.",
         "A useful review looks at the manifest, requested permissions, host permissions, content scripts, service worker behavior, external network calls, update patterns, publisher identity, privacy policy, and any code indicators that point to obfuscation, injection, credential access, or data movement. None of these signals should be reviewed alone. The strongest answer comes from the combination.",
-        "ExtensionShield treats browser extension security as a decision workflow. A public user can paste a Chrome Web Store URL before installing. A developer can upload a private CRX or ZIP before release. A security team can review the same evidence as part of an allowlist, exception, or monitoring process."
+        "ExtensionShield treats browser extension security as a decision workflow. A public user can paste a Chrome Web Store URL before installing. A developer can upload a private CRX or ZIP before release. A security team can review the same evidence as part of an allowlist or exception review."
       ]
     },
     {
@@ -91,7 +91,7 @@ export const extensionSecurityContent = {
         {
           heading: "Governance signals",
           paragraphs: [
-            "Governance review looks at publisher reputation, update cadence, disclosure quality, permission justification, policy fit, monitoring needs, and whether a security team can defend the allow or block decision later."
+            "Governance review looks at publisher reputation, update cadence, disclosure quality, permission justification, policy fit, and whether a security team can defend the allow or block decision later."
           ]
         }
       ]
@@ -181,7 +181,7 @@ export const extensionRiskScoreContent = {
   h1: "Extension Risk Score",
   intro: [
     "An extension risk score is a structured way to summarize browser extension risk using evidence from permissions, code behavior, privacy signals, publisher context, and governance fit.",
-    "ExtensionShield uses the score as a decision aid, not a black box. Each report separates Security, Privacy, and Governance so reviewers can see why a Chrome extension looks low risk, needs monitoring, or should be blocked.",
+    "ExtensionShield uses the score as a decision aid, not a black box. Each report separates Security, Privacy, and Governance so reviewers can see why a Chrome extension looks low risk, needs closer review, or should be blocked.",
     "The score is useful for individuals checking an extension before install, developers auditing a private CRX/ZIP before release, and security teams building consistent allow/block workflows."
   ],
   heroCtas: [
@@ -285,12 +285,12 @@ export const extensionRiskScoreContent = {
       heading: "How to use an extension risk score in policy",
       paragraphs: [
         "A practical policy maps score ranges to actions. The exact thresholds should match your risk tolerance, but the structure should be consistent. Low-risk extensions can be allowed. Medium-risk extensions may need reviewer approval. High-risk extensions should require business justification or remediation. Critical findings should block installation or release.",
-        "Policy should also define exceptions. Some extensions need broad access to work. The right question is whether the access is necessary, whether the user population is appropriate, and whether monitoring is enough to reduce the remaining risk.",
+        "Policy should also define exceptions. Some extensions need broad access to work. The right question is whether the access is necessary, whether the user population is appropriate, and whether remaining exposure is acceptable given the business justification.",
         "When a decision is made, preserve the extension ID, version, score, evidence, approver, and rationale. That record turns a one-time score into governance evidence."
       ],
       bullets: [
         "Allow: narrow access, clear purpose, low-risk evidence.",
-        "Allow with monitoring: justified access but meaningful exposure.",
+        "Allow with conditions: justified access but meaningful exposure — re-scan after updates.",
         "Request fix: permissions or disclosures can be reduced before approval.",
         "Block: suspicious behavior, unjustified access, or unacceptable data exposure."
       ],
@@ -512,7 +512,7 @@ export const extensionGovernanceContent = {
       heading: "What extension governance means",
       paragraphs: [
         "Extension governance is more than knowing which extensions exist. Inventory is useful, but governance asks a harder question: should this extension be allowed for this user group, on this device, with this level of data exposure?",
-        "A mature governance process includes request intake, pre-install review, risk scoring, permission analysis, privacy review, policy mapping, approval workflow, monitoring, exception handling, and evidence retention.",
+        "A mature governance process includes request intake, pre-install review, risk scoring, permission analysis, privacy review, policy mapping, approval workflow, re-review triggers, exception handling, and evidence retention.",
         "For developers, governance also applies before release. A private extension should be reviewed for permissions, code risks, privacy disclosures, and Chrome Web Store policy alignment before it is submitted or rolled out internally."
       ]
     },
@@ -584,14 +584,14 @@ export const extensionGovernanceContent = {
         "Define restricted permission categories.",
         "Require pre-install review for broad host access.",
         "Document decision owner and business justification.",
-        "Monitor approved extensions for material changes.",
+        "Re-scan approved extensions after material changes.",
         "Review exceptions on a fixed schedule."
       ]
     },
     {
       heading: "Example governance policy",
       paragraphs: [
-        "A simple extension governance policy can start with three tiers. Low-risk extensions can be allowed when access is narrow and evidence is clean. Medium-risk extensions require reviewer approval and monitoring. High-risk extensions require business justification, compensating controls, or remediation before approval.",
+        "A simple extension governance policy can start with three tiers. Low-risk extensions can be allowed when access is narrow and evidence is clean. Medium-risk extensions require reviewer approval and periodic re-review. High-risk extensions require business justification, compensating controls, or remediation before approval.",
         "Critical findings should block installation or release. Examples include malware indicators, suspicious exfiltration behavior, unjustified cookie access, obfuscated code paired with broad host access, or privacy disclosures that do not match observed behavior.",
         "The policy should also define what happens after approval. If an extension adds sensitive permissions, changes publisher, contacts new domains, or receives new threat indicators, the prior decision should be re-opened."
       ],
@@ -600,7 +600,7 @@ export const extensionGovernanceContent = {
     {
       heading: "Evidence required for browser extension compliance",
       paragraphs: [
-        "Browser extension compliance is not just a list of installed extensions. It is the ability to prove that risky browser-level access was reviewed, approved, and monitored according to policy.",
+        "Browser extension compliance is not just a list of installed extensions. It is the ability to prove that risky browser-level access was reviewed, approved, and re-evaluated according to policy.",
         "Useful evidence includes the extension ID, version, publisher, requested permissions, host access, score, report date, findings, privacy policy status, external domains, approver, rationale, and required follow-up. For private builds, include the submitted artifact version and remediation notes.",
         "This evidence helps with internal security review, customer security questionnaires, SOC 2-style control discussions, GDPR data exposure review, and general vendor risk conversations. The exact compliance obligation depends on the organization, but the evidence discipline is broadly useful."
       ]
