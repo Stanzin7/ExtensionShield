@@ -1,5 +1,6 @@
 import React from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import RedirectExtensionToScanResults from "./RedirectExtensionToScanResults";
 import GlossaryPage from "../pages/GlossaryPage";
 
 // Lazy load pages for better code splitting
@@ -58,12 +59,6 @@ const BlogPostPage = React.lazy(() => import("../pages/blog/BlogPostPage"));
 // Careers
 const CareersPage = React.lazy(() => import("../pages/careers/CareersPage"));
 const CareersApplyPage = React.lazy(() => import("../pages/careers/CareersApplyPage"));
-
-// Redirect /extension/:id to /scan/results/:id (extension route removed)
-const RedirectExtensionToScanResults = () => {
-  const { extensionId } = useParams();
-  return <Navigate to={`/scan/results/${encodeURIComponent(extensionId || "")}`} replace />;
-};
 
 // Report detail (individual report view)
 const ReportDetailPage = React.lazy(() => import("../pages/reports/ReportDetailPage"));

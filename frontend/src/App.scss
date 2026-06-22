@@ -1464,7 +1464,7 @@ body {
   }
 }
 
-/* Below 860px: all menu items (incl. megamenu) move into hamburger; theme toggler stays next to hamburger for one-tap access */
+/* Below 860px: all menu items (incl. megamenu) move into hamburger; the GitHub badge stays next to the hamburger for one-tap access */
 @media (max-width: 860px) {
   :root {
     --extensionshield-header-height: 64px;
