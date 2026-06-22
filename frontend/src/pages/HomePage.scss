@@ -9,7 +9,7 @@
   /* Override global theme variables to always use light values */
   --extensionshield-text-primary:   #1c1a17;
   --extensionshield-text-secondary: #57534e;
-  --extensionshield-text-muted:     #a8a29e;
+  --extensionshield-text-muted:     #6b6865;
   --extensionshield-bg-primary:     #fafaf9;
   --extensionshield-bg-secondary:   #f5f5f0;
   --extensionshield-bg-card:        #ffffff;
@@ -672,7 +672,7 @@
 }
 
 .stat-label {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--extensionshield-text-muted);
   text-transform: uppercase;
@@ -1563,6 +1563,7 @@
 
 .hp-repo-fdesc {
   color: var(--extensionshield-text-muted);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1594,6 +1595,7 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--extensionshield-text-muted);
   margin-left: auto;
 
@@ -1900,7 +1902,7 @@
   .subtitle {
     display: block;
     font-size: 0.9375rem;
-    font-weight: 400;
+    font-weight: 450;
     line-height: 1.6;
     color: var(--extensionshield-text-muted);
     margin: 0.75rem auto 0;
@@ -1995,19 +1997,22 @@
     line-height: 1.55;
     margin: 0;
   }
-}
 
-.point-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1.35;
-  color: var(--extensionshield-accent);
-  font-weight: 500;
+  // Nested so specificity (0,2,0) beats the bare `p` rule above (0,1,1).
+  // Color is #15803d — darker green that passes WCAG AA (4.8:1) on the
+  // warm near-white card background; the lighter accent #16a34a only gives 3.2:1.
+  .point-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: #15803d;
+    font-weight: 500;
 
-  svg { flex-shrink: 0; }
+    svg { flex-shrink: 0; }
+  }
 }
 
 .scam-footer {
