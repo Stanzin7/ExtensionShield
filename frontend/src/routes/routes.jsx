@@ -310,7 +310,7 @@ export const routes = [
     element: <ExtensionGovernancePage />,
     seo: {
       title: "Extension Governance Platform | Browser Extension Compliance",
-      description: "Extension governance platform for browser extension compliance, allow/block decisions, update monitoring, policy evidence, and pre-install risk assessment.",
+      description: "Extension governance platform for browser extension compliance, allow/block decisions, governance evidence, policy support, and pre-install risk assessment.",
       canonical: "/extension-governance"
     },
     priority: 0.9,
@@ -321,7 +321,7 @@ export const routes = [
     element: <BrowserExtensionRiskAssessmentPage />,
     seo: {
       title: "Browser Extension Risk Assessment | Enterprise Extension Security | ExtensionShield",
-      description: "Browser extension risk assessment for enterprises: govern extensions, enforce allowlists, and get audit-ready reports. Extension security and compliance monitoring at scale.",
+      description: "Browser extension risk assessment for enterprises: govern extensions, review allowlist decisions, and get audit-ready reports. Evidence-backed compliance support for security teams.",
       canonical: "/browser-extension-risk-assessment"
     },
     priority: 0.8,
@@ -378,7 +378,7 @@ export const routes = [
     element: <CompareExtensionAuditorPage />,
     seo: {
       title: "Extension Auditor Alternative | Extension Auditor vs ExtensionShield",
-      description: "Compare Extension Auditor and ExtensionShield for browser extension security, risk scores, permission analysis, monitoring, API workflows, private audits, and governance.",
+      description: "Compare Extension Auditor and ExtensionShield for browser extension security, risk scores, permission analysis, governance workflows, private audits, and evidence-backed decisions.",
       canonical: "/compare/extension-auditor"
     },
     priority: 0.7,
@@ -685,7 +685,7 @@ export const routes = [
     element: <EnterprisePage />,
     seo: {
       title: "Extension Governance Platform for Enterprise | ExtensionShield",
-      description: "Browser extension governance for enterprise: allowlist policies, update monitoring, audit exports, pre-install risk assessment, and compliance evidence.",
+      description: "Browser extension governance for enterprise: pre-install risk assessment, governance evidence, scored reports, and compliance decision support for security teams.",
       canonical: "/enterprise"
     },
     priority: 0.8,
