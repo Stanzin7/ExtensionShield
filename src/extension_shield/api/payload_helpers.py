@@ -78,6 +78,23 @@ def build_publisher_disclosures(
     }
 
 
+def governance_verdict_from_payload(payload: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Extract the authoritative governance verdict from a scan payload (D1).
+
+    Prefers governance_bundle['decision']['final_verdict'] (the Decision
+    Authority result that includes org-policy and baseline-governance rungs),
+    falling back to a top-level governance_verdict. Returns None when absent.
+    """
+    if not isinstance(payload, dict):
+        return None
+    bundle = payload.get("governance_bundle")
+    if isinstance(bundle, dict):
+        decision = bundle.get("decision")
+        if isinstance(decision, dict) and decision.get("final_verdict"):
+            return decision.get("final_verdict")
+    return payload.get("governance_verdict")
+
+
 def build_report_view_model_safe(
     manifest: Dict[str, Any],
     analysis_results: Dict[str, Any],
@@ -85,6 +102,7 @@ def build_report_view_model_safe(
     extension_id: str,
     scan_id: str,
     skip_llm: bool = False,
+    governance_verdict: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Safely build the report view model, returning an empty dict on failure."""
     try:
@@ -95,6 +113,7 @@ def build_report_view_model_safe(
             extension_id=extension_id,
             scan_id=scan_id,
             skip_llm=skip_llm,
+            governance_verdict=governance_verdict,
         )
     except Exception as exc:
         logger.warning("Failed to build report_view_model, using empty dict: %s", exc)
@@ -240,6 +259,7 @@ def upgrade_legacy_payload(payload: Optional[Dict[str, Any]], extension_id: str)
                     extension_id=extension_id,
                     scan_id=extension_id,
                     skip_llm=True,
+                    governance_verdict=governance_verdict_from_payload(payload),
                 )
                 payload["report_view_model"] = report_view_model
                 logger.info(

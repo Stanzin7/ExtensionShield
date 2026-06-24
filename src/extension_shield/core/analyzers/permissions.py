@@ -120,10 +120,17 @@ class PermissionsAnalyzer(BaseAnalyzer):
             + "\n"
         )
 
+        # Tri-state (D4): only is_reasonable is False is "suspicious"; is None is
+        # "unavailable" (analysis failed) and must not be reported as reasonable.
         suspicious_permissions = [
             permission
             for permission, analysis in is_permissions_reasonable.items()
-            if not analysis.get("is_reasonable")
+            if analysis.get("is_reasonable") is False
+        ]
+        unavailable_permissions = [
+            permission
+            for permission, analysis in is_permissions_reasonable.items()
+            if analysis.get("is_reasonable") is None
         ]
 
         if suspicious_permissions:
@@ -132,8 +139,15 @@ class PermissionsAnalyzer(BaseAnalyzer):
                 analysis = is_permissions_reasonable[permission]
                 reason = analysis.get("justification_reasoning", "No reason provided.")
                 result += f"- {permission}: {reason}\n"
-        else:
+        elif not unavailable_permissions:
             result += "\n✅ All permissions appear to be reasonable."
+
+        if unavailable_permissions:
+            result += (
+                "\nℹ️ Permission reasonableness could not be assessed for: "
+                + ", ".join(unavailable_permissions)
+                + " (analysis unavailable)."
+            )
 
         return result
 
@@ -173,9 +187,12 @@ class PermissionsAnalyzer(BaseAnalyzer):
                     time.sleep(0.6)
             except Exception as e:
                 logger.warning(f"Failed to analyze permission {permission}: {e}")
-                # Provide a fallback result for failed permission analysis
+                # D4: tri-state fail-CLOSED. A failed analysis is "unavailable",
+                # NOT "reasonable". Marking it reasonable (the old default) hid real
+                # permission risk and rendered failed analysis as verified-safe.
                 is_permissions_reasonable[permission] = {
-                    "is_reasonable": True,  # Default to reasonable to avoid blocking
+                    "is_reasonable": None,  # unavailable: neither reasonable nor confirmed-unreasonable
+                    "status": "unavailable",
                     "justification_reasoning": f"Analysis unavailable: {str(e)[:100]}",
                 }
         

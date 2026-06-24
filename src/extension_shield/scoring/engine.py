@@ -371,6 +371,21 @@ class ScoringEngine:
             coverage_cap_reason = "SAST coverage missing; score capped at 80"
             extra_review_reasons.append(coverage_cap_reason)
 
+        # SAST scan failure (D2): a Semgrep crash/timeout means the primary code
+        # analyzer did not run to completion. Its absence of findings is NOT
+        # evidence of safety, so cap into the review band and force NEEDS_REVIEW
+        # regardless of the other layers. This is independent of the coverage
+        # branches above (a failed scan can still report files_scanned > 0).
+        if getattr(signal_pack.sast, "scan_error", False):
+            if overall_score > INSUFFICIENT_DATA_SCORE_CAP:
+                overall_score = INSUFFICIENT_DATA_SCORE_CAP
+            coverage_cap_applied = True
+            coverage_cap_reason = (
+                "SAST scan failed or was incomplete; cannot clear as safe without "
+                "code-analysis coverage"
+            )
+            extra_review_reasons.append(coverage_cap_reason)
+
         logger.debug(
             "Layer scores (after gate penalties): security=%d, privacy=%d, "
             "governance=%d, overall=%d, confidence=%.2f",

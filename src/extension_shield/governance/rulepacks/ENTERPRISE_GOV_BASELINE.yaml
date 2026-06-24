@@ -160,3 +160,18 @@ rules:
     recommended_action: "Require developer to publish privacy policy"
     citations: ["ENTERPRISE_GOV_BASELINE::GUIDE_7"]
     evidence_refs: []
+
+  # ============================================================================
+  # REPUTATION RULES
+  # ============================================================================
+
+  - rule_id: "ENTERPRISE_GOV_BASELINE::R11"
+    name: "Elevated ChromeStats Risk"
+    description: "ChromeStats reputation indicates high or critical aggregate risk for this extension"
+    condition: |
+      signals contains type="CHROMESTATS_RISK"
+    verdict: "NEEDS_REVIEW"
+    confidence: 0.7
+    recommended_action: "Manually review the extension's ChromeStats risk indicators before approval"
+    citations: []
+    evidence_refs: []

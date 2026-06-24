@@ -317,10 +317,17 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                     len(file_paths),
                 )
                 return findings_by_file
-            logger.info("No findings from batch Semgrep scan")
+            # Semgrep invoked with --json always emits a JSON document, even for
+            # zero findings. Empty stdout therefore means the scan did NOT run to
+            # completion (crash/abort) — surface it as an explicit error sentinel,
+            # never as an (indistinguishable) clean "no findings" result.
+            logger.error(
+                "Batch Semgrep scan produced no output (returncode=%s)", result.returncode
+            )
             return {
-                JavaScriptAnalyzer._get_relative_path(fp, extension_dir): []
-                for fp in file_paths
+                "__sast_error__": [
+                    {"detail": f"semgrep produced no output (returncode={result.returncode})"}
+                ]
             }
 
         except subprocess.TimeoutExpired:
@@ -329,10 +336,10 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                 timeout,
                 len(file_paths),
             )
-            return {}
+            return {"__sast_error__": [{"detail": f"batch scan timed out after {timeout}s"}]}
         except Exception as exc:
             logger.error("Error running batch Semgrep scan: %s", exc)
-            return {}
+            return {"__sast_error__": [{"detail": str(exc)}]}
 
     def _run_parallel_batch_scans(
         self, file_paths: List[str], extension_dir: str, config: str = "auto", max_workers: int = 4
@@ -382,6 +389,11 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                     logger.error(
                         "Parallel batch scan failed for batch of %d files: %s", len(batch), exc
                     )
+                    # Propagate as an explicit scan error so a failed batch is
+                    # never silently dropped into a clean result (D2).
+                    all_findings["__sast_error__"] = [
+                        {"detail": f"parallel batch scan failed: {exc}"}
+                    ]
 
         # Fallback: Check if third-party API was detected, if not scan directly
         third_party_found = any(
@@ -648,6 +660,20 @@ class JavaScriptAnalyzer(BaseAnalyzer):
                 else:
                     all_findings[rel_path] = []
 
+        # D2: detect a genuine Semgrep execution failure (distinct from a clean
+        # scan that found nothing). A failed scan must NOT be reported as clean;
+        # strip the sentinel here and propagate scan_error downstream so the
+        # scoring engine forces NEEDS_REVIEW instead of clearing as safe.
+        scan_error_detail: Optional[str] = None
+        if isinstance(all_findings, dict) and "__sast_error__" in all_findings:
+            err = all_findings.pop("__sast_error__")
+            if isinstance(err, list) and err and isinstance(err[0], dict):
+                scan_error_detail = err[0].get("detail", "SAST scan failed")
+            else:
+                scan_error_detail = "SAST scan failed"
+            logger.error("SAST scan error detected: %s", scan_error_detail)
+        scan_error = scan_error_detail is not None
+
         # Fallback: Check if third-party API was detected, if not scan directly
         third_party_found = any(
             "third_party" in f.get("check_id", "").lower()
@@ -676,4 +702,6 @@ class JavaScriptAnalyzer(BaseAnalyzer):
         return {
             "sast_analysis": sast_analysis,
             "sast_findings": all_findings,
+            "scan_error": scan_error,
+            "scan_error_detail": scan_error_detail,
         }

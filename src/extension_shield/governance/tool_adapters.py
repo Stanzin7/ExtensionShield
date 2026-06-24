@@ -117,7 +117,13 @@ class SastAdapter(BaseToolAdapter):
             return
         
         sast_findings = js_analysis.get("sast_findings", {})
+        scan_error = bool(js_analysis.get("scan_error", False))
         if not sast_findings:
+            # D2: a failed/incomplete Semgrep run is missing coverage, not a clean
+            # result. Even with zero findings, record the error so scoring forces
+            # review rather than treating the absence of findings as safe.
+            if scan_error:
+                signal_pack.sast = SastSignalPack(files_scanned=0, scan_error=True)
             return
         
         # Initialize counters
@@ -196,6 +202,7 @@ class SastAdapter(BaseToolAdapter):
             confidence=confidence,
             files_scanned=files_scanned,
             files_with_findings=files_with_findings,
+            scan_error=scan_error,
         )
         
         logger.info(
@@ -712,7 +719,9 @@ class PermissionsAdapter(BaseToolAdapter):
         perm_details = perm_analysis.get("permissions_details", {})
         if isinstance(perm_details, dict):
             for perm_name, perm_info in perm_details.items():
-                is_reasonable = perm_info.get("is_reasonable", True)
+                # D4: no fail-open default. Missing/unavailable -> None (unknown),
+                # never True (which would read as verified-reasonable).
+                is_reasonable = perm_info.get("is_reasonable", None)
                 risk_level = perm_info.get("risk_level", "low")
                 justification = perm_info.get("justification_reasoning", "")
                 
@@ -724,8 +733,11 @@ class PermissionsAdapter(BaseToolAdapter):
                     category=perm_info.get("category", "other"),
                 )
                 permission_analysis.append(result)
-                
-                if not is_reasonable:
+
+                # D4: only CONFIRMED-unreasonable (False) counts; None is
+                # "unavailable" and must not inflate the unreasonable-permission
+                # count that drives signals/penalties.
+                if is_reasonable is False:
                     unreasonable_permissions.append(perm_name)
                     
                     # Create evidence for unreasonable permission

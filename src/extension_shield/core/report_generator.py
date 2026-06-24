@@ -400,12 +400,19 @@ class ReportGenerator:
             ))
             return elements
 
-        # Permissions table
+        # Permissions table. Tri-state (D4): True=reasonable, False=unreasonable,
+        # None=analysis unavailable. A failed/missing analysis must render as
+        # "Unknown", never as a verified-safe "Yes / Low".
         table_data = [["Permission", "Reasonable", "Risk"]]
         for perm_name, perm_info in list(details.items())[:15]:
-            is_reasonable = perm_info.get("is_reasonable", True)
-            risk = "Low" if is_reasonable else "High"
-            table_data.append([perm_name, "Yes" if is_reasonable else "No", risk])
+            is_reasonable = perm_info.get("is_reasonable", None)
+            if is_reasonable is True:
+                reasonable_cell, risk = "Yes", "Low"
+            elif is_reasonable is False:
+                reasonable_cell, risk = "No", "High"
+            else:
+                reasonable_cell, risk = "Unknown", "Not analyzed"
+            table_data.append([perm_name, reasonable_cell, risk])
 
         perm_table = Table(table_data, colWidths=[3 * inch, 1.5 * inch, 1 * inch])
         perm_table.setStyle(TableStyle([
@@ -432,9 +439,25 @@ class ReportGenerator:
         elements = []
         elements.append(Paragraph("5. SAST Findings", self.styles['SectionHeader']))
 
-        findings = sast_results.get("javascript_analysis", [])
-        if not findings:
-            findings = sast_results.get("findings", [])
+        # The analyzer emits findings as {file_path: [semgrep_finding, ...]} under
+        # the "sast_findings" key. Flatten to (file, finding) rows. Fall back to
+        # legacy flat-list shapes for backward compatibility.
+        findings: List = []  # list of (file_path, finding_dict)
+        findings_by_file = sast_results.get("sast_findings")
+        if isinstance(findings_by_file, dict):
+            for file_path, file_findings in findings_by_file.items():
+                for f in (file_findings or []):
+                    findings.append((file_path, f))
+        else:
+            legacy = (
+                sast_results.get("findings")
+                or sast_results.get("javascript_analysis")
+                or []
+            )
+            if isinstance(legacy, list):
+                for f in legacy:
+                    fp = f.get("file", f.get("path", "Unknown")) if isinstance(f, dict) else "Unknown"
+                    findings.append((fp, f))
 
         if not findings:
             elements.append(Paragraph(
@@ -445,13 +468,34 @@ class ReportGenerator:
 
         # Findings table
         table_data = [["File", "Line", "Severity", "Rule"]]
-        for finding in findings[:20]:
-            severity = finding.get("risk_level", finding.get("severity", "medium"))
+        for file_path, finding in findings[:20]:
+            finding = finding if isinstance(finding, dict) else {}
+            extra = finding.get("extra", {}) or {}
+            start = finding.get("start", {}) or {}
+            severity = (
+                extra.get("severity")
+                or finding.get("risk_level")
+                or finding.get("severity")
+                or "medium"
+            )
+            line_no = (
+                start.get("line")
+                or finding.get("line_number")
+                or finding.get("line")
+                or "-"
+            )
+            rule = (
+                finding.get("check_id")
+                or finding.get("pattern_name")
+                or finding.get("rule")
+                or "-"
+            )
+            file_label = str(file_path or finding.get("file", "Unknown"))
             table_data.append([
-                finding.get("file", "Unknown")[:30],
-                str(finding.get("line_number", finding.get("line", "-"))),
-                severity.upper(),
-                finding.get("pattern_name", finding.get("rule", "-"))[:25],
+                file_label[:30],
+                str(line_no),
+                str(severity).upper(),
+                str(rule)[:25],
             ])
 
         findings_table = Table(table_data, colWidths=[2 * inch, 0.6 * inch, 0.8 * inch, 2 * inch])

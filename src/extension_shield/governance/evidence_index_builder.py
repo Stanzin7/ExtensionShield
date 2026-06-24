@@ -257,8 +257,9 @@ class EvidenceIndexBuilder:
         perm_findings = facts.security_findings.permission_findings or []
         
         for finding in perm_findings:
-            # Only create evidence for unreasonable/dangerous permissions
-            if not finding.is_reasonable:
+            # Only create evidence for CONFIRMED-unreasonable permissions (D4).
+            # is_reasonable is None means analysis was unavailable, not unreasonable.
+            if finding.is_reasonable is False:
                 ev_id = self._next_evidence_id()
                 
                 provenance = (
@@ -278,7 +279,7 @@ class EvidenceIndexBuilder:
                     created_at=datetime.now(timezone.utc),
                 )
         
-        perm_evidence_count = sum(1 for f in perm_findings if not f.is_reasonable)
+        perm_evidence_count = sum(1 for f in perm_findings if f.is_reasonable is False)
         logger.debug("Extracted %d permission evidence items", perm_evidence_count)
     
     def _extract_manifest_evidence(

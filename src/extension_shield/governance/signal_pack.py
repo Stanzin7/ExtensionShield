@@ -141,6 +141,14 @@ class SastSignalPack(BaseModel):
     )
     files_scanned: int = Field(default=0)
     files_with_findings: int = Field(default=0)
+    scan_error: bool = Field(
+        default=False,
+        description=(
+            "True when the SAST scan failed to run to completion (Semgrep "
+            "crash/timeout). A failed scan is missing coverage, NOT a clean "
+            "result, and must not clear an extension as safe."
+        ),
+    )
 
 
 # =============================================================================
@@ -360,7 +368,8 @@ class PermissionAnalysisResult(BaseModel):
     """Analysis result for a single permission."""
     permission_name: str
     risk_level: str = "low"
-    is_reasonable: bool = True
+    # Tri-state (D4): True=reasonable, False=unreasonable, None=analysis unavailable.
+    is_reasonable: Optional[bool] = None
     justification: str = ""
     category: str = "other"
 

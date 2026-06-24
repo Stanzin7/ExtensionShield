@@ -129,6 +129,22 @@ def _normalize_verdict(decision: Any) -> str:
     return "UNKNOWN"
 
 
+_VERDICT_SEVERITY = {"BLOCK": 3, "NEEDS_REVIEW": 2, "ALLOW": 1, "UNKNOWN": 0}
+
+
+def _escalate_verdict(primary: str, other: str) -> str:
+    """Return the MORE severe of two verdict buckets (escalate-only merge).
+
+    Used to reconcile the engine's scoring verdict with the authoritative
+    governance verdict (which includes org-policy and baseline-governance
+    BLOCK/REVIEW rungs the engine omits). This only ever raises severity — it
+    never downgrades an engine BLOCK/NEEDS_REVIEW.
+    """
+    if _VERDICT_SEVERITY.get(other, 0) > _VERDICT_SEVERITY.get(primary, 0):
+        return other
+    return primary
+
+
 def _reconcile_score_label(score_label: str, verdict: str) -> str:
     """
     Keep the score-derived risk label from contradicting the authoritative verdict.
@@ -1509,6 +1525,7 @@ def build_report_view_model(
     extension_id: str,
     scan_id: str,
     skip_llm: bool = False,
+    governance_verdict: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Build the production `report_view_model` dict for the frontend.
@@ -1558,6 +1575,12 @@ def build_report_view_model(
     # cannot soften a BLOCK/NEEDS_REVIEW into "review"/"appears safe". The score
     # number itself is unchanged and still rendered. (Phase 1 follow-up.)
     verdict = _normalize_verdict(getattr(scoring_result, "decision", None))
+    # D1: the engine's scoring decision deliberately omits the org-policy and
+    # baseline-governance BLOCK/NEEDS_REVIEW rungs (those are applied by the
+    # governance node). The consumer report must not soften an authoritative
+    # governance BLOCK/REVIEW into "appears safe", so escalate (never downgrade)
+    # to the more severe of (engine verdict, authoritative governance verdict).
+    verdict = _escalate_verdict(verdict, _normalize_verdict(governance_verdict))
     score_label = _reconcile_score_label(score_label, verdict)
 
     # -------------------------------------------------------------------------
@@ -1737,6 +1760,10 @@ def build_report_view_model(
         scoring_v2_for_insights = scoring_result.model_dump_for_api() if scoring_result else None
     except Exception:
         scoring_v2_for_insights = None
+    # D1: surface the escalated (engine ∨ governance) verdict to consumer insights
+    # so they cannot read a softer engine-only decision.
+    if isinstance(scoring_v2_for_insights, dict):
+        scoring_v2_for_insights["decision"] = verdict
 
     consumer_insights = build_consumer_insights(
         scoring_v2=scoring_v2_for_insights,
@@ -1854,6 +1881,11 @@ def build_report_view_model(
         scoring_v2_for_summary = scoring_result.model_dump_for_api() if scoring_result else None
     except Exception:
         scoring_v2_for_summary = None
+    # D1: the consumer/unified summaries derive their verdict from scoring_v2's
+    # decision; feed them the escalated (engine ∨ governance) verdict so an
+    # org/baseline-governance BLOCK/REVIEW is never softened to "appears safe".
+    if isinstance(scoring_v2_for_summary, dict):
+        scoring_v2_for_summary["decision"] = verdict
 
     report_view_model["consumer_summary"] = build_consumer_summary(
         report_view_model=report_view_model,

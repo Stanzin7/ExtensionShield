@@ -358,14 +358,16 @@ class FactsBuilder:
                     if isinstance(details, dict):
                         findings.permission_findings.append(PermissionAnalysisFinding(
                             permission_name=perm_name,
-                            is_reasonable=details.get("is_reasonable", True),
+                            # D4: no fail-open default; unavailable -> None.
+                            is_reasonable=details.get("is_reasonable", None),
                             justification_reasoning=details.get("justification_reasoning", ""),
                         ))
-            
-            # Extract dangerous permissions
+
+            # Extract dangerous permissions (D4: only CONFIRMED-unreasonable;
+            # None = analysis unavailable, not a confirmed dangerous permission).
             findings.dangerous_permissions = [
                 pf.permission_name for pf in findings.permission_findings
-                if not pf.is_reasonable
+                if pf.is_reasonable is False
             ]
         
         # SAST results - handle both workflow state and results file formats

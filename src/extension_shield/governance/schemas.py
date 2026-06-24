@@ -75,7 +75,8 @@ class PermissionAnalysisFinding(BaseModel):
     """Individual permission analysis finding."""
     
     permission_name: str
-    is_reasonable: bool
+    # Tri-state (D4): True=reasonable, False=unreasonable, None=analysis unavailable.
+    is_reasonable: Optional[bool] = None
     justification_reasoning: str
 
 
