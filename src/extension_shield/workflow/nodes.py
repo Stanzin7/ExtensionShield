@@ -18,6 +18,7 @@ from extension_shield.core.impact_analyzer import ImpactAnalyzer
 from extension_shield.core.privacy_compliance_analyzer import PrivacyComplianceAnalyzer
 from extension_shield.utils.extension import (
     extract_extension_crx,
+    extract_extension_id_by_url,
     resolve_extension_root,
     cleanup_downloaded_crx,
     is_chrome_extension_store_url,
@@ -89,7 +90,14 @@ def extension_metadata_node(state: WorkflowState) -> Command:
         logger.info("Extracting metadata for extension URL: %s", chrome_extension_url)
         metadata_extractor = ExtensionMetadata(extension_url=chrome_extension_url)
         metadata = metadata_extractor.fetch_metadata()
-        
+
+        # Inject extension_id from the CWS URL so ChromeStatsAnalyzer receives it.
+        # fetch_metadata() scrapes web-store HTML and never returns extension_id.
+        if metadata is not None and not metadata.get("extension_id"):
+            ext_id = extract_extension_id_by_url(chrome_extension_url)
+            if ext_id:
+                metadata["extension_id"] = ext_id
+
         # Also fetch chrome-stats metadata if we have an extension ID
         if metadata and metadata.get("extension_id"):
             try:
@@ -236,7 +244,6 @@ def extension_downloader_node(state: WorkflowState) -> Command:
 
             if not extension_info or "file_path" not in extension_info:
                 # Primary download failed — try fallback
-                from extension_shield.utils.extension import extract_extension_id_by_url
                 ext_id = extract_extension_id_by_url(chrome_extension_path)
                 if ext_id:
                     logger.warning(
