@@ -51,6 +51,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from extension_shield.api.payload_helpers import (
     build_publisher_disclosures,
     build_report_view_model_safe,
+    governance_verdict_from_payload,
     ensure_consumer_insights,
     ensure_description_in_meta,
     ensure_name_in_payload,
@@ -818,6 +819,7 @@ def _refresh_scan_payload_with_store_metadata(
         metadata=merged_metadata,
         extension_id=extension_id,
         scan_id=extension_id,
+        governance_verdict=governance_verdict_from_payload(updated_payload),
     )
     updated_payload["publisher_disclosures"] = build_publisher_disclosures(
         merged_metadata,
@@ -1543,6 +1545,7 @@ async def run_analysis_workflow(url: str, extension_id: str):
                     metadata=metadata,
                     extension_id=extension_id,
                     scan_id=extension_id,
+                    governance_verdict=governance_verdict_from_payload(final_state),
                 ),
                 # V2 scoring - overall_security_score for backward compatibility
                 "overall_security_score": scoring_result.overall_score,
@@ -1987,9 +1990,11 @@ def calculate_risk_distribution(state: WorkflowState) -> Dict[str, int]:
     if not isinstance(permissions_details, dict):
         permissions_details = {}
     for _, perm_analysis in permissions_details.items():
-        is_reasonable = perm_analysis.get("is_reasonable", True)
+        # Tri-state (D4): only CONFIRMED-unreasonable (False) contributes to the
+        # distribution; None = analysis unavailable, not unreasonable.
+        is_reasonable = perm_analysis.get("is_reasonable")
         risk = perm_analysis.get("risk_level", "").lower()
-        if not is_reasonable:
+        if is_reasonable is False:
             if risk == "high":
                 distribution["high"] += 1
             elif risk == "low":

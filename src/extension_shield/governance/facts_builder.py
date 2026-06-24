@@ -358,14 +358,16 @@ class FactsBuilder:
                     if isinstance(details, dict):
                         findings.permission_findings.append(PermissionAnalysisFinding(
                             permission_name=perm_name,
-                            is_reasonable=details.get("is_reasonable", True),
+                            # D4: no fail-open default; unavailable -> None.
+                            is_reasonable=details.get("is_reasonable", None),
                             justification_reasoning=details.get("justification_reasoning", ""),
                         ))
-            
-            # Extract dangerous permissions
+
+            # Extract dangerous permissions (D4: only CONFIRMED-unreasonable;
+            # None = analysis unavailable, not a confirmed dangerous permission).
             findings.dangerous_permissions = [
                 pf.permission_name for pf in findings.permission_findings
-                if not pf.is_reasonable
+                if pf.is_reasonable is False
             ]
         
         # SAST results - handle both workflow state and results file formats
@@ -436,7 +438,9 @@ class FactsBuilder:
         vt_analysis = analysis_results.get("virustotal_analysis", {})
         if vt_analysis:
             findings.virustotal_malicious_count = vt_analysis.get("total_malicious", 0)
-            findings.virustotal_threat_level = vt_analysis.get("summary", {}).get("threat_level", "clean")
+            # Default to "unknown" (not "clean"): absent VT intelligence must not
+            # be conflated with a clean result.
+            findings.virustotal_threat_level = vt_analysis.get("summary", {}).get("threat_level", "unknown")
             
             for file_result in vt_analysis.get("file_results", []):
                 vt_data = file_result.get("virustotal", {})

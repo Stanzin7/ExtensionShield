@@ -687,32 +687,69 @@ class RulesEngine:
         try:
             # Evaluate condition
             condition_met = self.evaluator.evaluate(condition, eval_context)
-            
+
             # Determine verdict
             if condition_met:
                 verdict = rule.get("verdict", "NEEDS_REVIEW")
             else:
                 verdict = "ALLOW"
-            
+
             explanation = (
-                f"Condition matched. Verdict: {verdict}" 
-                if condition_met 
+                f"Condition matched. Verdict: {verdict}"
+                if condition_met
                 else f"Condition not matched. Verdict: ALLOW"
             )
-            
+
         except Exception as e:
             logger.error(f"Error evaluating rule {rule_id}: {e}")
             verdict = "NEEDS_REVIEW"
             explanation = f"Error during evaluation: {str(e)}"
-        
+            condition_met = False
+
+        # Evidence traceability (D5): a matched verdict must carry the concrete
+        # evidence ids of the signals that satisfied its condition, not the
+        # always-empty static rulepack field. This lets a reviewer trace a
+        # BLOCK / NEEDS_REVIEW back to the runtime signals that triggered it.
+        evidence_refs = list(rule.get("evidence_refs", []) or [])
+        if condition_met:
+            for ref in self._collect_signal_evidence_refs(
+                condition, eval_context.get("signals", [])
+            ):
+                if ref not in evidence_refs:
+                    evidence_refs.append(ref)
+
         return RuleResult(
             rule_id=rule_id,
             rulepack=rulepack_id,
             verdict=verdict,
             confidence=rule.get("confidence", 0.8),
-            evidence_refs=rule.get("evidence_refs", []),
+            evidence_refs=evidence_refs,
             citations=rule.get("citations", []),
             explanation=explanation,
             recommended_action=rule.get("recommended_action", ""),
             triggered_at=datetime.now(timezone.utc),
         )
+
+    @staticmethod
+    def _collect_signal_evidence_refs(
+        condition: str, signals: List[Dict[str, Any]]
+    ) -> List[str]:
+        """Collect evidence_refs from signals whose type is named in a condition.
+
+        A rule condition such as ``signals contains type="SENSITIVE_API"`` matches
+        one or more emitted signals. This returns the evidence ids carried by those
+        matched signals so the resulting verdict is traceable to concrete runtime
+        evidence rather than the empty static rulepack ``evidence_refs`` field.
+        """
+        signal_types = set(re.findall(r'type="([^"]+)"', condition or ""))
+        if not signal_types or not isinstance(signals, list):
+            return []
+        refs: List[str] = []
+        for signal in signals:
+            if not isinstance(signal, dict):
+                continue
+            if signal.get("type") in signal_types:
+                for ref in signal.get("evidence_refs", []) or []:
+                    if ref not in refs:
+                        refs.append(ref)
+        return refs
