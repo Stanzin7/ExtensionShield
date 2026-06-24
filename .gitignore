@@ -2,7 +2,7 @@
 # Private boundaries (OSS safety — do not remove)
 # ------------------------------------------------------------------------------
 # .env (except .env.example / .env.template) | *.db | extensions_storage/
-# docs/ | contracts/ | .venv/ | node_modules/ | frontend/dist/ | frontend/.vite/
+# docs/qa_extensionshield/ | contracts/ | .venv/ | node_modules/ | frontend/dist/ | frontend/.vite/
 # freelancer-repos/ | .railway-* | *.pem | *.key | *.p12 | *.pfx
 # ------------------------------------------------------------------------------
 

@@ -144,7 +144,7 @@ _init_sentry()
 # Disable interactive API docs in production to reduce attack surface and avoid exposing internal routes
 _prod = get_settings().is_prod()
 app = FastAPI(
-    title="Project Atlas API",
+    title="ExtensionShield API",
     description="REST API for Chrome extension security analysis",
     version="1.0.0",
     docs_url=None if _prod else "/docs",
@@ -3017,7 +3017,7 @@ async def generate_pdf_report(extension_id: str) -> Response:
         # Get extension name for filename
         extension_name = (results.get("metadata") or {}).get("title") or results.get("extension_name") or extension_id
         safe_name = "".join(c for c in (extension_name or extension_id) if c.isalnum() or c in " -_")[:50]
-        filename = f"Project_Atlas_Report_{safe_name}.pdf"
+        filename = f"ExtensionShield_Report_{safe_name}.pdf"
 
         return Response(
             content=pdf_bytes,

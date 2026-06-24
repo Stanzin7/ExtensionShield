@@ -103,7 +103,7 @@ In **Cloud mode** you also get auth, scan history, telemetry, and enterprise fea
 
 ## **License & attribution**
 
-- **Core** (scanner, CLI, local analysis): **MIT** — see <a href="LICENSE" style="color:#2ea043;">LICENSE</a>  
+- **Core** (scanner, CLI, local analysis): **MIT** — see <a href="LICENSE" style="color:#2ea043;">LICENSE</a>; the core is derived in part from ThreatXtension — see <a href="docs/NOTICE" style="color:#2ea043;">NOTICE</a> for attribution  
 - **Cloud** (auth, Supabase, telemetry admin, community queue, enterprise forms): **proprietary**, available via <a href="https://extensionshield.com" style="color:#2ea043;">ExtensionShield Cloud</a>  
 
 ---
@@ -114,4 +114,4 @@ We build ExtensionShield in the open so security tools stay transparent and easy
 
 Feedback, issue reports, docs fixes, tests, and rule improvements are welcome. If ExtensionShield helps you, consider opening a PR, sharing your use case, or supporting the project.
 
-**Acknowledgments**: ExtensionShield is our own design. We took inspiration from <a href="https://github.com/barvhaim/ThreatXtension" style="color:#2ea043;">ThreatXtension</a> in the extension scanning space.
+**Acknowledgments & attribution**: ExtensionShield began as a fork of <a href="https://github.com/barvhaim/ThreatXtension" style="color:#2ea043;">ThreatXtension</a> (MIT, declared in its upstream README) and builds substantially on its open-source scanner core — including the permissions database, sensitive-domains config, entropy analysis, and Semgrep malware rules. On top of that core, ExtensionShield adds original work: the governance engine, the V2 scoring engine, ExtensionShield Cloud, and an expanded frontend. See <a href="docs/NOTICE" style="color:#2ea043;">NOTICE</a> for the full scope of what is derived versus original.

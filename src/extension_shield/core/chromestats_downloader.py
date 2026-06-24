@@ -4,6 +4,10 @@ Chrome Stats Extension Downloader
 This module provides functionality to download Chrome extensions from chrome-stats.com API.
 """
 
+# Provenance: derived from ThreatXtension (https://github.com/barvhaim/ThreatXtension),
+# MIT per its upstream README (no LICENSE file is published upstream).
+# See docs/NOTICE for attribution.
+
 import os
 import logging
 import requests

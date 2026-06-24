@@ -1,5 +1,4 @@
 # ExtensionShield Docker Compose Configuration
-# For BlackHat Arsenal 2026 Demo
 
 services:
   extension-shield:

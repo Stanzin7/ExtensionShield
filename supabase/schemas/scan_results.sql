@@ -1,5 +1,5 @@
 -- Global scan results cache (RLS enabled, no policies - backend uses service role).
--- Schema extracted from SQLite database (ThreatXtension).
+-- Schema derived from the ThreatXtension SQLite schema (MIT per upstream README; no LICENSE file published upstream).
 -- Note: JSON fields stored as JSONB in Supabase (better than TEXT in SQLite).
 
 create table "public"."scan_results" (

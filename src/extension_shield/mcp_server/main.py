@@ -1,5 +1,9 @@
 """Main MCP server for Project Atlas Chrome extension analysis."""
 
+# Provenance: derived from ThreatXtension (https://github.com/barvhaim/ThreatXtension),
+# MIT per its upstream README (no LICENSE file is published upstream).
+# See docs/NOTICE for attribution.
+
 import uuid
 import json
 from datetime import datetime
@@ -8,7 +12,7 @@ from extension_shield.workflow.graph import build_graph
 from extension_shield.workflow.state import WorkflowStatus
 
 
-mcp = FastMCP("Project Atlas")
+mcp = FastMCP("ExtensionShield")
 
 
 @mcp.tool()

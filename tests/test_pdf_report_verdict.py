@@ -32,6 +32,8 @@ def _collect_text(flowables) -> str:
                         parts.append(_collect_text(cell))
                     else:
                         parts.append(_collect_text([cell]))
+        elif isinstance(f, (str, int, float)):
+            parts.append(str(f))
     return "\n".join(parts)
 
 
@@ -106,6 +108,40 @@ class TestVerdictSection:
         text = _collect_text(gen._create_verdict_section({"extension_id": "x" * 32}))
         assert "Not available" in text
         assert "No blocking issues found" not in text
+
+
+class TestScoreSection:
+    def test_score_section_surfaces_three_layer_scoring(self):
+        gen = ReportGenerator()
+        results = _results("BLOCK", ["Policy block"], overall_score=77, risk_level="medium")
+        results["scoring_v2"] = {
+            "overall_score": 77,
+            "overall_confidence": 0.86,
+            "risk_level": "medium",
+            "security_score": 81,
+            "privacy_score": 49,
+            "governance_score": 92,
+            "security_layer": {"score": 81, "risk_level": "low", "confidence": 0.95},
+            "privacy_layer": {"score": 49, "risk_level": "high", "confidence": 0.72},
+            "governance_layer": {"score": 92, "risk_level": "none", "confidence": 0.91},
+        }
+
+        text = _collect_text(gen._create_score_section(gen._extract_scoring_snapshot(results)))
+        assert "Overall Score" in text
+        assert "Confidence" in text
+        assert "Layer Overview" in text
+        assert "Security" in text
+        assert "Privacy" in text
+        assert "Governance" in text
+        assert "81" in text
+        assert "49" in text
+        assert "92" in text
+
+    def test_header_is_extension_risk_report_not_security_only(self):
+        gen = ReportGenerator()
+        text = _collect_text(gen._create_header("Example", "a" * 32, "2026-06-24T00:00:00Z"))
+        assert "Extension Risk Analysis Report" in text
+        assert "Security Analysis Report" not in text
 
 
 class TestGeneratePdfSmoke:

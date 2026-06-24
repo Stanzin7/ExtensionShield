@@ -101,6 +101,102 @@ class ReportGenerator:
     }
 
     @staticmethod
+    def _coerce_int(value: Any) -> Optional[int]:
+        """Best-effort integer coercion for score fields."""
+        try:
+            if value is None:
+                return None
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _coerce_float(value: Any) -> Optional[float]:
+        """Best-effort float coercion for confidence fields."""
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _risk_level_from_score(cls, score: Optional[int]) -> str:
+        """Fallback risk band when a layer does not ship an explicit label."""
+        if score is None:
+            return "unknown"
+        if score < 30:
+            return "critical"
+        if score < 50:
+            return "high"
+        if score < 75:
+            return "medium"
+        if score >= 95:
+            return "none"
+        return "low"
+
+    @classmethod
+    def _extract_scoring_snapshot(cls, scan_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract overall + three-layer scoring data for PDF rendering.
+
+        Prefer ``scoring_v2`` (the real ExtensionShield three-layer model) and
+        fall back to legacy top-level fields for older rows.
+        """
+        scoring_v2 = scan_results.get("scoring_v2")
+        if not isinstance(scoring_v2, dict):
+            scoring_v2 = {}
+
+        overall_score = cls._coerce_int(scoring_v2.get("overall_score"))
+        if overall_score is None:
+            overall_score = cls._coerce_int(scan_results.get("overall_security_score"))
+        if overall_score is None:
+            overall_score = cls._coerce_int(scan_results.get("security_score"))
+        if overall_score is None:
+            overall_score = 0
+
+        overall_risk = (
+            scoring_v2.get("risk_level")
+            or scan_results.get("overall_risk")
+            or scan_results.get("risk_level")
+            or "unknown"
+        )
+        overall_confidence = cls._coerce_float(
+            scoring_v2.get("overall_confidence", scan_results.get("overall_confidence"))
+        )
+
+        def _layer_snapshot(layer_key: str, score_key: str, label: str) -> Dict[str, Any]:
+            layer_obj = scoring_v2.get(layer_key)
+            if not isinstance(layer_obj, dict):
+                layer_obj = {}
+
+            score = cls._coerce_int(scoring_v2.get(score_key))
+            if score is None:
+                score = cls._coerce_int(layer_obj.get("score"))
+            if score is None:
+                score = cls._coerce_int(scan_results.get(score_key))
+
+            risk_level = layer_obj.get("risk_level") or cls._risk_level_from_score(score)
+            confidence = cls._coerce_float(layer_obj.get("confidence"))
+
+            return {
+                "label": label,
+                "score": score,
+                "risk_level": str(risk_level or "unknown"),
+                "confidence": confidence,
+            }
+
+        return {
+            "overall_score": overall_score,
+            "overall_risk": str(overall_risk or "unknown"),
+            "overall_confidence": overall_confidence,
+            "layers": [
+                _layer_snapshot("security_layer", "security_score", "Security"),
+                _layer_snapshot("privacy_layer", "privacy_score", "Privacy"),
+                _layer_snapshot("governance_layer", "governance_score", "Governance"),
+            ],
+        }
+
+    @staticmethod
     def _resolve_authoritative_verdict(scan_results: Dict) -> Dict[str, Any]:
         """Extract the authoritative verdict/reasons from scan results.
 
@@ -177,8 +273,8 @@ class ReportGenerator:
         elements = []
 
         # Title
-        elements.append(Paragraph("Project Atlas", self.styles['ReportTitle']))
-        elements.append(Paragraph("Security Analysis Report", self.styles['Heading2']))
+        elements.append(Paragraph("ExtensionShield", self.styles['ReportTitle']))
+        elements.append(Paragraph("Extension Risk Analysis Report", self.styles['Heading2']))
         elements.append(Spacer(1, 20))
 
         # Extension info table
@@ -201,49 +297,93 @@ class ReportGenerator:
 
         return elements
 
-    def _create_score_section(self, security_score: int, risk_level: str) -> List:
-        """Create security score section."""
+    def _create_score_section(self, scoring_snapshot: Dict[str, Any]) -> List:
+        """Create overall + layer score section for the three-layer model."""
         elements = []
 
-        # Score box
-        score_color = self._get_risk_color(risk_level)
-        score_data = [
-            [Paragraph(f"<b>{security_score}</b>/100", ParagraphStyle(
+        overall_score = self._coerce_int(scoring_snapshot.get("overall_score")) or 0
+        overall_risk = str(scoring_snapshot.get("overall_risk") or "unknown")
+        overall_confidence = self._coerce_float(scoring_snapshot.get("overall_confidence"))
+        layers = scoring_snapshot.get("layers") or []
+
+        score_color = self._get_risk_color(overall_risk)
+
+        overall_data = [
+            [Paragraph(f"<b>{overall_score}</b>/100", ParagraphStyle(
                 'ScoreStyle',
                 fontSize=28,
                 textColor=score_color,
                 alignment=TA_CENTER,
             ))],
-            [Paragraph("Security Score", self.styles['SmallText'])],
+            [Paragraph("Overall Score", self.styles['SmallText'])],
         ]
 
         risk_data = [
-            [Paragraph(f"<b>{risk_level.upper()}</b>", ParagraphStyle(
+            [Paragraph(f"<b>{overall_risk.upper()}</b>", ParagraphStyle(
                 'RiskStyle',
                 fontSize=18,
                 textColor=score_color,
                 alignment=TA_CENTER,
             ))],
-            [Paragraph("Risk Level", self.styles['SmallText'])],
+            [Paragraph("Overall Risk", self.styles['SmallText'])],
+        ]
+
+        confidence_label = "N/A"
+        if overall_confidence is not None:
+            confidence_label = f"{round(overall_confidence * 100):d}%"
+        confidence_data = [
+            [Paragraph(f"<b>{confidence_label}</b>", ParagraphStyle(
+                'ConfidenceStyle',
+                fontSize=18,
+                textColor=colors.HexColor('#1f2937'),
+                alignment=TA_CENTER,
+            ))],
+            [Paragraph("Confidence", self.styles['SmallText'])],
         ]
 
         # Create side-by-side tables
         combined_data = [[
-            Table(score_data, colWidths=[2.5 * inch]),
-            Table(risk_data, colWidths=[2.5 * inch]),
+            Table(overall_data, colWidths=[2.0 * inch]),
+            Table(risk_data, colWidths=[2.0 * inch]),
+            Table(confidence_data, colWidths=[2.0 * inch]),
         ]]
-        combined_table = Table(combined_data, colWidths=[3 * inch, 3 * inch])
+        combined_table = Table(combined_data, colWidths=[2.15 * inch, 2.15 * inch, 2.15 * inch])
         combined_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOX', (0, 0), (0, 0), 1, colors.HexColor('#e5e7eb')),
-            ('BOX', (1, 0), (1, 0), 1, colors.HexColor('#e5e7eb')),
+            ('BOX', (0, 0), (-1, 0), 1, colors.HexColor('#e5e7eb')),
+            ('INNERGRID', (0, 0), (-1, 0), 0.5, colors.HexColor('#e5e7eb')),
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
             ('TOPPADDING', (0, 0), (-1, -1), 15),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
         ]))
 
         elements.append(combined_table)
+
+        layer_rows = [["Layer", "Score", "Risk", "Confidence"]]
+        for layer in layers:
+            score = self._coerce_int(layer.get("score"))
+            layer_conf = self._coerce_float(layer.get("confidence"))
+            layer_rows.append([
+                str(layer.get("label") or "Unknown"),
+                str(score) if score is not None else "N/A",
+                str(layer.get("risk_level") or "unknown").upper(),
+                f"{round(layer_conf * 100):d}%" if layer_conf is not None else "N/A",
+            ])
+
+        layer_table = Table(layer_rows, colWidths=[2.1 * inch, 1.0 * inch, 1.4 * inch, 1.4 * inch])
+        layer_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+            ('TOPPADDING', (0, 0), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+        ]))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("Layer Overview", self.styles['SectionHeader']))
+        elements.append(layer_table)
         elements.append(Spacer(1, 20))
 
         return elements
@@ -539,7 +679,7 @@ class ReportGenerator:
         """Create report footer."""
         elements = []
         elements.append(Paragraph(
-            "Generated by Project Atlas - Chrome Extension Security Analyzer",
+            "Generated by ExtensionShield - Chrome Extension Security Analyzer",
             ParagraphStyle('Footer', fontSize=9, textColor=colors.HexColor('#9ca3af'), alignment=TA_CENTER)
         ))
         elements.append(Paragraph(
@@ -563,8 +703,7 @@ class ReportGenerator:
         extension_name = scan_results.get("extension_name", scan_results.get("metadata", {}).get("title", "Unknown Extension"))
         extension_id = scan_results.get("extension_id", "Unknown")
         timestamp = scan_results.get("timestamp", datetime.now().isoformat())
-        security_score = scan_results.get("overall_security_score", scan_results.get("security_score", 0))
-        risk_level = scan_results.get("risk_level", scan_results.get("overall_risk", "unknown"))
+        scoring_snapshot = self._extract_scoring_snapshot(scan_results)
 
         # Get analysis sections
         permissions_analysis = scan_results.get("permissions_analysis", {})
@@ -590,7 +729,7 @@ class ReportGenerator:
         # Authoritative verdict banner FIRST (the headline). Sourced from the
         # single Decision Authority, never recomputed from the score.
         elements.extend(self._create_verdict_section(scan_results))
-        elements.extend(self._create_score_section(security_score, risk_level))
+        elements.extend(self._create_score_section(scoring_snapshot))
         elements.extend(self._create_executive_summary(summary))
         elements.extend(self._create_virustotal_section(vt_analysis))
         elements.extend(self._create_entropy_section(entropy_analysis))

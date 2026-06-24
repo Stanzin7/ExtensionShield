@@ -1,5 +1,5 @@
 -- Privacy-first analytics: daily page view counts (no PII, no user_id).
--- Schema extracted from SQLite database (ThreatXtension).
+-- Schema derived from the ThreatXtension SQLite schema (MIT per upstream README; no LICENSE file published upstream).
 
 create table "public"."page_views_daily" (
   "day" text not null,

@@ -1,5 +1,5 @@
 -- Statistics table for aggregated metrics.
--- Schema matches SQLite database from ThreatXtension.
+-- Schema derived from the ThreatXtension SQLite schema (MIT per upstream README; no LICENSE file published upstream).
 
 create table "public"."statistics" (
   "id" bigserial primary key,
