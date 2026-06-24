@@ -1,3 +1,5 @@
+# Provenance: prompt carried over from ThreatXtension (https://github.com/barvhaim/ThreatXtension),
+# MIT per its upstream README (no LICENSE file is published upstream). See docs/NOTICE.
 sast_analysis_prompt: |
   Analyze SAST (Semgrep) security findings from a Chrome extension's JavaScript files.
 

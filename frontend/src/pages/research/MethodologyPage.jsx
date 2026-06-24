@@ -24,7 +24,7 @@ const methodologyFaqSchema = {
       "name": "What is ThreatXtension?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "ThreatXtension is an open-source Chrome extension security scanner in the same space. We took inspiration from its approach; our SAST and scoring pipeline are implemented independently in ExtensionShield."
+        "text": "ThreatXtension is an open-source (MIT) Chrome extension security scanner. ExtensionShield's Security (SAST) pipeline is built on it — adapting its Semgrep ruleset and category-based risk aggregation as a baseline — while ExtensionShield's V2 scoring engine and governance pipeline are our own work."
       }
     },
     {
@@ -130,7 +130,7 @@ const MethodologyPage = () => {
                           <button
                             type="button"
                             className="pipeline-open-source-trigger"
-                            aria-label="Open source credit — Inspired by ThreatXtension"
+                            aria-label="Open source credit — built on ThreatXtension"
                           >
                             <Info className="pipeline-open-source-trigger-icon" aria-hidden />
                           </button>
@@ -144,8 +144,9 @@ const MethodologyPage = () => {
                             </div>
                             <h3>Built on Open Source</h3>
                             <p>
-                              Pipeline 1 is our Security (SAST) pipeline. We took inspiration from the approach of <strong>ThreatXtension</strong> by Bar Haim & Itzik Chanan,
-                              an open-source Chrome extension security scanner in the same space.
+                              Pipeline 1 is our Security (SAST) pipeline. It builds on <strong>ThreatXtension</strong>,
+                              an open-source (MIT) Chrome extension security scanner: we adapted its Semgrep ruleset and
+                              risk-point aggregation as our baseline and extended it with ExtensionShield's own rules and V2 scoring.
                             </p>
                             <div className="credit-links">
                               <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer" className="credit-link">
@@ -154,12 +155,6 @@ const MethodologyPage = () => {
                                 </svg>
                                 View ThreatXtension
                               </a>
-                              <a href="https://github.com/barvhaim/ThreatXtension/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" className="credit-link">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                Contribute to ThreatXtension
-                              </a>
                             </div>
                           </div>
                         </DialogContent>
@@ -167,7 +162,7 @@ const MethodologyPage = () => {
                     </div>
                     <h3>Security Analysis</h3>
                     <h4 className="tech-credit">
-                      Inspired by <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer">ThreatXtension</a>
+                      Built on <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer">ThreatXtension</a> (MIT)
                     </h4>
                     <p>Static application security testing (SAST) with custom Semgrep rules detecting malicious patterns, obfuscation, and data exfiltration.</p>
                     

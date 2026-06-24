@@ -1,5 +1,13 @@
 # Railway Configuration for ExtensionShield
 # https://docs.railway.app/reference/config-as-code
+#
+# Relationship to the repo-root railway.toml:
+#   The root-level railway.toml is the authoritative config Railway reads on
+#   deploy. This file is the template that `make deploy` copies to the repo root
+#   when one is missing (Makefile: `test -f railway.toml || cp deploy/railway.toml
+#   railway.toml`). EXTSHIELD_MODE is injected by `make` at `railway up` time
+#   (`EXTSHIELD_MODE=cloud railway up`), so it is intentionally not set in this
+#   template's [env]. Keep the two files in sync when changing deploy settings.
 
 [build]
 # Use the existing Dockerfile for building
@@ -50,8 +58,6 @@ EXTENSION_STORAGE_PATH = "/app/extensions_storage"
 [static]
 # Not used since we serve static files via FastAPI
 disabled = true
-
-# Trigger redeployment prod - Updated: 2025-02-04 21:40 UTC, 2025-02-11 17:15 UTC
 
 # =============================================================================
 # CLI Deployment Shortcuts

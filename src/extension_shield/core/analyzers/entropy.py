@@ -5,6 +5,10 @@ This module provides entropy analysis to detect obfuscated/packed JavaScript cod
 High entropy values often indicate encrypted, compressed, or heavily obfuscated content.
 """
 
+# Provenance: carried over, with minimal local changes, from ThreatXtension
+# (https://github.com/barvhaim/ThreatXtension), MIT per its upstream README
+# (no LICENSE file is published upstream). See docs/NOTICE for attribution.
+
 import os
 import re
 import math

@@ -2,6 +2,10 @@
 Manifest Parser
 """
 
+# Provenance: derived from ThreatXtension (https://github.com/barvhaim/ThreatXtension),
+# MIT per its upstream README (no LICENSE file is published upstream).
+# See docs/NOTICE for attribution.
+
 import json
 import re
 from typing import Optional, Dict, Any, List

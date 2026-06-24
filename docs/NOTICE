@@ -8,28 +8,74 @@ This project is licensed under the MIT License. See the LICENSE file for the ful
 Third-party attributions
 -----------------------
 
-ExtensionShield incorporates or was inspired by the following:
+ExtensionShield is a derivative work. It began as a fork of ThreatXtension and
+retains substantial portions of that project's source code and data, alongside
+ideas, rules, and schema patterns adapted from it. The notes below describe what
+was carried over and on what license basis.
 
 - ThreatXtension (https://github.com/barvhaim/ThreatXtension)
-  ThreatXtension is distributed under the MIT License (declared in its upstream
-  README; no separate LICENSE file is published in the upstream repository, so
-  the exact upstream copyright text is not reproduced here).
+  Authors: the ThreatXtension contributors (GitHub: barvhaim).
 
-  We took inspiration from ThreatXtension in the same space (Chrome extension
-  security scanning, VirusTotal integration). The initial security score
-  aggregation logic (risk points by category) was inspired by ThreatXtension;
-  ExtensionShield's primary scoring is the V2 ScoringEngine (multi-layer,
-  gates, governance) in extension_shield.scoring.engine.
+  License status (important):
+  ThreatXtension's README declares the "MIT License" and links to a LICENSE
+  file, but the upstream repository does not actually publish a LICENSE file,
+  and GitHub reports its license as unspecified. There is therefore a
+  declared-but-unformalized MIT intent, with no upstream copyright-holder name
+  and no canonical license text to reproduce here. ExtensionShield relies in
+  good faith on that stated MIT intent. We note this as a residual risk: because
+  no formal grant or copyright line was published upstream, the permission is
+  weaker than a conventional MIT project, and exposure scales with the amount of
+  code reused (see scope below). We would replace this reliance with an explicit
+  grant if upstream formalizes a LICENSE or a maintainer requests changes.
 
-  A set of Semgrep malware-detection rules in
-  src/extension_shield/config/custom_semgrep_rules.yaml (credential theft,
-  cookie theft, C2/exfiltration, keylogger, clipboard, URL hijacking, and
-  tracking) was adapted from ThreatXtension's MIT-licensed Semgrep ruleset;
-  see the in-file section header for the local attribution.
+  Scope of derivation (carried over, not merely "inspired by"):
+  The upstream Python package was forked and renamed (threatxtension ->
+  extension_shield). The following are reproduced verbatim or near-verbatim and
+  remain present in this codebase:
 
-  Supabase migration schemas were initially derived from SQLite schema
-  patterns from that project; see supabase/migrations/ and supabase/schemas/
-  for file-level comments.
+    * Data/config reproduced verbatim or near-verbatim:
+        - src/extension_shield/data/permissions_db.json
+        - src/extension_shield/config/sensitive_domains.json
+        - src/extension_shield/config/sast_config.json
+        - src/extension_shield/config/virustotal_config.json
+        - src/extension_shield/llm/prompts/sast_analysis.yaml
+
+    * Core modules carried over, then locally modified:
+        - src/extension_shield/core/analyzers/entropy.py
+        - src/extension_shield/core/analyzers/chromestats.py
+        - src/extension_shield/core/chromestats_downloader.py
+        - src/extension_shield/core/extension_metadata.py
+        - src/extension_shield/core/manifest_parser.py
+        - src/extension_shield/cli/main.py
+        - the mcp_server, api, and workflow layers
+
+      Where the file format allows comments, these files carry an in-file
+      provenance header pointing back to ThreatXtension and to this NOTICE; the
+      verbatim JSON data files (which cannot carry comments) are attributed
+      here.
+
+    * Security-score aggregation: the original risk-points-by-category logic
+      originates from ThreatXtension. ExtensionShield additionally adds a V2
+      ScoringEngine (multi-layer, gates, governance) in
+      extension_shield.scoring.engine, but the original aggregation lineage is
+      upstream, not independent.
+
+    * Semgrep malware-detection rules in
+      src/extension_shield/config/custom_semgrep_rules.yaml (credential theft,
+      cookie theft, C2/exfiltration, keylogger, clipboard, URL hijacking, and
+      tracking) were adapted from ThreatXtension's Semgrep ruleset; see the
+      in-file section header.
+
+    * Supabase migration and schema files in supabase/migrations/ and
+      supabase/schemas/ were derived from ThreatXtension's SQLite schema (with
+      deliberate changes such as TEXT -> JSONB and timestamp text ->
+      timestamptz); see the per-file provenance comments.
+
+  Work that is original to ExtensionShield (not derived from upstream) includes
+  the V2 ScoringEngine and governance layers (extension_shield.scoring,
+  extension_shield.governance), the cloud/auth/telemetry API surface, and the
+  web frontend. ExtensionShield as a whole should nonetheless be understood as a
+  derivative of ThreatXtension, not an independent reimplementation.
 
 Other dependencies are governed by their respective licenses; see
 pyproject.toml and frontend/package.json.

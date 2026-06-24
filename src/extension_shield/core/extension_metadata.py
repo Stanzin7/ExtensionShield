@@ -1,5 +1,9 @@
 """Module for fetching and extracting Chrome extension metadata from the Chrome Web Store."""
 
+# Provenance: derived from ThreatXtension (https://github.com/barvhaim/ThreatXtension),
+# MIT per its upstream README (no LICENSE file is published upstream).
+# See docs/NOTICE for attribution.
+
 import logging
 import re
 from typing import Optional, Dict
