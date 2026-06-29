@@ -208,16 +208,18 @@ def get_settings() -> Settings:
     telemetry_admin_key = os.environ.get("TELEMETRY_ADMIN_KEY")
 
     # Zip-bomb protection: max file count and max total uncompressed size
-    _zip_max_files = os.environ.get("ZIP_EXTRACT_MAX_FILES", "10000")
-    _zip_max_bytes = os.environ.get("ZIP_EXTRACT_MAX_UNCOMPRESSED_BYTES", "524288000")  # 500 MiB
+    # Reduced defaults to prevent DoS via crafted .crx archives:
+    # 1000 files and 100 MiB are sufficient for any legitimate Chrome extension.
+    _zip_max_files = os.environ.get("ZIP_EXTRACT_MAX_FILES", "1000")
+    _zip_max_bytes = os.environ.get("ZIP_EXTRACT_MAX_UNCOMPRESSED_BYTES", "104857600")  # 100 MiB
     try:
         zip_extract_max_files = int(_zip_max_files)
     except ValueError:
-        zip_extract_max_files = 10000
+        zip_extract_max_files = 1000
     try:
         zip_extract_max_uncompressed_bytes = int(_zip_max_bytes)
     except ValueError:
-        zip_extract_max_uncompressed_bytes = 524288000
+        zip_extract_max_uncompressed_bytes = 104857600
 
     storage_backend = _parse_storage_backend(os.environ.get("STORAGE_BACKEND"))
 
