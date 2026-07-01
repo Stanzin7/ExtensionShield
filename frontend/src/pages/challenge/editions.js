@@ -32,9 +32,17 @@ export const EDITIONS = [
         "The ExtensionShield Threat Report Challenge at Nexus Spring of Code (Hackathon 2.0): investigate real Chrome extensions, classify risk on the evidence, and submit an evidence-backed report. Free to scan, no coding required.",
     },
     content: {
-      lede: "Secure yourself from harmful browser extensions.",
-      intro:
-        "Some browser extensions request powerful permissions that may access your browsing activity or personal data, depending on how they work. Learn to spot warning signs, investigate responsibly, and help people make safer browser choices.",
+      eyebrow: "Nexus Spring of Code · Hackathon 2.0",
+      heading: "Investigate risky browser extensions",
+      lead:
+        "Browser extensions can be genuinely useful — but some may be able to read the pages you visit, change what you see, or reach data tied to your accounts, depending on the permissions they request and how they behave. In this challenge you'll learn to read those signals, tell evidence from assumption, and document real risks in a clear, fair report.",
+      research: [
+        { label: "How we score extensions", path: "/research/methodology" },
+        { label: "Real-world case studies", path: "/research/case-studies" },
+        { label: "Permissions explained", path: "/chrome-extension-permissions" },
+      ],
+      challengeIntro:
+        "Choose real Chrome Web Store extensions, investigate the evidence, and turn what you find into a fair, clear, actionable threat report. ExtensionShield is the free research tool you'll use to scan extensions, inspect permissions, and document your findings.",
       playbookHeading: "Make the report useful, fair, and hard to ignore.",
       playbookIntro:
         "The strongest reports explain both what the evidence shows and what it does not. Risk is not a guess — support every recommendation with verifiable facts.",
@@ -59,21 +67,23 @@ export const EDITIONS = [
       riskNote:
         "Risk reflects your evidence-based judgment. A scan signals concerns to investigate — it does not by itself prove an extension is malicious.",
       judges: [
-        { title: "Accuracy", text: "Factually correct and proportionate." },
-        { title: "Evidence", text: "Screenshots, permissions, logs, sources." },
-        { title: "Analysis", text: "Why the signal matters." },
-        { title: "Recommendation", text: "A practical next step." },
-        { title: "Presentation", text: "Clear, structured, easy to follow." },
+        { title: "Accuracy", icon: "target", text: "Factually correct and proportionate." },
+        { title: "Evidence", icon: "image", text: "Screenshots, permissions, logs, sources." },
+        { title: "Analysis", icon: "bulb", text: "Why the signal matters." },
+        { title: "Recommendation", icon: "flag", text: "A practical next step." },
+        { title: "Presentation", icon: "list", text: "Clear, structured, easy to follow." },
       ],
       features: [
-        { title: "Scan as you browse", text: "Inspect extensions right where you find them." },
-        { title: "Save to your workspace", text: "Keep all your candidates in one place." },
-        { title: "Finish your report online", text: "Your saved extensions are ready when you export your final report." },
+        { title: "Scan as you browse", icon: "cursor", text: "Inspect extensions right where you find them." },
+        { title: "Save to your workspace", icon: "bookmark", text: "Keep all your candidates in one place." },
+        { title: "Finish your report online", icon: "download", text: "Your saved extensions are ready when you export your final report." },
       ],
       integrity:
         "Same extension, your own work. You may analyze the same extension as another participant — your scan, saved report, written analysis, screenshots, and recommendation must be your own. Signing in links your work to you, so judging stays fair.",
       prizes:
         "Standout submissions may also lead to open-source work, research, community leadership, or an internship, where applicable.",
+      beforeSubmit:
+        "Write what you observed. Attach your evidence. Explain why it matters. Then make the most responsible recommendation the facts support.",
     },
   },
 ];
