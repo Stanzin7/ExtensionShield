@@ -244,16 +244,6 @@ const ChallengeEditionPage = ({ slug }) => {
               <p className="panel-text">{c.beforeSubmit}</p>
             </div>
           </section>
-
-          {/* ---------- FINAL CTA ---------- */}
-          <section className="challenge-final">
-            <h3>Ready to start?</h3>
-            <p>
-              Free to scan. No payment required. Sign in only when you&apos;re ready to save, export,
-              or submit an official report.
-            </p>
-            <Link to="/scan" className="btn btn--primary">Open the scanner</Link>
-          </section>
         </div>
       </div>
     </>

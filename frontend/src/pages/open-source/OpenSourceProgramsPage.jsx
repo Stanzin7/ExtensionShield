@@ -21,10 +21,10 @@ const PROGRAMS = [
   },
   {
     id: "nexus-spring",
-    name: "Nexus Spring of Code — Hackathon 2.0",
-    description: "Challenge partner: ExtensionShield runs the Threat Report Challenge, a no-coding student security challenge.",
-    status: "Partner",
-    statusVariant: "partner",
+    name: "Nexus Spring of Code",
+    description: "A 60-day open-source program where maintainers bring real projects and contributors ship production-ready code. ExtensionShield runs the Threat Report Challenge as part of NSoC'26.",
+    status: "",
+    statusVariant: "",
     path: "/challenge",
     icon: "🛡️",
     iconClass: "nexus",
@@ -63,9 +63,11 @@ const OpenSourceProgramsPage = () => {
                 <div className="program-content">
                   <h3>{program.name}</h3>
                   <p>{program.description}</p>
-                  <span className={`program-status program-status--${program.statusVariant}`}>
-                    {program.status}
-                  </span>
+                  {program.status ? (
+                    <span className={`program-status program-status--${program.statusVariant}`}>
+                      {program.status}
+                    </span>
+                  ) : null}
                 </div>
                 <span className="arrow">→</span>
               </Link>
