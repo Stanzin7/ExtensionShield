@@ -1,20 +1,19 @@
 {
   "scripts": {
     "deploy": "./scripts/deploy.sh",
-    "supabase": "supabase",
-    "db:diff": "supabase db diff",
-    "db:push": "supabase db push",
-    "db:pull": "supabase db pull",
-    "db:reset": "supabase db reset",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:migration:up": "supabase migration up",
-    "db:migration:new": "supabase migration new",
+    "supabase": "./scripts/run-supabase.sh",
+    "db:diff": "./scripts/run-supabase.sh db diff",
+    "db:push": "./scripts/run-supabase.sh db push",
+    "db:pull": "./scripts/run-supabase.sh db pull",
+    "db:reset": "./scripts/run-supabase.sh db reset",
+    "db:start": "./scripts/run-supabase.sh start",
+    "db:stop": "./scripts/run-supabase.sh stop",
+    "db:migration:up": "./scripts/run-supabase.sh migration up",
+    "db:migration:new": "./scripts/run-supabase.sh migration new",
     "resend:test": "node scripts/send-resend-test-email.mjs"
   },
   "devDependencies": {
     "dotenv": "^16.4.5",
-    "resend": "^4.0.0",
-    "supabase": "^2.75.5"
+    "resend": "^4.0.0"
   }
 }

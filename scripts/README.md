@@ -33,6 +33,8 @@ Use these when you need to run something outside the usual `make` targets (e.g. 
 - **cloud_only/clear_all_scans.py** — Deletes every scan from the DB. Cloud only. `make clear-scans`.
 - **cloud_only/delete_scans_before_extension.py** — Deletes scans for a given extension (admin cleanup). Run with `PYTHONPATH=src python scripts/cloud_only/delete_scans_before_extension.py "Extension Name"`.
 
+Supabase shell helpers expect a separately installed `supabase` CLI instead of pulling it in during `npm install`.
+
 **Security / CSP**
 
 - **setup-production-csp.sh** — Builds the frontend and configures CSP headers for production.
