@@ -11,8 +11,6 @@ import "./ChallengePage.scss";
  * content lives on the edition page.
  */
 const ChallengePage = () => {
-  const active = EDITIONS.find((e) => e.statusVariant === "active") || EDITIONS[0];
-
   return (
     <>
       <SEOHead
@@ -26,31 +24,12 @@ const ChallengePage = () => {
         <RainfallDroplets />
 
         <div className="challenge-content">
-          {/* ---------- HERO ---------- */}
-          <header className="challenge-hero">
-            <div className="challenge-chips">
-              <span className="chip chip--green">No coding competition</span>
-              <span className="chip chip--blue">Anyone can participate</span>
-            </div>
+          <header className="hub-head">
             <h1>ExtensionShield Threat Report Challenge</h1>
-            <p className="challenge-lede">Secure yourself from harmful browser extensions.</p>
-            <p className="challenge-sub">
-              Learn to spot risky browser extensions, investigate their permissions and privacy
-              signals responsibly, and turn what you find into a fair, evidence-backed report — then
-              help people make safer browser choices.
-            </p>
-            <div className="challenge-cta">
-              {active && (
-                <Link to={`/challenge/${active.slug}`} className="btn btn--primary">View the challenge</Link>
-              )}
-              <Link to="/scan" className="btn btn--ghost">Open the scanner</Link>
-            </div>
-            <p className="challenge-hosts">Free to scan · No coding required · Evidence first</p>
+            <p>Choose a challenge to view its brief, rules, and how to enter.</p>
           </header>
 
-          {/* ---------- EDITIONS ---------- */}
           <section className="challenge-section">
-            <h2 className="section-eyebrow">Current challenge</h2>
             <div className="editions-grid">
               {EDITIONS.map((ed) => (
                 <Link key={ed.slug} to={`/challenge/${ed.slug}`} className="edition-card edition-card--link">

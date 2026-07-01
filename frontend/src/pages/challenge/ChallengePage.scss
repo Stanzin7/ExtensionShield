@@ -26,6 +26,26 @@
   }
 }
 
+/* ---------- Hub head (minimal, replaces the hero on /challenge) ---------- */
+.hub-head {
+  margin-bottom: 2rem;
+
+  h1 {
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 0 0 0.5rem;
+    color: var(--extensionshield-text-primary);
+  }
+
+  p {
+    font-size: 1rem;
+    color: var(--extensionshield-text-secondary);
+    margin: 0;
+    line-height: 1.6;
+  }
+}
+
 /* ---------- Back link ---------- */
 .challenge-back {
   display: inline-flex;
