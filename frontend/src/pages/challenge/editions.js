@@ -108,9 +108,8 @@ export const EDITIONS = [
       details: {
         extensions: "Choose 5–10 Chrome Web Store extensions.",
         deadline: "",
-        eligibility: "",
+        eligibility: "Anyone",
         submit: "",
-        rulesUrl: "",
       },
     },
   },

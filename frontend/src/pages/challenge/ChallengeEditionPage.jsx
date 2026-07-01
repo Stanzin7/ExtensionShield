@@ -45,9 +45,6 @@ const ChallengeEditionPage = ({ slug }) => {
     c.enter.submitUrl
       ? { label: "Submit", value: "Open the submission sheet", href: c.enter.submitUrl }
       : { label: "Submit", value: d.submit || tba },
-    d.rulesUrl
-      ? { label: "Rules and privacy", value: "Read the rules and privacy notice", href: d.rulesUrl }
-      : { label: "Rules and privacy", value: tba },
   ];
 
   const challengeSchema = {
