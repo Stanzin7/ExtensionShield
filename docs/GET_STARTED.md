@@ -87,6 +87,8 @@ cp .env.example .env
 docker compose up --build
 # → API at http://localhost:8007
 ```
+
+> **Network note:** The Docker config binds to `127.0.0.1:8007` (localhost only). This means the API is not reachable from other devices on your network. If you need external access (e.g. a shared dev server), change the binding to `0.0.0.0:8007:8007` in `docker-compose.yml` and ensure your firewall rules are appropriate. For production, place the API behind a reverse proxy (nginx, Caddy) rather than exposing it directly.
 </details>
 
 ---

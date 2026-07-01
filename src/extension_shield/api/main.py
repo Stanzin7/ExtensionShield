@@ -170,6 +170,36 @@ def _rate_limit(limit: str):
     return _noop
 
 
+def _format_byte_limit(max_bytes: int) -> str:
+    """Return a human-readable upload limit for API error messages."""
+    if max_bytes % (1024 * 1024) == 0:
+        mb = max_bytes // (1024 * 1024)
+        return f"{mb}MB"
+    return f"{max_bytes} bytes"
+
+
+async def _read_upload_with_limit(file: UploadFile, max_bytes: int) -> bytes:
+    """Read an UploadFile without accepting payloads larger than max_bytes."""
+    chunk_size = 1024 * 1024
+    chunks = []
+    total = 0
+
+    while True:
+        remaining = max_bytes - total + 1
+        chunk = await file.read(min(chunk_size, remaining))
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {_format_byte_limit(max_bytes)}.",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
@@ -390,6 +420,9 @@ DAILY_DEEP_SCAN_LIMIT = 3  # authenticated users
 ANONYMOUS_DAILY_DEEP_SCAN_LIMIT = 1  # anonymous (IP-based) users – after 1 scan, prompt login
 # deep_scan_usage[user_id][YYYY-MM-DD] = used_count
 deep_scan_usage: Dict[str, Dict[str, int]] = {}
+# Lock to prevent race conditions when multiple concurrent requests check/increment the same counter
+import threading as _threading
+_deep_scan_usage_lock = _threading.Lock()
 
 
 def _get_user_id(request: Request) -> str:
@@ -542,13 +575,14 @@ def _deep_scan_limit_status(rate_limit_key: str) -> Dict[str, Any]:
 
 
 def _consume_deep_scan(user_id: str) -> Dict[str, Any]:
-    status = _deep_scan_limit_status(user_id)
-    if status["remaining"] <= 0:
-        return status
-    day_key = status["day_key"]
-    deep_scan_usage.setdefault(user_id, {})
-    deep_scan_usage[user_id][day_key] = deep_scan_usage[user_id].get(day_key, 0) + 1
-    return _deep_scan_limit_status(user_id)
+    with _deep_scan_usage_lock:
+        status = _deep_scan_limit_status(user_id)
+        if status["remaining"] <= 0:
+            return status
+        day_key = status["day_key"]
+        deep_scan_usage.setdefault(user_id, {})
+        deep_scan_usage[user_id][day_key] = deep_scan_usage[user_id].get(day_key, 0) + 1
+        return _deep_scan_limit_status(user_id)
 
 
 def _has_cached_results(extension_id: str) -> bool:
@@ -2460,14 +2494,9 @@ async def upload_and_scan(
             detail="Invalid file type. Only .crx and .zip files are supported"
         )
 
-    # Validate file size (max 100MB)
-    max_size = 100 * 1024 * 1024  # 100MB
-    file_content = await file.read()
-    if len(file_content) > max_size:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {max_size / (1024*1024):.0f}MB"
-        )
+    # Validate file size before saving/analysis. Read with a bounded loop rather than
+    # slurping an arbitrary body into memory first.
+    file_content = await _read_upload_with_limit(file, settings.upload_max_bytes)
 
     # Validate MIME type (additional security check)
     import mimetypes
@@ -3030,6 +3059,18 @@ async def generate_pdf_report(extension_id: str) -> Response:
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 
 
+def _can_view_scan_files(request_user_id: str | None, results: dict[str, Any]) -> bool:
+    """Allow file access for public scans and the owning user for private scans."""
+    if not isinstance(results, dict):
+        return False
+    if results.get("visibility") != "private":
+        return True
+    owner_user_id = results.get("user_id")
+    if not owner_user_id or not request_user_id:
+        return False
+    return str(owner_user_id) == str(request_user_id)
+
+
 @app.get("/api/scan/files/{extension_id}")
 async def get_file_list(extension_id: str, http_request: Request) -> FileListResponse:
     """
@@ -3051,6 +3092,9 @@ async def get_file_list(extension_id: str, http_request: Request) -> FileListRes
     results = scan_results.get(extension_id)
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    if not _can_view_scan_files(user_id, results):
+        raise HTTPException(status_code=404, detail="Scan results not found")
 
     extracted_path = results.get("extracted_path")
     if not extracted_path or not os.path.exists(extracted_path):
@@ -3083,6 +3127,9 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     if not results:
         raise HTTPException(status_code=404, detail="Extension not found")
 
+    if not _can_view_scan_files(user_id, results):
+        raise HTTPException(status_code=404, detail="Scan results not found")
+
     extracted_path = results.get("extracted_path")
     if not extracted_path:
         raise HTTPException(status_code=404, detail="Extracted files not found")
@@ -3090,12 +3137,32 @@ async def get_file_content(extension_id: str, file_path: str, http_request: Requ
     # Construct full file path
     full_path = os.path.join(extracted_path, file_path)
 
-    # Security check: ensure path is within extracted directory
-    if not os.path.abspath(full_path).startswith(os.path.abspath(extracted_path)):
+    # Security check: use commonpath to prevent path traversal bypasses.
+    # os.path.abspath(...).startswith(...) is vulnerable when one path is a
+    # prefix of another directory name (e.g. /tmp/ext_abc vs /tmp/ext_abcdef).
+    abs_full = os.path.abspath(full_path)
+    abs_extracted = os.path.abspath(extracted_path)
+    try:
+        if os.path.commonpath([abs_extracted, abs_full]) != abs_extracted:
+            raise HTTPException(status_code=403, detail="Access denied")
+    except ValueError:
+        # commonpath raises ValueError on Windows when paths are on different drives
         raise HTTPException(status_code=403, detail="Access denied")
 
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="File not found")
+
+    # Guard against reading very large files into memory (e.g. bundled assets).
+    _MAX_FILE_READ_BYTES = 5 * 1024 * 1024  # 5 MB
+    try:
+        file_size = os.path.getsize(full_path)
+    except OSError:
+        file_size = 0
+    if file_size > _MAX_FILE_READ_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large to display ({file_size // 1024} KB). Maximum is {_MAX_FILE_READ_BYTES // 1024} KB.",
+        )
 
     try:
         with open(full_path, "r", encoding="utf-8") as f:

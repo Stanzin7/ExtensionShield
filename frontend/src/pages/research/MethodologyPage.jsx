@@ -9,6 +9,22 @@ import "./MethodologyPage.scss";
 
 const CANONICAL_DOMAIN = "https://extensionshield.com";
 
+// FAQ: same content drives both the visible list and the FAQPage JSON-LD
+const faqItems = [
+  {
+    question: "How is the extension risk score calculated?",
+    answer: "ExtensionShield combines three pipelines weighted near-equally in the smooth score: Security (34%), Privacy (33%), and Governance (33%). Security uses open-source SAST (Semgrep-based rules), Privacy analyzes data collection and tracking, and Governance covers policy alignment and disclosure consistency. Hard gates override the smooth score to BLOCK severe findings such as malware or credential capture."
+  },
+  {
+    question: "What is ThreatXtension?",
+    answer: "ThreatXtension is an open-source Chrome extension security scanner (MIT per its README; no separate upstream LICENSE file is published). ExtensionShield began as a derivative of ThreatXtension: our Security (SAST) pipeline builds on its Semgrep ruleset and category-based risk aggregation, while ExtensionShield's V2 scoring engine and governance pipeline are our own work."
+  },
+  {
+    question: "What does the aggregate risk score mean?",
+    answer: "The overall score (0–100) is a weighted combination of Security, Privacy, and Governance. Lower scores indicate higher risk. We show the breakdown so you can see which dimension drives the result."
+  }
+];
+
 const breadcrumbSchema = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
@@ -112,7 +128,7 @@ const MethodologyPage = () => {
                           <button
                             type="button"
                             className="pipeline-open-source-trigger"
-                            aria-label="Open source credit — built on ThreatXtension"
+                            aria-label="Open source credit — based on ThreatXtension"
                           >
                             <Info className="pipeline-open-source-trigger-icon" aria-hidden />
                           </button>
@@ -126,9 +142,10 @@ const MethodologyPage = () => {
                             </div>
                             <h3>Built on Open Source</h3>
                             <p>
-                              Pipeline 1 is our Security (SAST) pipeline. It builds on <strong>ThreatXtension</strong>,
-                              an open-source (MIT) Chrome extension security scanner: we adapted its Semgrep ruleset and
-                              risk-point aggregation as our baseline and extended it with ExtensionShield's own rules and V2 scoring.
+                              ExtensionShield began as a derivative of <strong>ThreatXtension</strong>
+                              (open-source, MIT per its README). Pipeline 1, our Security (SAST) pipeline, builds
+                              directly on its Semgrep ruleset and risk-point aggregation; the V2 scoring engine and
+                              governance pipeline are ExtensionShield's own.
                             </p>
                             <div className="credit-links">
                               <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer" className="credit-link">
@@ -144,7 +161,7 @@ const MethodologyPage = () => {
                     </div>
                     <h3>Security Analysis</h3>
                     <h4 className="tech-credit">
-                      Built on <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer">ThreatXtension</a> (MIT)
+                      Based on <a href="https://github.com/barvhaim/ThreatXtension" target="_blank" rel="noopener noreferrer">ThreatXtension</a> (MIT per its README)
                     </h4>
                     <p>Static application security testing (SAST) with custom Semgrep rules detecting malicious patterns, obfuscation, and data exfiltration.</p>
                     
