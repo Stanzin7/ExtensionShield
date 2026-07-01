@@ -73,21 +73,21 @@ export const EDITIONS = [
         { title: "Recommendation", icon: "flag", text: "A practical next step." },
         { title: "Presentation", icon: "list", text: "Clear, structured, easy to follow." },
       ],
-      extensionHeading: "Install the extension — and stay safer",
+      extensionHeading: "Scan as you browse",
       extensionLead:
-        "The ExtensionShield Chrome extension is the fastest way to work the challenge — and it helps you stay safer day to day. It keeps an eye on the extensions you already have installed and flags the ones worth a closer look.",
+        "The ExtensionShield Chrome extension gives you quicker access to scan extensions you already use and investigate Chrome Web Store listings while you browse.",
       features: [
-        { title: "Scan as you browse", icon: "cursor", text: "Inspect extensions right where you find them." },
-        { title: "Save to your workspace", icon: "bookmark", text: "Keep all your candidates in one place." },
-        { title: "Finish your report online", icon: "download", text: "Your saved extensions are ready when you export your final report." },
+        { title: "Scan installed extensions", icon: "cursor", text: "Review extensions already in your browser." },
+        { title: "Save to your workspace", icon: "bookmark", text: "Keep the extensions you want to investigate in one place." },
+        { title: "Finish your report online", icon: "download", text: "Use your saved work when preparing your final report." },
       ],
       enter: {
         intro:
           "Scanning is free and needs no account. To submit an official entry you'll sign in — it's how we keep the challenge fair for everyone.",
         points: [
-          { icon: "bookmark", title: "Your work saves automatically", text: "Every extension you scan while signed in is saved to your account, so nothing gets lost before you submit." },
+          { icon: "bookmark", title: "Save your work to your workspace", text: "Sign in to save the extensions you want to review and keep your challenge work organized." },
           { icon: "download", title: "One-click PDF report", text: "Export your saved scans as a ready-to-submit PDF report — no rebuilding your findings by hand." },
-          { icon: "usercheck", title: "Verified participants only", text: "Your sign-in is cross-checked against the challenge registrations, so only registered participants can enter and every report is tied to a real person." },
+          { icon: "usercheck", title: "Official entries are account-linked", text: "Sign in to save, export, and submit an official report. Your account links the entry to its author and helps keep judging fair." },
         ],
         submit: "When your report is ready, export the PDF and attach it to the challenge submission sheet.",
         // Add the Google Form / submission sheet link here to show a submit button.
@@ -97,10 +97,21 @@ export const EDITIONS = [
         "Same extension, your own work. You may analyze the same extension as another participant. When possible, choose an extension not yet covered in ExtensionShield to help expand community coverage.",
         "Your saved report, written analysis, screenshots, and recommendation must be your own. Signing in links your official entry to your account, helping keep judging fair.",
       ],
+      prizeTitle: "Cash prizes for the top three reports",
+      // When tiers/amounts are finalized, e.g. ["1st — ₹25,000", "2nd — ₹15,000", "3rd — ₹10,000"]. Empty hides the chips.
+      prizeTiers: [],
       prizes:
         "Standout submissions may also lead to open-source work, research, community leadership, or an internship, where applicable.",
       beforeSubmit:
         "Write what you observed. Attach your evidence. Explain why it matters. Then make the most responsible recommendation the facts support.",
+      // Fill these in before publishing. Blank fields render as "To be announced".
+      details: {
+        extensions: "Choose 5–10 Chrome Web Store extensions.",
+        deadline: "",
+        eligibility: "",
+        submit: "",
+        rulesUrl: "",
+      },
     },
   },
 ];

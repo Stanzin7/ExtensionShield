@@ -36,6 +36,20 @@ const ChallengeEditionPage = ({ slug }) => {
   if (!ed) return <Navigate to="/challenge" replace />;
   const c = ed.content;
 
+  const d = c.details || {};
+  const tba = "To be announced";
+  const detailRows = [
+    { label: "Extensions", value: d.extensions || "Choose 5–10 Chrome Web Store extensions." },
+    { label: "Submission deadline", value: d.deadline || ed.schedule.endDate || tba },
+    { label: "Eligibility", value: d.eligibility || tba },
+    c.enter.submitUrl
+      ? { label: "Submit", value: "Open the submission sheet", href: c.enter.submitUrl }
+      : { label: "Submit", value: d.submit || tba },
+    d.rulesUrl
+      ? { label: "Rules and privacy", value: "Read the rules and privacy notice", href: d.rulesUrl }
+      : { label: "Rules and privacy", value: tba },
+  ];
+
   const challengeSchema = {
     "@context": "https://schema.org",
     "@type": "Event",
@@ -170,10 +184,10 @@ const ChallengeEditionPage = ({ slug }) => {
 
           {/* ---------- INSTALL THE EXTENSION (SAFETY) ---------- */}
           <section className="challenge-section">
-            <div className="panel panel--accent">
+            <div className="panel panel--soft">
               <div className="panel-head">
-                <h3 className="panel-title"><span className="ti ti--green"><Icon name="shield" /></span>{c.extensionHeading}</h3>
-                <span className="tag-optional tag-optional--rec">Recommended</span>
+                <h3 className="panel-title"><span className="ti ti--green"><Icon name="cursor" /></span>{c.extensionHeading}</h3>
+                <span className="tag-optional">Optional</span>
               </div>
               <p className="panel-text ext-lead">{c.extensionLead}</p>
               <div className="features-grid">
@@ -187,7 +201,7 @@ const ChallengeEditionPage = ({ slug }) => {
                   </div>
                 ))}
               </div>
-              <a className="btn btn--primary btn--sm" href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
+              <a className="link-inline" href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
                 Add ExtensionShield to Chrome ↗
               </a>
             </div>
@@ -228,13 +242,13 @@ const ChallengeEditionPage = ({ slug }) => {
                 ))}
               </div>
               <div className="panel panel--prize">
-                <h3 className="panel-title"><span className="ti ti--gold"><Icon name="trophy" /></span>Cash prizes for top reports</h3>
+                <h3 className="panel-title"><span className="ti ti--gold"><Icon name="trophy" /></span>{c.prizeTitle}</h3>
                 <p className="panel-text">{c.prizes}</p>
-                <div className="medals">
-                  <span>1st</span>
-                  <span>2nd</span>
-                  <span>3rd</span>
-                </div>
+                {c.prizeTiers && c.prizeTiers.length > 0 ? (
+                  <div className="medals">
+                    {c.prizeTiers.map((t) => <span key={t}>{t}</span>)}
+                  </div>
+                ) : null}
               </div>
             </div>
           </section>
@@ -244,6 +258,27 @@ const ChallengeEditionPage = ({ slug }) => {
             <div className="panel panel--soft">
               <h3 className="panel-title"><span className="ti ti--blue"><Icon name="pencil" /></span>Before you submit</h3>
               <p className="panel-text">{c.beforeSubmit}</p>
+            </div>
+          </section>
+
+          {/* ---------- CHALLENGE DETAILS ---------- */}
+          <section className="challenge-section">
+            <div className="panel">
+              <h3 className="panel-title"><span className="ti ti--green"><Icon name="list" /></span>Challenge details</h3>
+              <dl className="details-list">
+                {detailRows.map((r) => (
+                  <div key={r.label} className="details-row">
+                    <dt>{r.label}</dt>
+                    <dd>
+                      {r.href ? (
+                        <a href={r.href} target="_blank" rel="noopener noreferrer">{r.value} ↗</a>
+                      ) : (
+                        r.value
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           </section>
         </div>
