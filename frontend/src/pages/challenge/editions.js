@@ -97,11 +97,13 @@ export const EDITIONS = [
         "Same extension, your own work. You may analyze the same extension as another participant. When possible, choose an extension not yet covered in ExtensionShield to help expand community coverage.",
         "Your saved report, written analysis, screenshots, and recommendation must be your own. Signing in links your official entry to your account, helping keep judging fair.",
       ],
-      prizeTitle: "Cash prizes for the top three reports",
+      prizeTitle: "Cash prizes & opportunities",
       // When tiers/amounts are finalized, e.g. ["1st — ₹25,000", "2nd — ₹15,000", "3rd — ₹10,000"]. Empty hides the chips.
       prizeTiers: [],
-      prizes:
-        "Standout submissions may also lead to open-source work, research, community leadership, or an internship, where applicable.",
+      prizes: [
+        "The top three eligible reports receive cash prizes. Prize amounts and distribution are administered through Nexus Spring of Code.",
+        "Strong participants may also be invited to discuss a separate, paid part-time role with ExtensionShield — subject to availability and a separate selection process.",
+      ],
       beforeSubmit:
         "Write what you observed. Attach your evidence. Explain why it matters. Then make the most responsible recommendation the facts support.",
       // Fill these in before publishing. Blank fields render as "To be announced".

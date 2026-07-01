@@ -240,7 +240,9 @@ const ChallengeEditionPage = ({ slug }) => {
               </div>
               <div className="panel panel--prize">
                 <h3 className="panel-title"><span className="ti ti--gold"><Icon name="trophy" /></span>{c.prizeTitle}</h3>
-                <p className="panel-text">{c.prizes}</p>
+                {c.prizes.map((para, i) => (
+                  <p key={i} className="panel-text" style={i ? { marginTop: "0.7rem" } : undefined}>{para}</p>
+                ))}
                 {c.prizeTiers && c.prizeTiers.length > 0 ? (
                   <div className="medals">
                     {c.prizeTiers.map((t) => <span key={t}>{t}</span>)}
