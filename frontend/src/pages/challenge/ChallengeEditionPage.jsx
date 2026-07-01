@@ -22,6 +22,7 @@ const PATHS = {
   scale: (<><path d="M12 4v16" /><path d="M7 20h10" /><path d="M5 7h14" /><path d="M5 7l-2.4 5a2.5 2.5 0 0 0 4.8 0z" /><path d="M19 7l-2.4 5a2.5 2.5 0 0 0 4.8 0z" /></>),
   trophy: (<><path d="M8 21h8" /><path d="M12 17v4" /><path d="M6 4h12v4a6 6 0 0 1-12 0z" /><path d="M18 5h2.5a1.5 1.5 0 0 1 0 5H18" /><path d="M6 5H3.5a1.5 1.5 0 0 0 0 5H6" /></>),
   pencil: (<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>),
+  usercheck: (<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m16 11 2 2 4-4" /></>),
 };
 
 const Icon = ({ name }) => (
@@ -167,13 +168,14 @@ const ChallengeEditionPage = ({ slug }) => {
             </div>
           </section>
 
-          {/* ---------- EXTENSION (OPTIONAL) ---------- */}
+          {/* ---------- INSTALL THE EXTENSION (SAFETY) ---------- */}
           <section className="challenge-section">
-            <div className="panel panel--soft">
+            <div className="panel panel--accent">
               <div className="panel-head">
-                <h3 className="panel-title">Work faster with the extension</h3>
-                <span className="tag-optional">Optional</span>
+                <h3 className="panel-title"><span className="ti ti--green"><Icon name="shield" /></span>{c.extensionHeading}</h3>
+                <span className="tag-optional tag-optional--rec">Recommended</span>
               </div>
+              <p className="panel-text ext-lead">{c.extensionLead}</p>
               <div className="features-grid">
                 {c.features.map((f) => (
                   <div key={f.title} className="feature-item">
@@ -185,9 +187,34 @@ const ChallengeEditionPage = ({ slug }) => {
                   </div>
                 ))}
               </div>
-              <a className="link-inline" href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
+              <a className="btn btn--primary btn--sm" href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
                 Add ExtensionShield to Chrome ↗
               </a>
+            </div>
+          </section>
+
+          {/* ---------- SIGN IN TO ENTER ---------- */}
+          <section className="challenge-section">
+            <div className="panel">
+              <h3 className="panel-title"><span className="ti ti--green"><Icon name="usercheck" /></span>Sign in to enter</h3>
+              <p className="panel-text ext-lead">{c.enter.intro}</p>
+              <div className="enter-points">
+                {c.enter.points.map((p) => (
+                  <div key={p.title} className="enter-point">
+                    <span className="ti ti--green"><Icon name={p.icon} /></span>
+                    <div>
+                      <b>{p.title}</b>
+                      <p>{p.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="panel-text enter-submit">{c.enter.submit}</p>
+              {c.enter.submitUrl ? (
+                <a className="btn btn--ghost btn--sm" href={c.enter.submitUrl} target="_blank" rel="noopener noreferrer">
+                  Open the submission sheet ↗
+                </a>
+              ) : null}
             </div>
           </section>
 

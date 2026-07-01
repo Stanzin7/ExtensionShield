@@ -73,11 +73,26 @@ export const EDITIONS = [
         { title: "Recommendation", icon: "flag", text: "A practical next step." },
         { title: "Presentation", icon: "list", text: "Clear, structured, easy to follow." },
       ],
+      extensionHeading: "Install the extension — and stay safer",
+      extensionLead:
+        "The ExtensionShield Chrome extension is the fastest way to work the challenge — and it helps you stay safer day to day. It keeps an eye on the extensions you already have installed and flags the ones worth a closer look.",
       features: [
         { title: "Scan as you browse", icon: "cursor", text: "Inspect extensions right where you find them." },
         { title: "Save to your workspace", icon: "bookmark", text: "Keep all your candidates in one place." },
         { title: "Finish your report online", icon: "download", text: "Your saved extensions are ready when you export your final report." },
       ],
+      enter: {
+        intro:
+          "Scanning is free and needs no account. To submit an official entry you'll sign in — it's how we keep the challenge fair for everyone.",
+        points: [
+          { icon: "bookmark", title: "Your work saves automatically", text: "Every extension you scan while signed in is saved to your account, so nothing gets lost before you submit." },
+          { icon: "download", title: "One-click PDF report", text: "Export your saved scans as a ready-to-submit PDF report — no rebuilding your findings by hand." },
+          { icon: "usercheck", title: "Verified participants only", text: "Your sign-in is cross-checked against the challenge registrations, so only registered participants can enter and every report is tied to a real person." },
+        ],
+        submit: "When your report is ready, export the PDF and attach it to the challenge submission sheet.",
+        // Add the Google Form / submission sheet link here to show a submit button.
+        submitUrl: "",
+      },
       integrity:
         "Same extension, your own work. You may analyze the same extension as another participant — your scan, saved report, written analysis, screenshots, and recommendation must be your own. Signing in links your work to you, so judging stays fair.",
       prizes:
