@@ -13,8 +13,8 @@ const PROGRAMS = [
     id: "gsoc",
     name: "Google Summer of Code",
     description: "Project ideas for GSoC contributors. ExtensionShield ideas: extension security, SAST, and community tooling.",
-    status: "Applied",
-    statusVariant: "applied", // applied | rejected | accepted | partner
+    status: "",
+    statusVariant: "", // applied | rejected | accepted | partner
     path: "/gsoc/ideas",
     icon: "☀️",
     iconClass: "gsoc",

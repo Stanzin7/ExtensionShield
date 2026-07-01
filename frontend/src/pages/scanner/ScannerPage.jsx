@@ -879,19 +879,6 @@ const ScannerPage = () => {
         </div>
       </section>
 
-      <section
-        className="scanner-learn-more"
-        aria-label="Learn more about extension risk"
-        style={{ maxWidth: "880px", margin: "1rem auto 0", padding: "0 1.25rem" }}
-      >
-        <p style={{ fontSize: "0.9375rem", lineHeight: 1.6, color: "var(--theme-text-secondary)" }}>
-          New to extension risk? Read <Link to="/research/methodology">how our scoring works</Link>{" "}
-          and <Link to="/extension-risk-score">what the risk score means</Link>. You can also see{" "}
-          <Link to="/chrome-extension-permissions">which permissions to watch for</Link>, or start with{" "}
-          <Link to="/is-this-chrome-extension-safe">our guide to checking if an extension is safe</Link>.
-        </p>
-      </section>
-
       <DemoModal
         isOpen={demoModalOpen}
         onClose={() => setDemoModalOpen(false)}
