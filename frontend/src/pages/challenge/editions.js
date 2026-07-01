@@ -93,8 +93,10 @@ export const EDITIONS = [
         // Add the Google Form / submission sheet link here to show a submit button.
         submitUrl: "",
       },
-      integrity:
-        "Same extension, your own work. You may analyze the same extension as another participant — your scan, saved report, written analysis, screenshots, and recommendation must be your own. Signing in links your work to you, so judging stays fair.",
+      integrity: [
+        "Same extension, your own work. You may analyze the same extension as another participant. When possible, choose an extension not yet covered in ExtensionShield to help expand community coverage.",
+        "Your saved report, written analysis, screenshots, and recommendation must be your own. Signing in links your official entry to your account, helping keep judging fair.",
+      ],
       prizes:
         "Standout submissions may also lead to open-source work, research, community leadership, or an internship, where applicable.",
       beforeSubmit:

@@ -223,7 +223,9 @@ const ChallengeEditionPage = ({ slug }) => {
             <div className="two-col">
               <div className="panel">
                 <h3 className="panel-title"><span className="ti ti--green"><Icon name="scale" /></span>Submission integrity</h3>
-                <p className="panel-text">{c.integrity}</p>
+                {c.integrity.map((para, i) => (
+                  <p key={i} className="panel-text" style={i ? { marginTop: "0.7rem" } : undefined}>{para}</p>
+                ))}
               </div>
               <div className="panel panel--prize">
                 <h3 className="panel-title"><span className="ti ti--gold"><Icon name="trophy" /></span>Cash prizes for top reports</h3>
